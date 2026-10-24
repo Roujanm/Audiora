@@ -1,7 +1,9 @@
 // Reactive client for the Audiora engine's WebSocket control API.
 // Components read `engine.*` and call its methods; nothing else touches the socket.
 
-import { stepMeter, type MeterState } from './ballistics.ts';
+import { stepMeter, stepSpectrum, type MeterState } from './ballistics.ts';
+import { shortName } from './theme.ts';
+import { toast } from './toast.svelte.ts';
 import type {
   AppSessionEntry,
   DeviceEntry,
@@ -21,6 +23,15 @@ const HW_POLL_MS = 100;
 const DIRTY_GRACE_MS = 600;
 
 type Pending = { resolve: (r: Reply) => void; reject: (e: Error) => void; timer: number };
+
+function loadAliases(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem('audiora.names') ?? '{}');
+    return raw && typeof raw === 'object' ? (raw as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
 
 function inTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -45,6 +56,14 @@ class EngineClient {
   license = $state<LicenseStatus | null>(null);
   apps = $state<AppSessionEntry[]>([]);
 
+  /** Programme loudness of the master bus in LUFS (momentary, short-term, integrated). */
+  loudness = $state({ m: -120, s: -120, i: -120 });
+  /** Smoothed spectrum in dBFS while an analyser source is selected, else null. */
+  spectrum = $state<number[] | null>(null);
+  bandHz = $state<number[]>([]);
+  /** User-chosen channel names, kept per device in this browser / window. */
+  aliases = $state<Record<string, string>>(loadAliases());
+
   hwInfo = $state<HwInfo | null>(null);
   hwControls = $state<HwControl[]>([]);
   hwMeters = $state<Record<string, number>>({});
@@ -57,6 +76,7 @@ class EngineClient {
   #dirty = new Map<string, number>();
   #timers: number[] = [];
   #started = false;
+  #lastAnalysisAt = 0;
 
   start() {
     if (this.#started) return;
@@ -105,6 +125,7 @@ class EngineClient {
       await this.refreshState();
       const sub = await this.call('subscribe', { hz: 30 });
       this.#meterPaths = sub.paths as string[];
+      this.bandHz = (sub.band_hz as number[]) ?? [];
       this.#lastMeterAt = performance.now();
       await Promise.all([
         this.refreshPresets(),
@@ -143,6 +164,10 @@ class EngineClient {
       this.#applyMeters(msg.v);
       return;
     }
+    if (msg.event === 'analysis') {
+      this.#applyAnalysis(msg as unknown as { m: number; s: number; i: number; spectrum: number[] | null });
+      return;
+    }
     if (msg.id != null) {
       const p = this.#pending.get(msg.id);
       if (!p) return;
@@ -169,6 +194,57 @@ class EngineClient {
     });
     this.meters = meters;
     this.gauges = gauges;
+  }
+
+  #applyAnalysis(a: { m: number; s: number; i: number; spectrum: number[] | null }) {
+    const now = performance.now();
+    const elapsed = now - this.#lastAnalysisAt;
+    this.#lastAnalysisAt = now;
+    this.loudness = { m: a.m, s: a.s, i: a.i };
+    this.spectrum = a.spectrum ? stepSpectrum(this.spectrum, a.spectrum, elapsed) : null;
+  }
+
+  /** Which signal feeds the spectrum analyser (`strip/0`, `bus/0`, ...) or null to switch it off. */
+  setSpectrumSource(source: string | null) {
+    this.call('analysis_source', { source }).catch(() => {});
+    if (source === null) this.spectrum = null;
+  }
+
+  resetLoudness() {
+    this.call('loudness_reset')
+      .then(() => toast('Loudness measurement restarted'))
+      .catch((e) => (this.lastError = String(e)));
+  }
+
+  // ---- channel names -------------------------------------------------------
+
+  #aliasKey(kind: 'strip' | 'bus', index: number): string | null {
+    const n = kind === 'strip' ? this.info?.strips[index] : this.info?.buses[index];
+    if (!n) return null;
+    return n.kind === 'tone' ? 'tone' : (n.device_id ?? `${kind}:${index}`);
+  }
+
+  /** Name to show for a strip or bus: the user's own, else a tidied device name. */
+  labelOf(kind: 'strip' | 'bus', index: number): string {
+    const n = kind === 'strip' ? this.info?.strips[index] : this.info?.buses[index];
+    if (!n) return '—';
+    const key = this.#aliasKey(kind, index);
+    return (key && this.aliases[key]) || (n.kind === 'tone' ? 'Tone generator' : shortName(n.name));
+  }
+
+  rename(kind: 'strip' | 'bus', index: number, name: string) {
+    const key = this.#aliasKey(kind, index);
+    if (!key) return;
+    const next = { ...this.aliases };
+    const clean = name.trim().slice(0, 40);
+    if (clean) next[key] = clean;
+    else delete next[key];
+    this.aliases = next;
+    try {
+      localStorage.setItem('audiora.names', JSON.stringify(next));
+    } catch {
+      /* private mode: the name just is not remembered */
+    }
   }
 
   /** Sends a command and resolves with the reply; rejects on `ok: false`. */

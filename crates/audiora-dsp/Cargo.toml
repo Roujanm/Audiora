@@ -12,3 +12,4 @@ workspace = true
 
 [dependencies]
 nnnoiseless = { version = "0.5.2", default-features = false }
+realfft = "3.5.0"

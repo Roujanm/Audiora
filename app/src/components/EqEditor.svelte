@@ -33,6 +33,12 @@
   const x = (f: number) => freqToX(f) * width;
   const y = (db: number) => height / 2 - (db / RANGE_DB) * (height / 2);
 
+  // feed the analyser with this strip while the editor is open, switch it off afterwards
+  $effect(() => {
+    engine.setSpectrumSource(`strip/${strip}`);
+    return () => engine.setSpectrumSource(null);
+  });
+
   $effect(() => {
     const ro = new ResizeObserver(([e]) => {
       width = Math.max(320, Math.floor(e.contentRect.width));
@@ -79,6 +85,27 @@
         ctx.fillStyle = 'rgba(133,145,163,0.8)';
         ctx.fillText(`${db > 0 ? '+' : ''}${db}`, 8, gy - 4);
       }
+    }
+
+    // live spectrum of the incoming signal (dBFS, -90 .. 0 mapped onto 85 % of the height)
+    const spec = engine.spectrum;
+    const hz = engine.bandHz;
+    if (spec && hz.length === spec.length) {
+      const sy = (db: number) => height - Math.min(Math.max((db + 90) / 90, 0), 1) * height * 0.85;
+      const sp = new Path2D();
+      spec.forEach((db, i) => (i ? sp.lineTo(x(hz[i]), sy(db)) : sp.moveTo(x(hz[i]), sy(db))));
+      const sa = new Path2D(sp);
+      sa.lineTo(x(hz[hz.length - 1]), height);
+      sa.lineTo(x(hz[0]), height);
+      sa.closePath();
+      const g = ctx.createLinearGradient(0, height * 0.15, 0, height);
+      g.addColorStop(0, 'rgba(160,180,210,0.30)');
+      g.addColorStop(1, 'rgba(160,180,210,0.02)');
+      ctx.fillStyle = g;
+      ctx.fill(sa);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(190,205,228,0.45)';
+      ctx.stroke(sp);
     }
 
     // response
@@ -215,7 +242,7 @@
   <header>
     <div>
       <h2 class="eyebrow">Equalizer</h2>
-      <p class="hint muted">Drag a point to set frequency and gain · scroll over it to change Q · double-click to reset</p>
+      <p class="hint muted">Drag a point to set frequency and gain · scroll over it to change Q · double-click to reset · grey: live input spectrum</p>
     </div>
     <button class="btn sm" disabled={flat} onclick={() => [0, 1, 2, 3].forEach((b) => engine.set(`strip/${strip}/eq/${b}/gain_db`, 0))}>
       Flatten

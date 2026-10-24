@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { parseNumber } from '../lib/parse.ts';
+  import ValueEdit from './ValueEdit.svelte';
   import { dragFrac, fracToAngle, fromFrac, snap, toFrac, type Scale } from '../lib/knob.ts';
 
   interface Props {
@@ -19,6 +21,8 @@
     color?: string;
     disabled?: boolean;
     format?: (v: number) => string;
+    /** Parses text typed into the read-out; defaults to plain numbers ("2.5k" works). */
+    parse?: (text: string) => number | null;
     onchange: (v: number) => void;
   }
   let {
@@ -36,6 +40,7 @@
     color = 'var(--accent)',
     disabled = false,
     format,
+    parse = parseNumber,
     onchange,
   }: Props = $props();
 
@@ -140,7 +145,15 @@
       <line x1={baseX} y1={baseY} x2={tipX} y2={tipY} class="needle" />
     </svg>
   </div>
-  <output class="num readout">{text}</output>
+  <output class="num readout">
+    <ValueEdit
+      {text}
+      label={label || 'Value'}
+      {parse}
+      {disabled}
+      onchange={(v) => onchange(snap(Number.isFinite(v) ? v : min, step, min, max))}
+    />
+  </output>
 </div>
 
 <style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { engine } from '../lib/engine.svelte.ts';
-  import { shortName, stripColor } from '../lib/theme.ts';
+  import { stripColor } from '../lib/theme.ts';
+  import { toast } from '../lib/toast.svelte.ts';
   import Icon from './Icon.svelte';
   import LedMeter from './LedMeter.svelte';
 
@@ -29,8 +30,10 @@
     message = '';
     try {
       await engine.recStart(chosen);
+      toast('Recording started', 'ok');
     } catch (e) {
       message = String(e instanceof Error ? e.message : e);
+      toast(message, 'error');
     }
     busy = false;
   }
@@ -40,8 +43,10 @@
     try {
       const r = await engine.recStop();
       lastTake = r.path as string;
+      toast(`Take saved · ${(r.seconds as number).toFixed(1)} s${(r.dropped_frames as number) > 0 ? ` · ${r.dropped_frames} dropped frames` : ''}`, 'ok');
     } catch (e) {
       message = String(e instanceof Error ? e.message : e);
+      toast(message, 'error');
     }
     busy = false;
   }
@@ -75,10 +80,10 @@
   const nameOf = (src: string) => {
     const [kind, i] = src.split('/');
     return kind === 'bus'
-      ? { title: +i === 0 ? 'Master mix' : `Output ${+i + 1}`, sub: shortName(buses[+i]?.name ?? ''), color: 'var(--accent)' }
+      ? { title: +i === 0 ? 'Master mix' : `Output ${+i + 1}`, sub: engine.labelOf('bus', +i), color: 'var(--accent)' }
       : {
           title: strips[+i]?.kind === 'input' ? `Input ${+i + 1}` : 'Tone',
-          sub: shortName(strips[+i]?.name ?? ''),
+          sub: engine.labelOf('strip', +i),
           color: stripColor(strips[+i], +i),
         };
   };

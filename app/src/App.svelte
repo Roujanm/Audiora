@@ -14,6 +14,9 @@
   import Icon, { type IconName } from './components/Icon.svelte';
   import Popover from './components/Popover.svelte';
   import Segmented from './components/Segmented.svelte';
+  import CommandPalette, { type Command } from './components/CommandPalette.svelte';
+  import Toasts from './components/Toasts.svelte';
+  import { toast } from './lib/toast.svelte.ts';
 
   engine.start();
 
@@ -66,6 +69,95 @@
     if (selected >= strips.length) selected = 0;
   });
 
+  // ---- command palette, shortcuts, error toasts -----------------------------------------
+  let paletteOpen = $state(false);
+
+  const commands = $derived.by<Command[]>(() => {
+    const list: Command[] = visibleNav.map((n, i) => ({
+      id: `go-${n.id}`,
+      title: `Go to ${n.title}`,
+      group: 'Navigate',
+      icon: n.icon,
+      hint: `Alt+${i + 1}`,
+      run: () => (tab = n.id),
+    }));
+    if (engine.connected) {
+      for (const name of engine.presets) {
+        list.push({
+          id: `preset-${name}`,
+          title: `Load preset “${name}”`,
+          group: 'Presets',
+          icon: 'save',
+          run: () => void engine.loadPreset(name).then(() => toast(`Loaded “${name}”`, 'ok')).catch((e) => toast(String(e), 'error')),
+        });
+      }
+      list.push(
+        engine.rec.recording
+          ? {
+              id: 'rec-stop',
+              title: 'Stop recording',
+              group: 'Actions',
+              icon: 'stop',
+              run: () => void engine.recStop().then((r) => toast(`Take saved · ${(r.seconds as number).toFixed(1)} s`, 'ok')).catch((e) => toast(String(e), 'error')),
+            }
+          : {
+              id: 'rec-start',
+              title: 'Start recording the master mix',
+              group: 'Actions',
+              icon: 'record',
+              run: () => void engine.recStart(['bus/0']).then(() => toast('Recording started', 'ok')).catch((e) => toast(String(e), 'error')),
+            },
+        {
+          id: 'mute-master',
+          title: engine.get('bus/0/mute') > 0.5 ? 'Unmute master output' : 'Mute master output',
+          group: 'Actions',
+          icon: 'speaker',
+          run: () => engine.toggle('bus/0/mute'),
+        },
+        {
+          id: 'lufs-reset',
+          title: 'Restart loudness measurement',
+          group: 'Actions',
+          icon: 'bolt',
+          run: () => engine.resetLoudness(),
+        },
+      );
+    }
+    list.push({
+      id: 'skin',
+      title: skin === 'play' ? 'Switch to Studio mode' : 'Switch to Play mode',
+      group: 'Appearance',
+      icon: 'interface',
+      run: () => (skin = skin === 'play' ? 'studio' : 'play'),
+    });
+    for (const a of ACCENTS) {
+      list.push({ id: `accent-${a.id}`, title: `Accent colour: ${a.label}`, group: 'Appearance', icon: 'palette', run: () => (accent = a.id) });
+    }
+    return list;
+  });
+
+  function onwindowkey(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      paletteOpen = !paletteOpen;
+      return;
+    }
+    if (e.altKey && /^[1-9]$/.test(e.key)) {
+      const target = visibleNav[Number(e.key) - 1];
+      if (target) {
+        e.preventDefault();
+        tab = target.id;
+      }
+    }
+  }
+
+  let shownError = '';
+  $effect(() => {
+    const err = engine.lastError;
+    if (err && err !== shownError) toast(err.slice(0, 200), 'error');
+    shownError = err;
+  });
+
   const current = $derived(NAV.find((n) => n.id === tab)!);
   const master = $derived(buses[0]);
   const s = $derived(engine.stats);
@@ -86,6 +178,8 @@
                 : 'Devices, audio health and licence',
   );
 </script>
+
+<svelte:window onkeydown={onwindowkey} />
 
 <div class="app">
   <nav class="rail" aria-label="Sections">
@@ -122,7 +216,12 @@
         </div>
       {/if}
 
-      {#if engine.connected}<Presets />{/if}
+      {#if engine.connected}
+        <button class="btn ghost search" onclick={() => (paletteOpen = true)} aria-label="Open command palette" title="Command palette (Ctrl+K)">
+          <Icon name="bolt" size={15} /> <kbd>Ctrl K</kbd>
+        </button>
+        <Presets />
+      {/if}
 
       <Popover width={196}>
         {#snippet trigger({ open, toggle })}
@@ -216,6 +315,9 @@
         <div class="scroll"><System /></div>
       {/if}
     </main>
+
+    <CommandPalette open={paletteOpen} {commands} onclose={() => (paletteOpen = false)} />
+    <Toasts />
 
     <footer class="foot">
       {#if engine.connected}
@@ -388,6 +490,29 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .search kbd {
+    font: 600 10.5px var(--mono);
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--bg-0);
+    border: 1px solid var(--line-2);
+    color: var(--muted);
+  }
+
+  /* every view fades and rises in when it is opened */
+  .mixer,
+  .scroll,
+  .connect {
+    animation: view-in 0.24s var(--ease) both;
+  }
+
+  @keyframes view-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
   }
 
   .status-pill {

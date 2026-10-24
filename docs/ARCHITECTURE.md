@@ -95,8 +95,13 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   bus chain *sum → fader → brick-wall limiter*. Parameters ramp per block (no zipper noise),
   every value is addressable by path, meters include gain reduction.
 - **DSP** (`audiora-dsp`): RBJ biquads, gate, compressor with soft knee, look-ahead limiter with a
-  provable ceiling, RNNoise-port denoiser (48 kHz), linear resampler. Not yet: de-esser,
-  convolution/reverb, LUFS / true-peak meters.
+  provable ceiling, RNNoise-port denoiser (48 kHz), linear resampler, BS.1770 loudness meter,
+  spectrum analyser. Not yet: de-esser, convolution/reverb, true-peak / LRA meters.
+- **Analysis** (`audiora-svc/analysis.rs`, off the audio thread): programme loudness of the master bus
+  per ITU-R BS.1770-4 / EBU R128 — K-weighting (coefficients verified against the standard), momentary
+  400 ms, short-term 3 s, gated integrated, checked against the EBU Tech 3341 reference tone — and a
+  96-band FFT spectrum of one selectable signal. The audio callback only copies blocks into wait-free
+  rings.
 - **Recorder** (`audiora-rec`): audio thread → wait-free ring → disk thread → 32-bit float WAV,
   extensible format for 3+ channels, RF64 beyond 4 GB, header re-patched every second so a crash
   keeps everything but the last second. Not yet: punch-in/out, take management, input monitoring.
@@ -132,6 +137,10 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   knobs), gate and compressor with transfer-curve graphs and live gain reduction, the recorder
   (timecode, track meters, takes list, show-in-folder), a patchbay routing view with cables, and the
   audio-interface panel. Layouts adapt down to the 980 x 620 minimum window.
+- **Workflow**: click any read-out to type an exact value ("-6", "2.5k", "L30"); double-click a channel
+  name to rename it (remembered per device); Ctrl+K opens a command palette (navigate, load presets,
+  record, mute master, accent, mode); Alt+1..9 switch views; toasts confirm actions and report errors.
+  The EQ view draws the live input spectrum behind the curve; the master section shows LUFS.
 - All state comes from the engine; the UI keeps no audio logic except display maths that mirrors the
   engine (EQ curve, meter ballistics), covered by tests against the same expectations as the Rust.
 
@@ -213,7 +222,7 @@ Audiora/
 | Virtual audio driver | Designed — blocked: WDK missing, no safe test machine |
 | ASIO driver | Designed — blocked: Steinberg licence decision |
 | Per-app routing | Blocked on the virtual driver |
-| VST3 / CLAP hosting, LUFS meters, convolution | Not started |
+| VST3 / CLAP hosting, convolution, true-peak / LRA meters | Not started |
 | Installer signing, updater, telemetry | Not started (needs certificates and hosting) |
 
 ## 11. Top risks

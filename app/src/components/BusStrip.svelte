@@ -1,10 +1,11 @@
 <script lang="ts">
   import { engine } from '../lib/engine.svelte.ts';
-  import { periodLabel, rateLabel, shortName } from '../lib/theme.ts';
+  import { periodLabel, rateLabel } from '../lib/theme.ts';
   import Fader from './Fader.svelte';
   import Icon from './Icon.svelte';
   import LedMeter from './LedMeter.svelte';
   import Pill from './Pill.svelte';
+  import TextEdit from './TextEdit.svelte';
 
   interface Props {
     index: number;
@@ -17,7 +18,14 @@
   const gr = $derived(limiterOn ? engine.gauge(p('limiter/gr_db')) : 0);
   const clipping = $derived(engine.holdDb(p('peak_l')) > -0.5 || engine.holdDb(p('peak_r')) > -0.5);
   const master = $derived(index === 0);
-  const name = $derived(node ? shortName(node.name) : '—');
+  const name = $derived(engine.labelOf('bus', index));
+  const lufs = (v: number) => (v <= -100 ? '—' : v.toFixed(1).replace('-', '\u2212'));
+  // streaming platforms normalise to about -14 LUFS, podcasts to -16
+  const tone = $derived.by(() => {
+    const i = engine.loudness.i;
+    if (i <= -100) return '';
+    return Math.abs(i + 14) <= 1 || Math.abs(i + 16) <= 1 ? 'good' : i > -9 ? 'hot' : '';
+  });
   const accent = 'var(--accent)';
 </script>
 
@@ -28,7 +36,7 @@
     <span class="badge"><Icon name={name.toLowerCase().includes('head') ? 'headphones' : 'speaker'} size={15} /></span>
     <div class="meta">
       <span class="role eyebrow">{master ? 'Master output' : `Output ${index + 1}`}</span>
-      <h3 title={node?.name}>{name}</h3>
+      <h3 title={node?.name}><TextEdit value={name} label={name} onchange={(v) => engine.rename('bus', index, v)} /></h3>
       <span class="sub num">
         {rateLabel(node?.sample_rate)} · {periodLabel(node?.sample_rate, node?.period_frames)}{node?.exclusive ? ' · EXCL' : node?.low_latency ? ' · LL' : ''}
       </span>
@@ -39,6 +47,18 @@
     <Pill active={engine.get(p('mute')) > 0.5} variant="mute" title="Mute" label="Mute {name}" onclick={() => engine.toggle(p('mute'))}>MUTE</Pill>
     <Pill active={limiterOn} variant="accent" title="Brick-wall limiter" label="Limiter {name}" onclick={() => engine.toggle(p('limiter/enabled'))}>LIMIT</Pill>
   </div>
+
+  {#if master}
+    <div class="lufs {tone}" role="group" aria-label="Loudness">
+      <small>Loudness · LUFS-I</small>
+      <div class="big num"><span>{lufs(engine.loudness.i)}</span></div>
+      <div class="sub num">
+        <span title="Momentary (400 ms)">M {lufs(engine.loudness.m)}</span>
+        <span title="Short-term (3 s)">S {lufs(engine.loudness.s)}</span>
+        <button class="rst" title="Restart the loudness measurement" aria-label="Restart loudness measurement" onclick={() => engine.resetLoudness()}>↺</button>
+      </div>
+    </div>
+  {/if}
 
   <div class="grbar" class:active={gr > 0.2} title="Limiter gain reduction">
     <div class="fill" style:width="{Math.min(gr / 12, 1) * 100}%"></div>
@@ -121,12 +141,69 @@
     font-size: 12.5px;
     font-weight: 650;
     line-height: 1.25;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: anywhere;
+  }
+
+  .lufs {
+    padding: 8px 10px 7px;
+    border-radius: var(--r-md);
+    background: var(--bg-0);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+
+  .lufs .big {
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.15;
+  }
+
+  .lufs small {
+    display: block;
+    font: 650 8.5px var(--font);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .lufs .sub {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 3px;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+
+  .lufs.good .big span {
+    color: var(--ok);
+    text-shadow: 0 0 14px color-mix(in oklab, var(--ok) 55%, transparent);
+  }
+
+  .lufs.hot .big span {
+    color: var(--warn);
+  }
+
+  .rst {
+    margin-left: auto;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--faint);
+    font-size: 13px;
+  }
+
+  .rst:hover {
+    background: var(--bg-3);
+    color: var(--text);
+  }
+
+  @media (max-height: 780px) {
+    .lufs .sub {
+      display: none;
+    }
   }
 
   .sub {

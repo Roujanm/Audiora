@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatDb } from '../lib/dsp.ts';
+  import ValueEdit from './ValueEdit.svelte';
 
   interface Props {
     /** Gain in dB; values at or below -100 mean "off" (minus infinity). */
@@ -94,7 +95,13 @@
       </div>
     </div>
   </div>
-  <output class="num readout" class:off={value <= -100}>{formatDb(value)}<small>dB</small></output>
+  <output class="num readout" class:off={value <= -100}>
+    <ValueEdit
+      text={formatDb(value)}
+      label="{label} gain in dB"
+      onchange={(v) => emit(v === Number.NEGATIVE_INFINITY ? -120 : v)}
+    /><small>dB</small>
+  </output>
 </div>
 
 <style>

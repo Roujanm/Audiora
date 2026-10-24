@@ -21,6 +21,7 @@ use arrayvec::ArrayVec;
 use audiora_core::{ring, DriftResampler, Mixer, MixerParams, MAX_BLOCK_FRAMES};
 use audiora_hal::{list_devices, CaptureStream, Flow, Mode, RenderStream, StreamFormat};
 
+use crate::analysis::{self, Analysis};
 use crate::rec::{self, AudioTap, RecController, TapSlot};
 
 pub const MAX_STRIPS: usize = 16;
@@ -75,6 +76,7 @@ pub struct Engine {
     pub stats: Arc<Stats>,
     pub info: EngineInfo,
     pub rec: Arc<RecController>,
+    pub analysis: Arc<Analysis>,
     stop: Arc<AtomicBool>,
     threads: Vec<JoinHandle<()>>,
 }
@@ -107,6 +109,7 @@ impl Engine {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(Stats::default());
         let slot = Arc::new(TapSlot::default());
+        let analysis = Arc::new(Analysis::default());
         let mut threads: Vec<JoinHandle<()>> = Vec::new();
         let abort = |stop: &Arc<AtomicBool>, threads: Vec<JoinHandle<()>>, msg: String| {
             stop.store(true, Ordering::Relaxed);
@@ -163,6 +166,7 @@ impl Engine {
                 extra_prods,
                 rate_txs,
                 n_buses: n_out,
+                analysis: analysis.clone(),
             };
             let (stop2, stats2, slot2) = (stop.clone(), stats.clone(), slot.clone());
             threads.push(std::thread::spawn(move || master_thread(args, stop2, stats2, slot2, tx)));
@@ -195,7 +199,7 @@ impl Engine {
         let layout = rec::Layout::new(strips.len(), buses.len(), n_in);
         let rec = Arc::new(RecController::new(slot, master_fmt.sample_rate, rec_dir, layout));
 
-        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, stop, threads })
+        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, stop, threads })
     }
 
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
@@ -265,6 +269,7 @@ struct MasterArgs {
     extra_prods: Vec<ring::Producer>,
     rate_txs: Vec<mpsc::Sender<StreamFormat>>,
     n_buses: usize,
+    analysis: Arc<Analysis>,
 }
 
 fn master_thread(
@@ -312,6 +317,8 @@ fn master_thread(
     let tone_step = a.tone_hz.map(|hz| TAU * hz / fmt.sample_rate as f32);
     let mut phase = 0f32;
     let mut tap = AudioTap::new(slot, cap / 2, n_strips + a.n_buses);
+    let (mut analysis_tap, analysis_thread) =
+        analysis::spawn(a.analysis.clone(), fmt.sample_rate as f32, cap / 2, stop.clone());
 
     let mut render = |out: &mut [f32], frames: usize| {
         let n = frames * 2;
@@ -355,6 +362,7 @@ fn master_thread(
         let sources: ArrayVec<&[f32], { MAX_STRIPS + MAX_BUSES }> =
             in_bufs.iter().chain(bus_bufs.iter()).map(|b| &b[..n]).collect();
         tap.push(frames, &sources);
+        analysis_tap.push(&sources, &bus_bufs[0][..n]);
 
         for (i, frame) in out.chunks_exact_mut(ch).enumerate() {
             frame[0] = bus_bufs[0][i * 2];
@@ -377,6 +385,8 @@ fn master_thread(
             None => break,
         }
     }
+    stop.store(true, Ordering::Relaxed);
+    let _ = analysis_thread.join();
 }
 
 fn output_thread(

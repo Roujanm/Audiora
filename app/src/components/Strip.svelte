@@ -1,11 +1,13 @@
 <script lang="ts">
   import { engine } from '../lib/engine.svelte.ts';
-  import { periodLabel, rateLabel, shortName, stripColor } from '../lib/theme.ts';
+  import { parseBalance } from '../lib/parse.ts';
+  import { periodLabel, rateLabel, stripColor } from '../lib/theme.ts';
   import Fader from './Fader.svelte';
   import Icon from './Icon.svelte';
   import Knob from './Knob.svelte';
   import LedMeter from './LedMeter.svelte';
   import Pill from './Pill.svelte';
+  import TextEdit from './TextEdit.svelte';
 
   interface Props {
     index: number;
@@ -34,7 +36,7 @@
   const gr = $derived(on('comp/enabled') ? engine.gauge(p('comp/gr_db')) : 0);
 
   const toggleBus = (b: number) => engine.set(p('bus_mask'), mask ^ (1 << b));
-  const name = $derived(node ? (isInput ? shortName(node.name) : node.name) : '—');
+  const name = $derived(engine.labelOf('strip', index));
 </script>
 
 <section class="strip panel" class:selected style:--c={color} aria-label={node?.name ?? `Strip ${index + 1}`}>
@@ -43,7 +45,7 @@
   <header>
     <span class="badge"><Icon name={isInput ? 'mic' : 'wave'} size={15} /></span>
     <div class="meta">
-      <h3 title={node?.name}>{name}</h3>
+      <h3 title={node?.name}><TextEdit value={name} label={name} onchange={(v) => engine.rename('strip', index, v)} /></h3>
       <span class="sub num">
         {#if isInput}{rateLabel(node?.sample_rate)} · {periodLabel(node?.sample_rate, node?.period_frames)}{:else}Test signal{/if}
       </span>
@@ -62,6 +64,7 @@
       reset={0}
       color={color}
       value={engine.get(p('balance'))}
+      parse={parseBalance}
       format={(v) => (Math.abs(v) < 0.025 ? 'C' : v < 0 ? `L${Math.round(-v * 100)}` : `R${Math.round(v * 100)}`)}
       onchange={(v) => engine.set(p('balance'), v)}
     />
@@ -173,12 +176,6 @@
     font-size: 12.5px;
     font-weight: 650;
     line-height: 1.2;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: anywhere;
   }
 
   .sub {

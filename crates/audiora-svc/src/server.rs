@@ -161,7 +161,8 @@ fn ws_client(
                         let hz = v.get("hz").and_then(Value::as_f64).unwrap_or(30.0).clamp(1.0, 60.0);
                         interval = Some(Duration::from_secs_f64(1.0 / hz));
                         next_push = Instant::now();
-                        json!({ "ok": true, "id": v.get("id"), "hz": hz, "paths": meter_paths }).to_string()
+                        let band_hz: Vec<f32> = (0..audiora_dsp::SPECTRUM_BANDS).map(audiora_dsp::band_frequency).collect();
+                        json!({ "ok": true, "id": v.get("id"), "hz": hz, "paths": meter_paths, "band_hz": band_hz }).to_string()
                     }
                     Some(("unsubscribe", v)) => {
                         interval = None;
@@ -188,6 +189,7 @@ fn ws_client(
                 }
                 let msg = json!({ "event": "meters", "v": api.meter_values(&meter_paths) });
                 ws.send(Message::text(msg.to_string()))?;
+                ws.send(Message::text(api.analysis_event().to_string()))?;
             }
         }
     }

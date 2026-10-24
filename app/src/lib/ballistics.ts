@@ -36,3 +36,13 @@ export function stepMeter(
   }
   return { db, hold, holdAt };
 }
+
+export const SPECTRUM_DECAY_DB_PER_S = 34;
+export const SPECTRUM_FLOOR_DB = -120;
+
+/** Fast attack, steady decay per band, like the level meters. */
+export function stepSpectrum(prev: number[] | null, next: number[], elapsedMs: number): number[] {
+  if (!prev || prev.length !== next.length) return next.slice();
+  const fall = (SPECTRUM_DECAY_DB_PER_S * Math.min(Math.max(elapsedMs, 0), 500)) / 1000;
+  return next.map((v, i) => Math.max(v, prev[i] - fall, SPECTRUM_FLOOR_DB));
+}

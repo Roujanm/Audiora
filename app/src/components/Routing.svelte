@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { engine } from '../lib/engine.svelte.ts';
   import { linToDb } from '../lib/dsp.ts';
-  import { rateLabel, shortName, stripColor } from '../lib/theme.ts';
+  import { rateLabel, stripColor } from '../lib/theme.ts';
   import Icon from './Icon.svelte';
   import LedMeter from './LedMeter.svelte';
 
@@ -76,7 +76,7 @@
       <div class="card panel" style:--c={color}>
         <span class="badge"><Icon name={s.kind === 'input' ? 'mic' : 'wave'} size={16} /></span>
         <div class="meta">
-          <strong>{s.kind === 'input' ? shortName(s.name) : 'Tone generator'}</strong>
+          <strong>{engine.labelOf('strip', si)}</strong>
           <span class="muted">{s.kind === 'input' ? `Input ${si + 1} · ${rateLabel(s.sample_rate)}` : 'Test signal'}</span>
         </div>
         <div class="sends" role="group" aria-label="Send {s.name} to">
@@ -101,7 +101,7 @@
         <i class="port" bind:this={busPorts[bi]}></i>
         <span class="badge"><Icon name="speaker" size={16} /></span>
         <div class="meta">
-          <strong>{shortName(b.name)}</strong>
+          <strong>{engine.labelOf('bus', bi)}</strong>
           <span class="muted">{bi === 0 ? 'Master output' : `Output ${bi + 1}`} · {rateLabel(b.sample_rate)}</span>
         </div>
         <div class="lvl">

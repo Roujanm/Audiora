@@ -26,7 +26,10 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | `state` | | `params` (every path → value, meters included), `stats` |
 | `get` / `set` | `path` (`value` for set) | `path`, `value` (after clamping) |
 | `meters` | | `paths[]`, `values[]` (index-aligned) |
-| `subscribe` *(WebSocket)* | `hz` 1–60 (default 30) | `hz`, `paths[]`; then `{"event":"meters","v":[…]}` frames in that order |
+| `subscribe` *(WebSocket)* | `hz` 1–60 (default 30) | `hz`, `paths[]`, `band_hz[]` (96 spectrum band centres); then `{"event":"meters","v":[…]}` and `{"event":"analysis",…}` frames |
+| `analysis` | | `m`, `s`, `i` (momentary, short-term, integrated loudness in LUFS; -120 = nothing measured yet) and `spectrum` (96 dBFS values, or null while the analyser is off) |
+| `analysis_source` | `source`: `strip/N`, `bus/N`, an alias, or `null` | selects which signal feeds the spectrum analyser (off by default; the app switches it on only while the EQ view is open) |
+| `loudness_reset` | | restarts the integrated-loudness measurement |
 | `unsubscribe` *(WebSocket)* | | |
 | `preset_list` | | `presets[]` |
 | `preset_save` / `preset_load` / `preset_delete` | `name` | save: `saved`; load: `applied`, `skipped` |

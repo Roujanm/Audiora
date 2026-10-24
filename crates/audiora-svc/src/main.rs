@@ -9,6 +9,7 @@
 //! `--in` / `--out` can be repeated: every input becomes a mixer strip, every
 //! output a bus; the first output is the master device that clocks the mixer.
 
+mod analysis;
 mod api;
 mod engine;
 mod presets;
@@ -119,6 +120,7 @@ fn main() -> ExitCode {
         params: engine.params.clone(),
         stats: engine.stats.clone(),
         rec: engine.rec.clone(),
+        analysis: engine.analysis.clone(),
         presets: presets.clone(),
         stop: stop.clone(),
         data_dir: data_dir.clone(),

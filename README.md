@@ -14,7 +14,8 @@ Proprietary — all rights reserved.
 * **App** (`app/`): Svelte 5 + Tauri 2 with a hardware-style interface (knobs, machined faders, LED
   meters, patchbay routing, five accent colours). Play skin: mixer and application volumes. Studio
   skin adds the EQ curve editor, gate/compressor graphs, recorder with takes list, routing and the
-  interface panel. Live meters at 30 Hz.
+  interface panel. Live meters at 30 Hz, master LUFS (BS.1770), live spectrum behind the EQ, click-to-type
+  values, renamable channels and a Ctrl+K command palette.
 * **Control API** over a loopback WebSocket / TCP — see [docs/CONTROL-API.md](docs/CONTROL-API.md).
 * **R Interface**: control layer plus a clearly-labelled **simulator**; licence system with a vendor
   tool.

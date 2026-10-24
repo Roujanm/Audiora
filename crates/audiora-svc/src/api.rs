@@ -7,6 +7,7 @@
 //!   {"cmd":"get","path":"strip/0/gain_db"}
 //!   {"cmd":"set","path":"strip/0/eq/1/gain_db","value":3.5}
 //!   {"cmd":"meters"}
+//!   {"cmd":"analysis"} / {"cmd":"analysis_source","source":"strip/0"|null} / {"cmd":"loudness_reset"}
 //!   {"cmd":"preset_list"} / preset_save / preset_load / preset_delete  ("name")
 //!   {"cmd":"rec_start","sources":["mix"]} / rec_stop / rec_status / rec_list
 //!   {"cmd":"apps"} / {"cmd":"app_set","device":"…","instance_id":"…","volume":0.5,"mute":false}
@@ -20,6 +21,7 @@ use audiora_core::MixerParams;
 use audiora_device::{ControlKind, HardwareInterface};
 use serde_json::{json, Map, Value};
 
+use crate::analysis::{Analysis, SPECTRUM_OFF};
 use crate::engine::Stats;
 use crate::presets::{PresetStore, LAST};
 use crate::rec::{self, RecController};
@@ -30,6 +32,7 @@ pub struct Api {
     pub params: Arc<MixerParams>,
     pub stats: Arc<Stats>,
     pub rec: Arc<RecController>,
+    pub analysis: Arc<Analysis>,
     pub presets: Arc<PresetStore>,
     /// Attached interface hardware (or the labelled simulator), if any.
     pub hw: Option<Mutex<Box<dyn HardwareInterface>>>,
@@ -77,6 +80,28 @@ impl Api {
                     }
                     _ => Err("\"app_set\" needs \"device\", \"instance_id\" and \"volume\" and/or \"mute\"".into()),
                 }
+            }
+            "analysis" => Ok(self.analysis_event()),
+            "analysis_source" => {
+                use std::sync::atomic::Ordering::Relaxed as R;
+                match req.get("source") {
+                    None | Some(Value::Null) => {
+                        self.analysis.source.store(SPECTRUM_OFF, R);
+                        Ok(json!({ "source": Value::Null }))
+                    }
+                    Some(Value::String(name)) => match self.rec.layout().resolve(name) {
+                        Some(i) => {
+                            self.analysis.source.store(i, R);
+                            Ok(json!({ "source": name }))
+                        }
+                        None => Err(format!("unknown source \"{name}\"")),
+                    },
+                    Some(_) => Err("\"source\" must be a name or null".into()),
+                }
+            }
+            "loudness_reset" => {
+                self.analysis.reset.store(true, Relaxed);
+                Ok(json!({}))
             }
             "license_status" => Ok(self.license_status()),
             "hw_info" => self.hw_info(),
@@ -232,6 +257,17 @@ impl Api {
         })
     }
 
+    /// Loudness values plus, while the analyser is on, the current spectrum.
+    pub fn analysis_event(&self) -> Value {
+        json!({
+            "event": "analysis",
+            "m": self.analysis.momentary.get(),
+            "s": self.analysis.short_term.get(),
+            "i": self.analysis.integrated.get(),
+            "spectrum": self.analysis.spectrum().map(|s| s.iter().map(|v| (v * 10.0).round() / 10.0).collect::<Vec<f32>>()),
+        })
+    }
+
     fn with_name(
         &self,
         req: &Value,
@@ -313,9 +349,10 @@ mod tests {
         let (_m, params) = Mixer::new(48_000.0, 2, 1);
         let dir = std::env::temp_dir().join(format!("audiora-api-test-{}", std::process::id()));
         let rec = Arc::new(RecController::new(Default::default(), 48_000, dir, crate::rec::Layout::new(2, 1, 1)));
+        let analysis = Arc::new(Analysis::default());
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
         let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
-        Api { params, stats: Arc::new(Stats::default()), rec, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}) }
+        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}) }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -384,6 +421,21 @@ mod tests {
         assert_eq!(call(&a, r#"{"cmd":"hw_set","path":"input/0/gain_db","value":900}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"hw_get","path":"bogus"}"#)["ok"], false);
         assert!(call(&a, r#"{"cmd":"hw_meters"}"#)["meters"]["input/0/peak"].is_number());
+    }
+
+    #[test]
+    fn analysis_commands_select_sources_and_report() {
+        let a = api();
+        let r = call(&a, r#"{"cmd":"analysis"}"#);
+        assert_eq!(r["event"], "analysis");
+        assert_eq!(r["i"], -120.0);
+        assert!(r["spectrum"].is_null(), "analyser starts off");
+        assert_eq!(call(&a, r#"{"cmd":"analysis_source","source":"strip/1"}"#)["source"], "strip/1");
+        assert!(call(&a, r#"{"cmd":"analysis"}"#)["spectrum"].is_array());
+        assert_eq!(call(&a, r#"{"cmd":"analysis_source","source":"nope"}"#)["ok"], false);
+        assert_eq!(call(&a, r#"{"cmd":"analysis_source","source":null}"#)["ok"], true);
+        assert!(call(&a, r#"{"cmd":"analysis"}"#)["spectrum"].is_null());
+        assert_eq!(call(&a, r#"{"cmd":"loudness_reset"}"#)["ok"], true);
     }
 
     #[test]

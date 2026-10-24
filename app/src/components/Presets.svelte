@@ -1,11 +1,11 @@
 <script lang="ts">
   import { engine } from '../lib/engine.svelte.ts';
+  import { toast } from '../lib/toast.svelte.ts';
   import Icon from './Icon.svelte';
   import Popover from './Popover.svelte';
 
   let naming = $state(false);
   let newName = $state('');
-  let note = $state('');
   let active = $state('');
 
   const valid = $derived(/^[A-Za-z0-9 _-]{1,64}$/.test(newName.trim()) && !newName.trim().startsWith('.'));
@@ -13,11 +13,10 @@
   async function run(fn: () => Promise<void>, ok: string) {
     try {
       await fn();
-      note = ok;
+      toast(ok, 'ok');
     } catch (e) {
-      note = String(e instanceof Error ? e.message : e);
+      toast(String(e instanceof Error ? e.message : e), 'error');
     }
-    setTimeout(() => (note = ''), 2600);
   }
 
   const load = (name: string, close: () => void) =>
@@ -87,7 +86,6 @@
         <button class="btn newbtn" onclick={() => (naming = true)}><Icon name="plus" size={15} /> Save current mix…</button>
       {/if}
     </div>
-    {#if note}<p class="note" role="status">{note}</p>{/if}
   {/snippet}
 </Popover>
 
@@ -207,9 +205,4 @@
     justify-content: flex-start;
   }
 
-  .note {
-    margin: 8px 4px 2px;
-    font-size: 12px;
-    color: var(--text-2);
-  }
 </style>
