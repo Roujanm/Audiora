@@ -11,6 +11,9 @@ publish.workspace = true
 name = "audiora-svc"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 arrayvec = "0.7.8"
 audiora-core = { path = "../audiora-core" }

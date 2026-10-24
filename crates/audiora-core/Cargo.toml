@@ -7,5 +7,8 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 audiora-dsp = { path = "../audiora-dsp" }

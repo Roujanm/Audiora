@@ -15,6 +15,9 @@ path = "src/lib.rs"
 name = "audiora-license"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 base64 = "0.23.1"
 ed25519-dalek = "3.0.0"

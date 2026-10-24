@@ -324,7 +324,7 @@ mod tests {
         let (mut m, p) = Mixer::new(48_000.0, 1, 1);
         let inputs = [dc(1.0)];
         let refs: Vec<&[f32]> = inputs.iter().map(|v| v.as_slice()).collect();
-        let mut out = vec![vec![0f32; FRAMES * 2]];
+        let mut out = [vec![0f32; FRAMES * 2]];
         let mut r: Vec<&mut [f32]> = out.iter_mut().map(|v| v.as_mut_slice()).collect();
         m.process(&refs, &mut r);
         p.strips[0].gain_db.set(-120.0);

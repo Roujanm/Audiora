@@ -18,6 +18,14 @@ authors = ["Roujan Digital Agency"]
 license = "LicenseRef-Proprietary"
 publish = false
 
+# Interleaved stereo is processed as fixed 2-sample frames throughout; the indexed
+# loops mirror the filter-bank maths and read better than iterator chains.
+[workspace.lints.clippy]
+chunks_exact_to_as_chunks = "allow"
+needless_range_loop = "allow"
+manual_is_multiple_of = "allow"
+result_large_err = "allow"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

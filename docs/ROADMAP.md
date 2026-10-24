@@ -5,7 +5,7 @@ Legend: ✅ done and verified here · 🟡 partly done · ⛔ blocked on somethi
 | Phase | Scope | State |
 |---|---|---|
 | **0 Foundation** | Workspace, DSP, mixer, ring, WASAPI, CLI | ✅ |
-| **1 Engine** | Multi-device graph, drift-tracking resampler, low-latency WASAPI, control API, presets, WebSocket | ✅ built · 🟡 1 h+ soak test not run · ⬜ WASAPI exclusive mode · ⬜ named-pipe transport with ACL |
+| **1 Engine** | Multi-device graph, drift-tracking resampler, low-latency WASAPI, control API, presets, WebSocket | ✅ built, incl. WASAPI exclusive and device-loss recovery · 🟡 15-min soak run, 1 h+ not run · ⬜ named-pipe transport with ACL |
 | **2 Recorder** | Multichannel 32-bit float WAV/RF64, crash-safe, engine integration | ✅ · ⬜ punch-in/out, take management, input monitoring |
 | **3 App** | Tauri 2 + Svelte 5: Play and Studio skins | ✅ UI verified live · 🟡 Tauri shell compiles; installer build and window run not exercised · ⬜ spectrum / LUFS displays |
 | **4 Virtual audio driver** | SysVAD-derived kernel driver, per-app routing | ⛔ designed; needs WDK + a test machine |

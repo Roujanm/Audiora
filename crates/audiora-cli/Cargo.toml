@@ -11,6 +11,9 @@ publish.workspace = true
 name = "audiora"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 audiora-core = { path = "../audiora-core" }
 audiora-hal = { path = "../audiora-hal" }

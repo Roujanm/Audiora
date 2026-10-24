@@ -411,7 +411,7 @@ impl RenderStream {
             self.s.client.Start()?;
             let result = (|| -> Result<()> {
                 while !stop.load(Ordering::Relaxed)
-                    && deadline.map_or(true, |d| std::time::Instant::now() < d)
+                    && deadline.is_none_or(|d| std::time::Instant::now() < d)
                 {
                     if !wait_event(self.s.event)? {
                         continue;

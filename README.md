@@ -8,10 +8,11 @@ Proprietary — all rights reserved.
 ## What works today
 
 * **Engine** (`audiora-svc`): any number of input and output devices, each on its own clock and
-  bridged without clicks; strip chain denoise → gate → EQ → compressor → fader; bus limiter; low-latency
-  WASAPI; presets and session restore; recorder to multichannel 32-bit float WAV (RF64, crash-safe).
-* **App** (`app/`): Svelte 5 + Tauri 2 — Play skin (mixer) and Studio skin (EQ curve editor, dynamics,
-  recorder, routing matrix, interface panel, system health), live meters at 30 Hz.
+  bridged without clicks; strip chain denoise → gate → EQ → compressor → fader; bus limiter; shared,
+  low-latency and **exclusive** WASAPI (3 ms periods); per-application volumes; survives devices
+  disappearing; presets and session restore; recorder to multichannel 32-bit float WAV (RF64, crash-safe).
+* **App** (`app/`): Svelte 5 + Tauri 2 — Play skin (mixer, application volumes) and Studio skin (EQ
+  curve editor, dynamics, recorder, routing matrix, interface panel, system health), live meters at 30 Hz.
 * **Control API** over a loopback WebSocket / TCP — see [docs/CONTROL-API.md](docs/CONTROL-API.md).
 * **R Interface**: control layer plus a clearly-labelled **simulator**; licence system with a vendor
   tool.

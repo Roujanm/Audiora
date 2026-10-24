@@ -78,12 +78,19 @@ Kernel-mode rules: C/C++ only, no DSP, no allocation in the stream path, Driver 
 WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit later.
 
 ### 4.2 Engine `audiora-svc` (Rust)
-- **HAL** (`audiora-hal`): WASAPI shared mode, event-driven, render and capture, with the
-  `IAudioClient3` minimum-period path (`--low-latency`). Planned behind the same types: WASAPI
-  exclusive, ASIO, R Interface native backend.
+- **HAL** (`audiora-hal`): WASAPI, event-driven, render and capture, in three modes — shared,
+  low-latency shared (`IAudioClient3` minimum period) and **exclusive** (native float or
+  16/24/32-bit integer format, device minimum period, converted to/from f32 at the edge). Audio
+  threads join the MMCSS "Pro Audio" class. Also lists per-application audio sessions and sets their
+  volume/mute (what the Windows volume mixer does). Planned behind the same types: ASIO, R
+  Interface native backend.
 - **Graph** (`audiora-svc/engine.rs`): any number of capture devices become strips; any number of
   output devices become buses. The first output is the master that clocks the mixer. Every other
-  device is its own clock domain, bridged by a `DriftResampler`.
+  device is its own clock domain, bridged by a `DriftResampler`. A device that disappears (unplugged,
+  taken exclusively by another application) does not stop the engine: that path goes silent, a
+  `device_errors` counter ticks, and the device is reopened automatically when it returns with the
+  same rate and channel count. Capture strips start unrouted so a microphone never feeds back by
+  default.
 - **Mixer** (`audiora-core`): strip chain *denoise → gate → 4-band EQ → compressor → fader/balance*,
   bus chain *sum → fader → brick-wall limiter*. Parameters ramp per block (no zipper noise),
   every value is addressable by path, meters include gain reduction.
@@ -126,6 +133,7 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
 |---|---|---|
 | Shared mode, default period | ~10 ms device period (measured: 480 frames @ 48 kHz) | Fine for games/chat |
 | `IAudioClient3` low-latency shared | 2 ms period on a virtual 96 kHz device (192 frames); Bluetooth headset stays at 10 ms | Hardware decides the minimum |
+| WASAPI exclusive | 3 ms period (144 frames @ 48 kHz, 24-bit) on onboard and HDMI audio, capture and render, no underruns in a release build | Needs the device to itself |
 | Added by the engine | one producer period + one consumer period + 50 % margin per device hop | `DriftResampler` target fill |
 | Studio, ASIO + R Interface | target ≤ 4 ms @ 96 kHz / 64 frames | Needs the R driver |
 | Hardware direct monitoring (R) | ~0 ms | Preferred for recording |
@@ -187,7 +195,7 @@ Audiora/
 
 | Area | State |
 |---|---|
-| Engine, mixer, DSP, recorder, presets, control API | Built and tested |
+| Engine, mixer, DSP, recorder, presets, control API, exclusive mode, per-app volumes, device-loss recovery | Built and tested |
 | Svelte app + Tauri shell | Built; UI verified live against the engine; Tauri shell compiles |
 | R Interface | Simulator only — real protocol unknown |
 | Virtual audio driver | Designed — blocked: WDK missing, no safe test machine |
