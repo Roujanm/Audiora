@@ -17,6 +17,7 @@ audiora-core = { path = "../audiora-core" }
 audiora-device = { version = "0.1.0", path = "../audiora-device" }
 audiora-dsp = { path = "../audiora-dsp" }
 audiora-hal = { path = "../audiora-hal" }
+audiora-license = { version = "0.1.0", path = "../audiora-license" }
 audiora-rec = { path = "../audiora-rec" }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 ctrlc = "3.5.2"

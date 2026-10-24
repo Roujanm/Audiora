@@ -7,6 +7,7 @@ members = [
     "crates/audiora-cli",
     "crates/audiora-rec",
     "crates/audiora-device",
+    "crates/audiora-license",
     "crates/audiora-svc",
 ]
 

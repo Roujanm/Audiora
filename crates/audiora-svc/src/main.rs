@@ -112,6 +112,7 @@ fn main() -> ExitCode {
         stats: engine.stats.clone(),
         rec: engine.rec.clone(),
         presets: presets.clone(),
+        data_dir: data_dir.clone(),
         hw: args.iter().any(|a| a == "--sim-r").then(|| {
             println!("R Interface SIMULATOR enabled (no real hardware is being controlled)");
             std::sync::Mutex::new(Box::new(audiora_device::SimulatedR::new()) as Box<dyn audiora_device::HardwareInterface>)

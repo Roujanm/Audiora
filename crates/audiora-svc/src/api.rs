@@ -32,6 +32,8 @@ pub struct Api {
     pub presets: Arc<PresetStore>,
     /// Attached interface hardware (or the labelled simulator), if any.
     pub hw: Option<Mutex<Box<dyn HardwareInterface>>>,
+    /// Where `license.json` lives (the data directory).
+    pub data_dir: std::path::PathBuf,
     /// Static engine description returned by `info`.
     pub info: Value,
 }
@@ -54,6 +56,7 @@ impl Api {
             "devices" => self.devices(),
             "state" => Ok(self.state()),
             "meters" => Ok(self.meters_json()),
+            "license_status" => Ok(self.license_status()),
             "hw_info" => self.hw_info(),
             "hw_controls" => self.hw_controls(),
             "hw_meters" => self.hw_with(|hw| {
@@ -123,6 +126,34 @@ impl Api {
                 v.to_string()
             }
             Err(e) => err_reply(&id, &e),
+        }
+    }
+
+    /// Verifies `license.json` in the data directory against the vendor key
+    /// baked into the build. Development builds have no key and say so.
+    pub fn license_status(&self) -> Value {
+        let path = self.data_dir.join("license.json");
+        let Some(public) = audiora_license::embedded_public_key() else {
+            return json!({ "state": "dev-build", "detail": "no vendor key embedded; license checks are off" });
+        };
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return json!({ "state": "none", "edition": "play", "path": path.display().to_string() });
+        };
+        let serials: Vec<String> = self
+            .hw
+            .as_ref()
+            .and_then(|h| h.lock().ok().map(|h| h.info().serial))
+            .into_iter()
+            .collect();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        match audiora_license::verify(&text, &public, now, &serials) {
+            Ok(c) => json!({
+                "state": "valid", "edition": c.edition, "issued_to": c.issued_to,
+                "expires_at": c.expires_at, "device_serial": c.device_serial, "features": c.features,
+            }),
+            Err(e) => json!({ "state": "invalid", "edition": "play", "error": e.to_string() }),
         }
     }
 
@@ -245,7 +276,7 @@ mod tests {
         let rec = Arc::new(RecController::new(Default::default(), 48_000, dir, crate::rec::Layout::new(2, 1, 1)));
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
         let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
-        Api { params, stats: Arc::new(Stats::default()), rec, presets, hw, info: json!({}) }
+        Api { params, stats: Arc::new(Stats::default()), rec, presets, hw, data_dir: std::env::temp_dir(), info: json!({}) }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -314,6 +345,16 @@ mod tests {
         assert_eq!(call(&a, r#"{"cmd":"hw_set","path":"input/0/gain_db","value":900}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"hw_get","path":"bogus"}"#)["ok"], false);
         assert!(call(&a, r#"{"cmd":"hw_meters"}"#)["meters"]["input/0/peak"].is_number());
+    }
+
+    #[test]
+    fn license_status_reports_dev_build_without_vendor_key() {
+        let a = api();
+        let r = call(&a, r#"{"cmd":"license_status"}"#);
+        assert_eq!(r["ok"], true);
+        if audiora_license::embedded_public_key().is_none() {
+            assert_eq!(r["state"], "dev-build");
+        }
     }
 
     #[test]

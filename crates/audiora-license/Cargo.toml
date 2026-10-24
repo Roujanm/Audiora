@@ -1,0 +1,23 @@
+[package]
+name = "audiora-license"
+description = "Offline Ed25519 license files, optionally locked to an R Interface serial number"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "audiora_license"
+path = "src/lib.rs"
+
+[[bin]]
+name = "audiora-license"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.23.1"
+ed25519-dalek = "3.0.0"
+getrandom = "0.4.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
