@@ -15,7 +15,30 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | `get` | `{"cmd":"get","path":"strip/0/gain_db"}` | `path`, `value` |
 | `set` | `{"cmd":"set","path":"…","value":-6}` | `path`, `value` (after clamping) |
 
+| `rec_start` | `{"cmd":"rec_start","sources":["mix","input"]}` | `path`, `sample_rate`, `channels`, `sources` |
+| `rec_stop` | `{"cmd":"rec_stop"}` | `path`, `frames`, `seconds`, `dropped_frames` |
+| `rec_status` | `{"cmd":"rec_status"}` | `recording`, and while recording: `path`, `frames`, `seconds`, `dropped_frames`, `error` |
+
 Booleans may be sent as `true/false`; they are stored as 1/0.
+
+## Recording
+
+Takes are 32-bit float WAV, written to `%USERPROFILE%\Music\Audiora\Recordings` (override with
+`--rec-dir`) as `take-YYYYMMDD-HHMMSS.wav`; existing files are never overwritten.
+
+`sources` picks what to record. Every source is one stereo pair, so channels = 2 × sources, in the
+order requested (default `["mix"]`):
+
+| Source | Signal |
+|---|---|
+| `input` | capture device, raw (before gain/EQ) — record the untouched take |
+| `tone` | built-in oscillator, raw |
+| `mix` | bus 0, after the mixer |
+
+Files with more than 2 channels use `WAVE_FORMAT_EXTENSIBLE`; anything over 4 GB is written as RF64.
+The header is re-patched about once per second of audio, so a crash or power loss keeps everything
+up to the last second. Stopping the service finalizes an active take. `dropped_frames` counts audio
+the disk could not keep up with (whole blocks are dropped, so channels never shift).
 
 ## Parameter paths
 

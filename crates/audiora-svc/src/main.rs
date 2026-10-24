@@ -4,6 +4,7 @@
 
 mod api;
 mod engine;
+mod rec;
 mod server;
 
 use std::process::ExitCode;
@@ -26,6 +27,7 @@ fn main() -> ExitCode {
         input_enabled: !args.iter().any(|a| a == "--no-input"),
         output: arg(&args, "--out"),
         tone_hz: arg(&args, "--tone"),
+        rec_dir: arg::<std::path::PathBuf>(&args, "--rec-dir"),
     };
     let port: u16 = arg(&args, "--port").unwrap_or(7878);
     let run_for: Option<f32> = arg(&args, "--secs");
@@ -52,7 +54,10 @@ fn main() -> ExitCode {
     let api = Arc::new(Api {
         params: engine.params.clone(),
         stats: engine.stats.clone(),
+        rec: engine.rec.clone(),
         info: json!({
+            "recordings_dir": engine.rec.dir().display().to_string(),
+            "rec_sources": rec::SOURCES,
             "api": api::API_VERSION,
             "output": { "sample_rate": out.sample_rate, "channels": out.channels, "buffer_frames": out.buffer_frames },
             "input": engine.info.input.map(|i| json!({ "sample_rate": i.sample_rate, "channels": i.channels })),

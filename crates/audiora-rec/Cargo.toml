@@ -1,0 +1,14 @@
+[package]
+name = "audiora-rec"
+description = "Audiora recorder: crash-safe multichannel 32-bit float WAV / RF64 writer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+audiora-core = { path = "../audiora-core" }
+
+[dev-dependencies]
+hound = "3.5"

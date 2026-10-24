@@ -139,8 +139,8 @@ Audiora/
 │  ├─ audiora-core/   mixer, param paths, SPSC ring  (done)
 │  ├─ audiora-hal/    WASAPI backend                 (done: enumerate, render, capture)
 │  ├─ audiora-cli/    `audiora devices|tone`         (done)
+│  ├─ audiora-rec/    WAV/RF64 writer + disk thread  (done)
 │  ├─ audiora-svc/    engine + JSON-lines control API (done, runs as a console app; Windows service wrapper next)
-│  └─ audiora-rec/    recorder                       (next)
 ├─ drivers/           virtual-audio, asio, r-interface (planned)
 ├─ app/               Tauri + Svelte UI              (planned)
 └─ docs/

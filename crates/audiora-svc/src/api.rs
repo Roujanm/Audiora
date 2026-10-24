@@ -16,12 +16,14 @@ use audiora_core::MixerParams;
 use serde_json::{json, Map, Value};
 
 use crate::engine::Stats;
+use crate::rec::{self, RecController};
 
 pub const API_VERSION: u32 = 1;
 
 pub struct Api {
     pub params: Arc<MixerParams>,
     pub stats: Arc<Stats>,
+    pub rec: Arc<RecController>,
     /// Static engine description returned by `info`.
     pub info: Value,
 }
@@ -43,6 +45,16 @@ impl Api {
             "info" => Ok(self.info.clone()),
             "devices" => self.devices(),
             "state" => Ok(self.state()),
+            "rec_start" => {
+                let sources: Vec<String> = req
+                    .get("sources")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
+                    .unwrap_or_default();
+                self.rec.start(&sources)
+            }
+            "rec_stop" => self.rec.stop().map(|s| rec::summary_json(&s)),
+            "rec_status" => Ok(self.rec.status()),
             "get" => match path {
                 Some(p) => self
                     .params
@@ -126,7 +138,9 @@ mod tests {
 
     fn api() -> Api {
         let (_m, params) = Mixer::new(48_000.0, 2, 1);
-        Api { params, stats: Arc::new(Stats::default()), info: json!({}) }
+        let dir = std::env::temp_dir().join(format!("audiora-api-test-{}", std::process::id()));
+        let rec = Arc::new(RecController::new(Default::default(), 48_000, dir));
+        Api { params, stats: Arc::new(Stats::default()), rec, info: json!({}) }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -158,6 +172,16 @@ mod tests {
         assert_eq!(call(&a, r#"{"cmd":"set","path":"strip/9/gain_db","value":1}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"set","path":"strip/0/peak_l","value":1}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"set","path":"strip/0/gain_db"}"#)["ok"], false);
+    }
+
+    #[test]
+    fn recording_commands_validate_state() {
+        let a = api();
+        assert_eq!(call(&a, r#"{"cmd":"rec_status"}"#)["recording"], false);
+        assert_eq!(call(&a, r#"{"cmd":"rec_stop"}"#)["ok"], false);
+        let r = call(&a, r#"{"cmd":"rec_start","sources":["nope"]}"#);
+        assert_eq!(r["ok"], false);
+        assert!(r["error"].as_str().unwrap().contains("unknown source"));
     }
 
     #[test]

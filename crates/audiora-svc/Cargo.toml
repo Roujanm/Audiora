@@ -15,5 +15,10 @@ path = "src/main.rs"
 audiora-core = { path = "../audiora-core" }
 audiora-dsp = { path = "../audiora-dsp" }
 audiora-hal = { path = "../audiora-hal" }
+audiora-rec = { path = "../audiora-rec" }
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 ctrlc = "3.5.2"
 serde_json = "1.0.154"
+
+[dev-dependencies]
+hound = "3.5"

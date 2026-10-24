@@ -11,6 +11,8 @@ use audiora_core::{ring, Mixer, MixerParams, MAX_BLOCK_FRAMES};
 use audiora_dsp::LinearResampler;
 use audiora_hal::{CaptureStream, RenderStream, StreamFormat};
 
+use crate::rec::{self, AudioTap, RecController, TapSlot};
+
 #[derive(Clone, Debug, Default)]
 pub struct EngineConfig {
     /// `None` = default capture device when `use_input`, see `input_enabled`.
@@ -19,6 +21,8 @@ pub struct EngineConfig {
     pub output: Option<String>,
     /// Built-in oscillator on strip 1, for tests without a microphone.
     pub tone_hz: Option<f32>,
+    /// Where takes are written; `None` = `%USERPROFILE%\Music\Audiora\Recordings`.
+    pub rec_dir: Option<std::path::PathBuf>,
 }
 
 #[derive(Default)]
@@ -42,6 +46,7 @@ pub struct Engine {
     pub params: Arc<MixerParams>,
     pub stats: Arc<Stats>,
     pub info: EngineInfo,
+    pub rec: Arc<RecController>,
     stop: Arc<AtomicBool>,
     threads: Vec<JoinHandle<()>>,
 }
@@ -54,11 +59,12 @@ impl Engine {
         let stats = Arc::new(Stats::default());
         let (prod, cons) = ring::ring(1 << 17);
         let mut threads = Vec::new();
+        let slot = Arc::new(TapSlot::default());
 
         let (tx, rx) = mpsc::channel::<Result<(StreamFormat, Arc<MixerParams>), String>>();
         {
-            let (stop, stats, cfg) = (stop.clone(), stats.clone(), cfg.clone());
-            threads.push(std::thread::spawn(move || render_thread(cfg, cons, stop, stats, tx)));
+            let (stop, stats, cfg, slot) = (stop.clone(), stats.clone(), cfg.clone(), slot.clone());
+            threads.push(std::thread::spawn(move || render_thread(cfg, cons, stop, stats, slot, tx)));
         }
         let (out_fmt, params) = rx
             .recv()
@@ -84,10 +90,13 @@ impl Engine {
             }
         }
 
+        let rec_dir = cfg.rec_dir.clone().unwrap_or_else(rec::default_dir);
+        let rec = Arc::new(RecController::new(slot, out_fmt.sample_rate, rec_dir));
         Ok(Engine {
             params,
             stats,
             info: EngineInfo { output: out_fmt, input: in_fmt },
+            rec,
             stop,
             threads,
         })
@@ -98,6 +107,10 @@ impl Engine {
     }
 
     pub fn stop(self) {
+        // Finalize an in-progress take while the audio thread can still detach.
+        if let Ok(s) = self.rec.stop() {
+            println!("recording saved: {} ({:.1} s, {} dropped frames)", s.path.display(), s.seconds, s.dropped_frames);
+        }
         self.stop.store(true, Ordering::Relaxed);
         for t in self.threads {
             let _ = t.join();
@@ -110,6 +123,7 @@ fn render_thread(
     mut cons: ring::Consumer,
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
+    slot: Arc<TapSlot>,
     ready: mpsc::Sender<Result<(StreamFormat, Arc<MixerParams>), String>>,
 ) {
     let stream = match RenderStream::open(cfg.output.as_deref()) {
@@ -133,10 +147,12 @@ fn render_thread(
     let high_water = target * 4;
     let tone_step = cfg.tone_hz.map(|hz| TAU * hz / fmt.sample_rate as f32);
     let mut phase = 0f32;
+    let mut tap = AudioTap::new(slot, cap / 2);
 
     let result = stream.run_until(&stop, None, |out, frames| {
         let n = frames * 2;
         stats.callbacks.fetch_add(1, Ordering::Relaxed);
+        tap.poll();
 
         // Keep latency bounded: if capture ran ahead, drop the oldest audio.
         let avail = cons.available();
@@ -172,6 +188,7 @@ fn render_thread(
         }
 
         mixer.process(&[&in_mic[..n], &in_tone[..n]], &mut [&mut bus[..n]]);
+        tap.push(frames, [&in_mic[..n], &in_tone[..n], &bus[..n]]);
         for (i, frame) in out.chunks_exact_mut(ch).enumerate() {
             frame[0] = bus[i * 2];
             if ch > 1 {

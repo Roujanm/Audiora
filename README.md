@@ -8,8 +8,8 @@ Proprietary — all rights reserved.
 
 ## Status
 
-Phase 0 (foundation) is done; phase 1 is under way: live engine service (`audiora-svc`) with WASAPI
-capture/render and a JSON-lines control API.
+Phase 0 (foundation) is done; phase 1 and 2 are under way: live engine service (`audiora-svc`) with WASAPI
+capture/render, a JSON-lines control API, and a multichannel 32-bit float WAV recorder.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md) and
 [docs/R-INTERFACE.md](docs/R-INTERFACE.md); the control protocol is in [docs/CONTROL-API.md](docs/CONTROL-API.md).
 
