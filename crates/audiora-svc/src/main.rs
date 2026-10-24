@@ -3,7 +3,7 @@
 //! ```text
 //! audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency]
 //!             [--port N] [--ws-port N] [--allow-origin URL]... [--rec-dir DIR]
-//!             [--data-dir DIR] [--fresh] [--secs S]
+//!             [--data-dir DIR] [--fresh] [--sim-r] [--secs S]
 //! ```
 //!
 //! `--in` / `--out` can be repeated: every input becomes a mixer strip, every
@@ -112,12 +112,17 @@ fn main() -> ExitCode {
         stats: engine.stats.clone(),
         rec: engine.rec.clone(),
         presets: presets.clone(),
+        hw: args.iter().any(|a| a == "--sim-r").then(|| {
+            println!("R Interface SIMULATOR enabled (no real hardware is being controlled)");
+            std::sync::Mutex::new(Box::new(audiora_device::SimulatedR::new()) as Box<dyn audiora_device::HardwareInterface>)
+        }),
         info: json!({
             "api": api::API_VERSION,
             "recordings_dir": engine.rec.dir().display().to_string(),
             "rec_sources": engine.rec.layout().list(),
             "strips": strips,
             "buses": buses,
+            "hardware": args.iter().any(|a| a == "--sim-r"),
         }),
     });
 

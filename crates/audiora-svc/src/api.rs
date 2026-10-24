@@ -13,9 +13,10 @@
 //! Replies carry `"ok":true` or `"ok":false,"error":"..."`; `id` is echoed.
 
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use audiora_core::MixerParams;
+use audiora_device::{ControlKind, HardwareInterface};
 use serde_json::{json, Map, Value};
 
 use crate::engine::Stats;
@@ -29,6 +30,8 @@ pub struct Api {
     pub stats: Arc<Stats>,
     pub rec: Arc<RecController>,
     pub presets: Arc<PresetStore>,
+    /// Attached interface hardware (or the labelled simulator), if any.
+    pub hw: Option<Mutex<Box<dyn HardwareInterface>>>,
     /// Static engine description returned by `info`.
     pub info: Value,
 }
@@ -51,6 +54,24 @@ impl Api {
             "devices" => self.devices(),
             "state" => Ok(self.state()),
             "meters" => Ok(self.meters_json()),
+            "hw_info" => self.hw_info(),
+            "hw_controls" => self.hw_controls(),
+            "hw_meters" => self.hw_with(|hw| {
+                let m: Map<String, Value> = hw.meters().into_iter().map(|(k, v)| (k, json!(v))).collect();
+                Ok(json!({ "meters": m }))
+            }),
+            "hw_get" => match path {
+                Some(p) => self.hw_with(|hw| {
+                    hw.get(p).map(|v| json!({ "path": p, "value": v })).map_err(|e| e.to_string())
+                }),
+                None => Err("missing \"path\"".into()),
+            },
+            "hw_set" => match (path, req.get("value").and_then(as_number)) {
+                (Some(p), Some(v)) => self.hw_with(|hw| {
+                    hw.set(p, v).and_then(|_| hw.get(p)).map(|v| json!({ "path": p, "value": v })).map_err(|e| e.to_string())
+                }),
+                _ => Err("\"hw_set\" needs \"path\" and a numeric/boolean \"value\"".into()),
+            },
             "preset_list" => Ok(json!({ "presets": self.presets.list() })),
             "preset_save" => self.with_name(&req, |n| {
                 self.presets.save(n, &self.params).map(|c| json!({ "name": n, "saved": c }))
@@ -103,6 +124,43 @@ impl Api {
             }
             Err(e) => err_reply(&id, &e),
         }
+    }
+
+    fn hw_with(&self, f: impl FnOnce(&mut dyn HardwareInterface) -> Result<Value, String>) -> Result<Value, String> {
+        let hw = self.hw.as_ref().ok_or("no interface hardware connected")?;
+        let mut guard = hw.lock().map_err(|_| "hardware lock poisoned".to_string())?;
+        f(guard.as_mut())
+    }
+
+    pub fn hw_info(&self) -> Result<Value, String> {
+        self.hw_with(|hw| {
+            let i = hw.info();
+            Ok(json!({
+                "model": i.model, "serial": i.serial, "firmware": i.firmware,
+                "simulated": i.simulated, "inputs": i.inputs, "outputs": i.outputs,
+            }))
+        })
+    }
+
+    fn hw_controls(&self) -> Result<Value, String> {
+        self.hw_with(|hw| {
+            let controls: Vec<Value> = hw
+                .controls()
+                .into_iter()
+                .map(|c| {
+                    let kind = match c.kind {
+                        ControlKind::Range { min, max, step, unit } => {
+                            json!({ "type": "range", "min": min, "max": max, "step": step, "unit": unit })
+                        }
+                        ControlKind::Toggle => json!({ "type": "toggle" }),
+                        ControlKind::Choice { options } => json!({ "type": "choice", "options": options }),
+                    };
+                    let value = hw.get(&c.path).ok();
+                    json!({ "path": c.path, "label": c.label, "group": c.group, "kind": kind, "value": value })
+                })
+                .collect();
+            Ok(json!({ "controls": controls }))
+        })
     }
 
     fn with_name(
@@ -186,7 +244,8 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("audiora-api-test-{}", std::process::id()));
         let rec = Arc::new(RecController::new(Default::default(), 48_000, dir, crate::rec::Layout::new(2, 1, 1)));
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
-        Api { params, stats: Arc::new(Stats::default()), rec, presets, info: json!({}) }
+        let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
+        Api { params, stats: Arc::new(Stats::default()), rec, presets, hw, info: json!({}) }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -243,6 +302,27 @@ mod tests {
         assert_eq!(call(&a, r#"{"cmd":"preset_delete","name":"api test"}"#)["ok"], true);
         assert_eq!(call(&a, r#"{"cmd":"preset_save","name":"_last"}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"preset_save","name":"../x"}"#)["ok"], false);
+    }
+
+    #[test]
+    fn hardware_commands_roundtrip_and_validate() {
+        let a = api();
+        assert_eq!(call(&a, r#"{"cmd":"hw_info"}"#)["simulated"], true);
+        let controls = call(&a, r#"{"cmd":"hw_controls"}"#);
+        assert!(controls["controls"].as_array().unwrap().iter().any(|c| c["path"] == "input/0/phantom" && c["kind"]["type"] == "toggle"));
+        assert_eq!(call(&a, r#"{"cmd":"hw_set","path":"input/0/gain_db","value":33}"#)["value"], 33.0);
+        assert_eq!(call(&a, r#"{"cmd":"hw_set","path":"input/0/gain_db","value":900}"#)["ok"], false);
+        assert_eq!(call(&a, r#"{"cmd":"hw_get","path":"bogus"}"#)["ok"], false);
+        assert!(call(&a, r#"{"cmd":"hw_meters"}"#)["meters"]["input/0/peak"].is_number());
+    }
+
+    #[test]
+    fn hardware_commands_fail_cleanly_without_hardware() {
+        let mut a = api();
+        a.hw = None;
+        let r = call(&a, r#"{"cmd":"hw_info"}"#);
+        assert_eq!(r["ok"], false);
+        assert!(r["error"].as_str().unwrap().contains("no interface hardware"));
     }
 
     #[test]

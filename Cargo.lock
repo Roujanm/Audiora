@@ -45,6 +45,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "audiora-device"
+version = "0.1.0"
+
+[[package]]
 name = "audiora-dsp"
 version = "0.1.0"
 dependencies = [
@@ -72,6 +76,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "audiora-core",
+ "audiora-device",
  "audiora-dsp",
  "audiora-hal",
  "audiora-rec",

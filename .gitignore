@@ -10,3 +10,5 @@
 *.cer
 *.pfx
 *.snk
+
+/dist/

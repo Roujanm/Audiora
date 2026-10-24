@@ -1,0 +1,10 @@
+[package]
+name = "audiora-device"
+description = "Hardware control abstraction for the R Interface (with a clearly-labelled simulator)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]

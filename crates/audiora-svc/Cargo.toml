@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 arrayvec = "0.7.8"
 audiora-core = { path = "../audiora-core" }
+audiora-device = { version = "0.1.0", path = "../audiora-device" }
 audiora-dsp = { path = "../audiora-dsp" }
 audiora-hal = { path = "../audiora-hal" }
 audiora-rec = { path = "../audiora-rec" }
