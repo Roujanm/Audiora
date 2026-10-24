@@ -250,6 +250,12 @@ fn master_thread(
     let tone_idx = n_in;
     let (mut mixer, params) = Mixer::new(fmt.sample_rate as f32, n_strips, a.n_buses);
     params.strips[tone_idx].gain_db.set(-30.0);
+    // Capture devices start unrouted: a microphone sent straight to speakers or
+    // headphones would feed back or echo the user's own voice. They are routed
+    // explicitly (routing matrix / strip buttons) or by a restored session.
+    for strip in &params.strips[..n_in] {
+        strip.bus_mask.store(0, Ordering::Relaxed);
+    }
     params.buses[0].limiter.enabled.store(true, Ordering::Relaxed);
     params.buses[0].limiter.ceiling_db.set(-1.0);
     for tx in &a.rate_txs {

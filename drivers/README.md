@@ -1,10 +1,9 @@
 # Drivers
 
-Planned (see ../docs/ARCHITECTURE.md §4.1):
+| Folder | State |
+|---|---|
+| `virtual-audio/` | design — [DESIGN.md](virtual-audio/DESIGN.md); needs the WDK and a test machine |
+| `asio/` | design — [DESIGN.md](asio/DESIGN.md); needs the Steinberg licence agreement |
+| `r-interface/` | not started — needs firmware / USB documentation ([R-INTERFACE.md](../docs/R-INTERFACE.md)) |
 
-- `virtual-audio/` — kernel WDM/PortCls virtual endpoints, derived from Microsoft SysVAD
-- `asio/` — user-mode ASIO driver
-- `r-interface/` — R Interface driver / support, pending firmware answers
-
-Prerequisites before starting: Visual Studio 2022 (Desktop C++), matching Windows Driver Kit,
-and a dedicated test machine with test-signing enabled.
+Run `scripts\check-driver-env.ps1` (read-only) to see what this machine is missing.

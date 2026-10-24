@@ -1,0 +1,25 @@
+[package]
+name = "audiora-app"
+version = "0.1.0"
+description = "Audiora desktop shell: hosts the Svelte UI and starts the engine"
+authors = ["Roujan Digital Agency"]
+edition = "2021"
+license = "LicenseRef-Proprietary"
+publish = false
+build = "build.rs"
+
+# The shell is its own workspace: it needs a different dependency set and
+# profile than the audio engine crates in the repository root.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

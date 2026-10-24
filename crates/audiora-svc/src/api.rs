@@ -32,6 +32,8 @@ pub struct Api {
     pub presets: Arc<PresetStore>,
     /// Attached interface hardware (or the labelled simulator), if any.
     pub hw: Option<Mutex<Box<dyn HardwareInterface>>>,
+    /// Set by the `shutdown` command so the app can stop an engine it started.
+    pub stop: Arc<std::sync::atomic::AtomicBool>,
     /// Where `license.json` lives (the data directory).
     pub data_dir: std::path::PathBuf,
     /// Static engine description returned by `info`.
@@ -56,6 +58,10 @@ impl Api {
             "devices" => self.devices(),
             "state" => Ok(self.state()),
             "meters" => Ok(self.meters_json()),
+            "shutdown" => {
+                self.stop.store(true, Relaxed);
+                Ok(json!({ "stopping": true }))
+            }
             "license_status" => Ok(self.license_status()),
             "hw_info" => self.hw_info(),
             "hw_controls" => self.hw_controls(),
@@ -276,7 +282,7 @@ mod tests {
         let rec = Arc::new(RecController::new(Default::default(), 48_000, dir, crate::rec::Layout::new(2, 1, 1)));
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
         let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
-        Api { params, stats: Arc::new(Stats::default()), rec, presets, hw, data_dir: std::env::temp_dir(), info: json!({}) }
+        Api { params, stats: Arc::new(Stats::default()), rec, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}) }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -345,6 +351,14 @@ mod tests {
         assert_eq!(call(&a, r#"{"cmd":"hw_set","path":"input/0/gain_db","value":900}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"hw_get","path":"bogus"}"#)["ok"], false);
         assert!(call(&a, r#"{"cmd":"hw_meters"}"#)["meters"]["input/0/peak"].is_number());
+    }
+
+    #[test]
+    fn shutdown_sets_the_stop_flag() {
+        let a = api();
+        assert!(!a.stop.load(Relaxed));
+        assert_eq!(call(&a, r#"{"cmd":"shutdown"}"#)["ok"], true);
+        assert!(a.stop.load(Relaxed));
     }
 
     #[test]

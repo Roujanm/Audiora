@@ -1,15 +1,24 @@
 # Audiora Roadmap
 
-| Phase | Goal | Exit criteria |
-|---|---|---|
-| **0 Foundation** ✅ | Workspace, DSP, mixer, ring buffer, WASAPI render, CLI | `cargo test` green; `audiora tone` plays through the mixer |
-| **1 Engine** 🟡 | `audiora-svc`: WASAPI capture + render, control API (done); multi-device graph, drift-tracking SRC, Windows service wrapper, 1 h soak test (open) | Mic → mixer → headphones live, no dropouts for 1 h |
-| **2 Recorder** 🟡 | `audiora-rec`: multitrack 32-bit float WAV, RF64, crash-safe headers, service integration (done); punch-in/out, take management, input-monitoring, per-device tracks (open) | 8-track 1 h take, bit-exact vs. input |
-| **3 App** | Tauri 2 + Svelte: Play skin first, then Studio skin | Mixer UI drives engine, 60 fps meters |
-| **4 Virtual audio driver** | SysVAD-derived kernel driver (Game/Chat/Media/Aux/Mic), per-app routing | Apps routed per channel; Driver Verifier clean |
-| **5 ASIO + R Interface** | ASIO driver, R backend, hardware control | DAW records from R at target latency |
-| **6 Plug-ins & DSP** | VST3/CLAP host, compressor/gate/limiter, noise suppression | Plug-in crash doesn't interrupt audio |
-| **7 Release** | Signing, installer, updater, licensing, telemetry opt-in | Clean install on fresh Windows 10/11 |
+Legend: ✅ done and verified here · 🟡 partly done · ⛔ blocked on something outside the code · ⬜ not started
 
-Dependencies: phase 4 needs Visual Studio + WDK installed and a dedicated test machine;
-phase 5 needs the answers in `R-INTERFACE.md`.
+| Phase | Scope | State |
+|---|---|---|
+| **0 Foundation** | Workspace, DSP, mixer, ring, WASAPI, CLI | ✅ |
+| **1 Engine** | Multi-device graph, drift-tracking resampler, low-latency WASAPI, control API, presets, WebSocket | ✅ built · 🟡 1 h+ soak test not run · ⬜ WASAPI exclusive mode · ⬜ named-pipe transport with ACL |
+| **2 Recorder** | Multichannel 32-bit float WAV/RF64, crash-safe, engine integration | ✅ · ⬜ punch-in/out, take management, input monitoring |
+| **3 App** | Tauri 2 + Svelte 5: Play and Studio skins | ✅ UI verified live · 🟡 Tauri shell compiles; installer build and window run not exercised · ⬜ spectrum / LUFS displays |
+| **4 Virtual audio driver** | SysVAD-derived kernel driver, per-app routing | ⛔ designed; needs WDK + a test machine |
+| **5 ASIO + R Interface** | ASIO driver, R backend, hardware control | ⛔ ASIO needs the Steinberg licence decision; R needs hardware documentation · ✅ simulator + control layer |
+| **6 Processing** | Gate, compressor, limiter, denoiser | ✅ · ⬜ de-esser, reverb/convolution, VST3/CLAP hosting, LUFS meters |
+| **7 Release** | Signing, installer, updater, licensing | ✅ licence format + tool, portable zip, per-user install script · ⛔ code-signing certificate · ⬜ updater, telemetry (opt-in) |
+
+## What unblocks what
+
+| Blocker | Who | Unblocks |
+|---|---|---|
+| Install the Windows Driver Kit; provide a VM or spare PC | Roujan Digital Agency | Phase 4 |
+| Sign Steinberg's ASIO licence agreement | Roujan Digital Agency (legal) | ASIO driver |
+| R Interface USB descriptors, control protocol, serial format (`R-INTERFACE.md`) | Hardware / firmware team | Real R backend, licence device-lock, ASIO tuning |
+| Code-signing certificate; Hardware Dashboard account | Roujan Digital Agency | Signed installer and drivers |
+| Decide edition limits (what is Play vs Studio) | Product | Licence gating |
