@@ -75,7 +75,7 @@
       ctx.moveTo(0, gy);
       ctx.lineTo(width, gy);
       ctx.stroke();
-      if (db !== 0) {
+      if (db !== 0 && db !== -RANGE_DB) {
         ctx.fillStyle = 'rgba(133,145,163,0.8)';
         ctx.fillText(`${db > 0 ? '+' : ''}${db}`, 8, gy - 4);
       }
