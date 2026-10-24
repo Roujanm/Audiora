@@ -32,6 +32,10 @@ pub struct StreamFormat {
     pub channels: u16,
     /// Frames the device buffer can hold; callbacks never exceed this.
     pub buffer_frames: u32,
+    /// Typical frames delivered per wake-up (the engine period).
+    pub period_frames: u32,
+    /// True when the IAudioClient3 minimum-period path is active.
+    pub low_latency: bool,
 }
 
 #[derive(Debug)]

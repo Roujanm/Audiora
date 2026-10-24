@@ -12,6 +12,7 @@ name = "audiora-svc"
 path = "src/main.rs"
 
 [dependencies]
+arrayvec = "0.7.8"
 audiora-core = { path = "../audiora-core" }
 audiora-dsp = { path = "../audiora-dsp" }
 audiora-hal = { path = "../audiora-hal" }

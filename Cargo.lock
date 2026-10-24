@@ -24,6 +24,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d62b7694a562cdf5a74227903507c56ab2cc8bdd1f781ed5cb4cf9c9f810bfc"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
+
+[[package]]
 name = "audiora-cli"
 version = "0.1.0"
 dependencies = [
@@ -64,6 +70,7 @@ dependencies = [
 name = "audiora-svc"
 version = "0.1.0"
 dependencies = [
+ "arrayvec",
  "audiora-core",
  "audiora-dsp",
  "audiora-hal",

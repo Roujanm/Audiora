@@ -139,7 +139,7 @@ mod tests {
     fn api() -> Api {
         let (_m, params) = Mixer::new(48_000.0, 2, 1);
         let dir = std::env::temp_dir().join(format!("audiora-api-test-{}", std::process::id()));
-        let rec = Arc::new(RecController::new(Default::default(), 48_000, dir));
+        let rec = Arc::new(RecController::new(Default::default(), 48_000, dir, crate::rec::Layout::new(2, 1, 1)));
         Api { params, stats: Arc::new(Stats::default()), rec, info: json!({}) }
     }
 

@@ -54,7 +54,7 @@ fn tone(args: &[String]) -> Res {
     let bass_db: f32 = flag(args, "--bass", 0.0);
     let device: String = flag(args, "--device", String::new());
 
-    let stream = RenderStream::open((!device.is_empty()).then_some(device.as_str()))?;
+    let stream = RenderStream::open((!device.is_empty()).then_some(device.as_str()), false)?;
     let fmt = stream.format();
     println!("{} Hz, {} ch, buffer {} frames; {freq} Hz at {gain_db} dB for {secs} s", fmt.sample_rate, fmt.channels, fmt.buffer_frames);
 

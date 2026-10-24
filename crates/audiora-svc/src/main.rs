@@ -1,6 +1,12 @@
 //! `audiora-svc` — Audiora engine. Runs the live graph and the control API.
 //!
-//!   audiora-svc [--in ID | --no-input] [--out ID] [--tone HZ] [--port N] [--secs S]
+//! ```text
+//! audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency]
+//!             [--port N] [--rec-dir DIR] [--secs S]
+//! ```
+//!
+//! `--in` / `--out` can be repeated: every input becomes a mixer strip, every
+//! output a bus; the first output is the master device that clocks the mixer.
 
 mod api;
 mod engine;
@@ -13,36 +19,72 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use api::Api;
-use engine::{Engine, EngineConfig};
-use serde_json::json;
+use engine::{Engine, EngineConfig, NodeInfo};
+use serde_json::{json, Value};
 
 fn arg<T: std::str::FromStr>(args: &[String], name: &str) -> Option<T> {
     args.windows(2).find(|w| w[0] == name).and_then(|w| w[1].parse().ok())
 }
 
+fn args_all(args: &[String], name: &str) -> Vec<String> {
+    args.windows(2).filter(|w| w[0] == name).map(|w| w[1].clone()).collect()
+}
+
+fn config_from_args(args: &[String]) -> EngineConfig {
+    let ins = args_all(args, "--in");
+    let inputs = if args.iter().any(|a| a == "--no-input") {
+        vec![]
+    } else if ins.is_empty() {
+        vec![None]
+    } else {
+        ins.into_iter().map(Some).collect()
+    };
+    let outs = args_all(args, "--out");
+    EngineConfig {
+        inputs,
+        outputs: if outs.is_empty() { vec![None] } else { outs.into_iter().map(Some).collect() },
+        tone_hz: arg(args, "--tone"),
+        rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
+        low_latency: args.iter().any(|a| a == "--low-latency"),
+    }
+}
+
+fn node_json(index: usize, n: &NodeInfo) -> Value {
+    json!({
+        "index": index,
+        "kind": n.kind,
+        "name": n.name,
+        "device_id": n.device_id,
+        "sample_rate": n.format.map(|f| f.sample_rate),
+        "channels": n.format.map(|f| f.channels),
+        "period_frames": n.format.map(|f| f.period_frames),
+        "low_latency": n.format.map(|f| f.low_latency),
+    })
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let cfg = EngineConfig {
-        input: arg(&args, "--in"),
-        input_enabled: !args.iter().any(|a| a == "--no-input"),
-        output: arg(&args, "--out"),
-        tone_hz: arg(&args, "--tone"),
-        rec_dir: arg::<std::path::PathBuf>(&args, "--rec-dir"),
-    };
     let port: u16 = arg(&args, "--port").unwrap_or(7878);
     let run_for: Option<f32> = arg(&args, "--secs");
 
-    let engine = match Engine::start(cfg) {
+    let engine = match Engine::start(config_from_args(&args)) {
         Ok(e) => e,
         Err(e) => {
             eprintln!("error: {e}");
             return ExitCode::FAILURE;
         }
     };
-    let out = engine.info.output;
-    println!("output: {} Hz, {} ch, buffer {} frames", out.sample_rate, out.channels, out.buffer_frames);
-    if let Some(i) = engine.info.input {
-        println!("input:  {} Hz, {} ch", i.sample_rate, i.channels);
+    for (i, b) in engine.info.buses.iter().enumerate() {
+        if let Some(f) = b.format {
+            println!("bus {i} -> {} ({} Hz, {} ch, period {} frames{})", b.name, f.sample_rate, f.channels, f.period_frames, if f.low_latency { ", low latency" } else { "" });
+        }
+    }
+    for (i, s) in engine.info.strips.iter().enumerate() {
+        if let Some(f) = s.format {
+            println!("strip {i} <- {} ({} Hz, {} ch)", s.name, f.sample_rate, f.channels);
+        } else {
+            println!("strip {i} <- {}", s.name);
+        }
     }
 
     let stop = engine.stop_flag();
@@ -51,18 +93,18 @@ fn main() -> ExitCode {
         let _ = ctrlc::set_handler(move || stop.store(true, Ordering::Relaxed));
     }
 
+    let strips: Vec<Value> = engine.info.strips.iter().enumerate().map(|(i, n)| node_json(i, n)).collect();
+    let buses: Vec<Value> = engine.info.buses.iter().enumerate().map(|(i, n)| node_json(i, n)).collect();
     let api = Arc::new(Api {
         params: engine.params.clone(),
         stats: engine.stats.clone(),
         rec: engine.rec.clone(),
         info: json!({
-            "recordings_dir": engine.rec.dir().display().to_string(),
-            "rec_sources": rec::SOURCES,
             "api": api::API_VERSION,
-            "output": { "sample_rate": out.sample_rate, "channels": out.channels, "buffer_frames": out.buffer_frames },
-            "input": engine.info.input.map(|i| json!({ "sample_rate": i.sample_rate, "channels": i.channels })),
-            "strips": engine.params.strips.len(),
-            "buses": engine.params.buses.len(),
+            "recordings_dir": engine.rec.dir().display().to_string(),
+            "rec_sources": engine.rec.layout().list(),
+            "strips": strips,
+            "buses": buses,
         }),
     });
 

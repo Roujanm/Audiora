@@ -3,11 +3,11 @@
 use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use windows::core::PCWSTR;
+use windows::core::{Interface, PCWSTR};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
-    eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IAudioRenderClient, IMMDevice,
+    eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IAudioClient3, IAudioRenderClient, IMMDevice,
     IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED,
     AUDCLNT_STREAMFLAGS_EVENTCALLBACK, DEVICE_STATE_ACTIVE, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
@@ -121,7 +121,7 @@ impl Drop for Shared {
     }
 }
 
-fn open_shared(flow: Flow, id: Option<&str>) -> Result<Shared> {
+fn open_shared(flow: Flow, id: Option<&str>, low_latency: bool) -> Result<Shared> {
     let e = enumerator()?;
     let dev = unsafe {
         match id {
@@ -147,14 +147,43 @@ fn open_shared(flow: Flow, id: Option<&str>) -> Result<Shared> {
     }
     unsafe {
         let ptr = client.GetMixFormat()?;
-        let init = client.Initialize(
-            AUDCLNT_SHAREMODE_SHARED,
-            AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-            0,
-            0,
-            ptr,
-            None,
-        );
+        let mut period_frames = 0u32;
+        let mut achieved_low = false;
+        let mut init: windows::core::Result<()> = Err(windows::core::Error::empty());
+
+        if low_latency {
+            // IAudioClient3: ask the engine for its smallest shared-mode period.
+            if let Ok(c3) = client.cast::<IAudioClient3>() {
+                let (mut def, mut fund, mut min, mut max) = (0u32, 0u32, 0u32, 0u32);
+                if c3.GetSharedModeEnginePeriod(ptr, &mut def, &mut fund, &mut min, &mut max).is_ok()
+                    && c3
+                        .InitializeSharedAudioStream(AUDCLNT_STREAMFLAGS_EVENTCALLBACK, min, ptr, None)
+                        .is_ok()
+                {
+                    init = Ok(());
+                    period_frames = min;
+                    achieved_low = true;
+                }
+            }
+        }
+        if !achieved_low {
+            init = client.Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                0,
+                0,
+                ptr,
+                None,
+            );
+            if init.is_ok() {
+                let mut default_hns = 0i64;
+                let mut min_hns = 0i64;
+                if client.GetDevicePeriod(Some(&mut default_hns), Some(&mut min_hns)).is_ok() {
+                    period_frames =
+                        (default_hns as f64 * fmt.nSamplesPerSec as f64 / 10_000_000.0).round() as u32;
+                }
+            }
+        }
         CoTaskMemFree(Some(ptr as *const _));
         init.map_err(|e| HalError(format!("initialize: {e}")))?;
         let event = CreateEventW(None, false, false, None)?;
@@ -167,6 +196,8 @@ fn open_shared(flow: Flow, id: Option<&str>) -> Result<Shared> {
                 sample_rate: fmt.nSamplesPerSec,
                 channels: fmt.nChannels,
                 buffer_frames,
+                period_frames: if period_frames == 0 { buffer_frames / 2 } else { period_frames },
+                low_latency: achieved_low,
             },
         })
     }
@@ -190,8 +221,8 @@ pub struct RenderStream {
 
 impl RenderStream {
     /// `None` opens the default render device.
-    pub fn open(device_id: Option<&str>) -> Result<Self> {
-        let s = open_shared(Flow::Render, device_id)?;
+    pub fn open(device_id: Option<&str>, low_latency: bool) -> Result<Self> {
+        let s = open_shared(Flow::Render, device_id, low_latency)?;
         let render: IAudioRenderClient = unsafe { s.client.GetService()? };
         Ok(Self { s, render })
     }
@@ -255,8 +286,8 @@ pub struct CaptureStream {
 
 impl CaptureStream {
     /// `None` opens the default capture device.
-    pub fn open(device_id: Option<&str>) -> Result<Self> {
-        let s = open_shared(Flow::Capture, device_id)?;
+    pub fn open(device_id: Option<&str>, low_latency: bool) -> Result<Self> {
+        let s = open_shared(Flow::Capture, device_id, low_latency)?;
         let capture: IAudioCaptureClient = unsafe { s.client.GetService()? };
         Ok(Self { s, capture })
     }

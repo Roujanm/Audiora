@@ -15,13 +15,47 @@ use std::time::{Duration, Instant};
 use audiora_rec::{RecProducer, RecordSession, Summary};
 use serde_json::{json, Value};
 
-/// Audio sources a recording can take, in the order the audio thread offers them.
-pub const SOURCES: [&str; 3] = ["input", "tone", "mix"];
-const MAX_SOURCES: usize = SOURCES.len();
+/// Most sources (stereo pairs) one take can contain.
+pub const MAX_REC_SOURCES: usize = 8;
+
+/// Names of everything the engine can record. Source index = position in the
+/// array the audio thread passes to [`AudioTap::push`]: all strips (raw,
+/// pre-fader), then all buses (post-mixer).
+#[derive(Clone, Debug)]
+pub struct Layout {
+    names: Vec<(String, usize)>,
+}
+
+impl Layout {
+    pub fn new(n_strips: usize, n_buses: usize, n_inputs: usize) -> Self {
+        let mut names = Vec::new();
+        for i in 0..n_strips {
+            names.push((format!("strip/{i}"), i));
+        }
+        for b in 0..n_buses {
+            names.push((format!("bus/{b}"), n_strips + b));
+        }
+        // Friendly aliases kept from the first API version.
+        if n_inputs > 0 {
+            names.push(("input".into(), 0));
+        }
+        names.push(("tone".into(), n_inputs));
+        names.push(("mix".into(), n_strips));
+        Self { names }
+    }
+
+    pub fn resolve(&self, name: &str) -> Option<usize> {
+        self.names.iter().find(|(n, _)| n == name).map(|(_, i)| *i)
+    }
+
+    pub fn list(&self) -> Vec<&str> {
+        self.names.iter().map(|(n, _)| n.as_str()).collect()
+    }
+}
 
 pub struct Tap {
     prod: RecProducer,
-    sources: [usize; MAX_SOURCES],
+    sources: [usize; MAX_REC_SOURCES],
     n: usize,
 }
 
@@ -43,8 +77,8 @@ pub struct AudioTap {
 }
 
 impl AudioTap {
-    pub fn new(slot: Arc<TapSlot>, max_frames: usize) -> Self {
-        Self { slot, local: None, seen: 0, scratch: vec![0.0; max_frames * MAX_SOURCES * 2] }
+    pub fn new(slot: Arc<TapSlot>, max_frames: usize, _n_sources: usize) -> Self {
+        Self { slot, local: None, seen: 0, scratch: vec![0.0; max_frames * MAX_REC_SOURCES * 2] }
     }
 
     /// Cheap check once per callback; applies a pending start/stop.
@@ -60,8 +94,8 @@ impl AudioTap {
         }
     }
 
-    /// `inputs` are interleaved stereo blocks indexed like [`SOURCES`].
-    pub fn push(&mut self, frames: usize, inputs: [&[f32]; MAX_SOURCES]) {
+    /// `inputs` are interleaved stereo blocks indexed like [`Layout`].
+    pub fn push(&mut self, frames: usize, inputs: &[&[f32]]) {
         let Some(tap) = self.local.as_mut() else { return };
         let k = tap.n;
         let frames = frames.min(self.scratch.len() / (k * 2));
@@ -93,6 +127,7 @@ pub struct RecController {
     slot: Arc<TapSlot>,
     sample_rate: u32,
     dir: PathBuf,
+    layout: Layout,
     active: Mutex<Option<Active>>,
 }
 
@@ -103,12 +138,16 @@ pub fn default_dir() -> PathBuf {
 }
 
 impl RecController {
-    pub fn new(slot: Arc<TapSlot>, sample_rate: u32, dir: PathBuf) -> Self {
-        Self { slot, sample_rate, dir, active: Mutex::new(None) }
+    pub fn new(slot: Arc<TapSlot>, sample_rate: u32, dir: PathBuf, layout: Layout) -> Self {
+        Self { slot, sample_rate, dir, layout, active: Mutex::new(None) }
     }
 
     pub fn dir(&self) -> &std::path::Path {
         &self.dir
+    }
+
+    pub fn layout(&self) -> &Layout {
+        &self.layout
     }
 
     pub fn start(&self, requested: &[String]) -> Result<Value, String> {
@@ -118,15 +157,14 @@ impl RecController {
         }
         let names: Vec<String> =
             if requested.is_empty() { vec!["mix".into()] } else { requested.to_vec() };
-        let mut idx = [0usize; MAX_SOURCES];
+        if names.len() > MAX_REC_SOURCES {
+            return Err(format!("at most {MAX_REC_SOURCES} sources per take"));
+        }
+        let mut idx = [0usize; MAX_REC_SOURCES];
         for (i, name) in names.iter().enumerate() {
-            if i >= MAX_SOURCES {
-                return Err(format!("at most {MAX_SOURCES} sources"));
-            }
-            let pos = SOURCES
-                .iter()
-                .position(|s| s == name)
-                .ok_or_else(|| format!("unknown source \"{name}\" (use {SOURCES:?})"))?;
+            let pos = self.layout.resolve(name).ok_or_else(|| {
+                format!("unknown source \"{name}\" (use {:?})", self.layout.list())
+            })?;
             if idx[..i].contains(&pos) {
                 return Err(format!("duplicate source \"{name}\""));
             }
@@ -210,24 +248,36 @@ pub fn summary_json(s: &Summary) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicBool;
+
+    #[test]
+    fn layout_resolves_names_and_aliases() {
+        let l = Layout::new(3, 2, 2); // strips 0,1 inputs, strip 2 tone; buses 3,4
+        assert_eq!(l.resolve("strip/1"), Some(1));
+        assert_eq!(l.resolve("bus/1"), Some(4));
+        assert_eq!(l.resolve("input"), Some(0));
+        assert_eq!(l.resolve("tone"), Some(2));
+        assert_eq!(l.resolve("mix"), Some(3));
+        assert_eq!(l.resolve("nope"), None);
+        assert_eq!(Layout::new(1, 1, 0).resolve("input"), None);
+    }
 
     #[test]
     fn handoff_records_selected_sources_into_one_multichannel_file() {
         let dir = std::env::temp_dir().join(format!("audiora-svc-test-{}", std::process::id()));
         let slot = Arc::new(TapSlot::default());
-        let ctl = RecController::new(slot.clone(), 48_000, dir.clone());
+        // sources: 0 = input, 1 = tone, 2 = mix
+        let ctl = RecController::new(slot.clone(), 48_000, dir.clone(), Layout::new(2, 1, 1));
 
         // Fake audio thread: constant per-source values.
         let run = Arc::new(AtomicBool::new(true));
         let audio = {
             let run = run.clone();
             std::thread::spawn(move || {
-                let mut tap = AudioTap::new(slot, 256);
+                let mut tap = AudioTap::new(slot, 256, 3);
                 let (a, b, c) = (vec![0.25f32; 128], vec![0.5f32; 128], vec![0.75f32; 128]);
                 while run.load(Ordering::Relaxed) {
                     tap.poll();
-                    tap.push(64, [&a, &b, &c]);
+                    tap.push(64, &[&a, &b, &c]);
                     std::thread::sleep(Duration::from_millis(1));
                 }
             })
