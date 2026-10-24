@@ -145,7 +145,11 @@ wait-free ring; the consumer reads through a 4-point Catmull-Rom interpolator wh
 (≤ ±0.5 %, slow proportional control on the filtered ring fill) so the fill level holds its target.
 The same component handles different nominal rates (16/44.1/48/96 kHz) and clock drift.
 Verified by simulation at ±400 ppm over 60 s (no underruns, no drops, fill stays bounded, output
-continuous) and live with two inputs and two outputs at 48 and 96 kHz.
+continuous), live with two inputs and two outputs at 48 and 96 kHz, and in a 14.5-minute soak with
+zero underruns, drops and device errors. One caveat from that soak: in one of two recorded 90 s takes
+the master bus showed an unexplained -51 dBFS non-sine component while the app was being used
+against the same engine; a repeat with nothing touching the engine was clean (two 60 s takes at the
+expected -80.00 dBFS, perfectly continuous), so it was not reproduced.
 
 ## 7. Security, signing, distribution
 
