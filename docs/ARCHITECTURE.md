@@ -196,7 +196,7 @@ Audiora/
 | Area | State |
 |---|---|
 | Engine, mixer, DSP, recorder, presets, control API, exclusive mode, per-app volumes, device-loss recovery | Built and tested |
-| Svelte app + Tauri shell | Built; UI verified live against the engine; Tauri shell compiles |
+| Svelte app + Tauri shell | Built; verified live against the engine in a browser and inside the Tauri window (dev and embedded-asset builds); installer not built |
 | R Interface | Simulator only — real protocol unknown |
 | Virtual audio driver | Designed — blocked: WDK missing, no safe test machine |
 | ASIO driver | Designed — blocked: Steinberg licence decision |
