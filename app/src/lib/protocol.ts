@@ -40,6 +40,16 @@ export interface RecStatus {
   dir?: string;
 }
 
+export interface TakeEntry {
+  name: string;
+  path: string;
+  bytes: number;
+  modified_ms: number;
+  channels: number;
+  sample_rate: number;
+  seconds: number;
+}
+
 export interface DeviceEntry {
   id: string;
   name: string;

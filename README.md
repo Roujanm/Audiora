@@ -11,8 +11,10 @@ Proprietary — all rights reserved.
   bridged without clicks; strip chain denoise → gate → EQ → compressor → fader; bus limiter; shared,
   low-latency and **exclusive** WASAPI (3 ms periods); per-application volumes; survives devices
   disappearing; presets and session restore; recorder to multichannel 32-bit float WAV (RF64, crash-safe).
-* **App** (`app/`): Svelte 5 + Tauri 2 — Play skin (mixer, application volumes) and Studio skin (EQ
-  curve editor, dynamics, recorder, routing matrix, interface panel, system health), live meters at 30 Hz.
+* **App** (`app/`): Svelte 5 + Tauri 2 with a hardware-style interface (knobs, machined faders, LED
+  meters, patchbay routing, five accent colours). Play skin: mixer and application volumes. Studio
+  skin adds the EQ curve editor, gate/compressor graphs, recorder with takes list, routing and the
+  interface panel. Live meters at 30 Hz.
 * **Control API** over a loopback WebSocket / TCP — see [docs/CONTROL-API.md](docs/CONTROL-API.md).
 * **R Interface**: control layer plus a clearly-labelled **simulator**; licence system with a vendor
   tool.

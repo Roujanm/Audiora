@@ -1,6 +1,10 @@
 <script lang="ts">
   import { engine } from '../lib/engine.svelte.ts';
-  import Slider from './Slider.svelte';
+  import { gateGainDb, outputDb } from '../lib/dynamics.ts';
+  import CurveGraph from './CurveGraph.svelte';
+  import Icon from './Icon.svelte';
+  import Knob from './Knob.svelte';
+  import Switch from './Switch.svelte';
 
   interface Props {
     strip: number;
@@ -9,157 +13,211 @@
 
   const p = (leaf: string) => `strip/${strip}/${leaf}`;
   const g = (leaf: string, d = 0) => engine.get(p(leaf), d);
+  const set = (leaf: string) => (v: number) => engine.set(p(leaf), v);
+  const flag = (leaf: string) => (v: boolean) => engine.set(p(leaf), v);
+
   const isInput = $derived(engine.info?.strips[strip]?.kind === 'input');
   const masterRate = $derived(engine.info?.buses[0]?.sample_rate ?? 48000);
   const denoiseOk = $derived(masterRate === 48000);
 
-  const gateOpen = $derived(engine.gauge(p('gate/open')) > 0.5);
-  const gr = $derived(engine.gauge(p('comp/gr_db')));
-  const compOn = $derived(g('comp/enabled') > 0.5);
   const gateOn = $derived(g('gate/enabled') > 0.5);
-  const set = (leaf: string) => (v: number) => engine.set(p(leaf), v);
+  const gateOpen = $derived(engine.gauge(p('gate/open')) > 0.5);
+  const compOn = $derived(g('comp/enabled') > 0.5);
+  const gr = $derived(compOn ? engine.gauge(p('comp/gr_db')) : 0);
+  const denoise = $derived(g('denoise') > 0.5);
+
+  const comp = $derived({ thresholdDb: g('comp/threshold_db', -18), ratio: g('comp/ratio', 3), kneeDb: g('comp/knee_db', 6) });
+  const makeup = $derived(g('comp/makeup_db'));
+
+  const ms = (v: number) => (v >= 100 ? `${Math.round(v)} ms` : `${v.toFixed(v < 10 ? 1 : 0)} ms`);
+  const db = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
 </script>
 
 <div class="dyn">
   {#if isInput}
-    <section class="block">
-      <div class="head">
-        <h2>Noise suppression</h2>
-        <button class="sw" class:on={g('denoise') > 0.5} disabled={!denoiseOk} onclick={() => engine.toggle(p('denoise'))} aria-pressed={g('denoise') > 0.5}>
-          {g('denoise') > 0.5 ? 'On' : 'Off'}
-        </button>
-      </div>
-      <p class="muted note">
+    <section class="card panel" class:off={!denoise}>
+      <header>
+        <span class="ico"><Icon name="bolt" size={16} /></span>
+        <h2 class="eyebrow">Noise suppression</h2>
+        <Switch checked={denoise} label="Noise suppression" disabled={!denoiseOk} onchange={flag('denoise')} />
+      </header>
+      <p class="muted copy">
         {#if denoiseOk}
-          RNNoise-class neural denoiser for voice. Adds 10 ms of latency to this strip.
+          Neural voice denoiser (RNNoise class). Removes fans, keyboard and room noise from this input. Adds 10 ms.
         {:else}
-          Requires a 48 kHz output; the master device runs at {masterRate / 1000} kHz.
+          Needs a 48 kHz master output. The master runs at {masterRate / 1000} kHz right now.
         {/if}
       </p>
     </section>
   {/if}
 
-  <section class="block">
-    <div class="head">
-      <h2>Gate</h2>
+  <section class="card panel" class:off={!gateOn}>
+    <header>
       <span class="led" class:on={gateOn && gateOpen} title={gateOn ? (gateOpen ? 'Open' : 'Closed') : 'Bypassed'}></span>
-      <button class="sw" class:on={gateOn} onclick={() => engine.toggle(p('gate/enabled'))} aria-pressed={gateOn}>{gateOn ? 'On' : 'Off'}</button>
+      <h2 class="eyebrow">Gate</h2>
+      <Switch checked={gateOn} label="Gate" onchange={flag('gate/enabled')} />
+    </header>
+    <div class="body">
+      <CurveGraph
+        label="Gate transfer curve"
+        thresholdDb={g('gate/threshold_db', -50)}
+        active={gateOn}
+        color="var(--ok)"
+        fn={(i) => i + gateGainDb(i, g('gate/threshold_db', -50), g('gate/range_db', 60))}
+      />
+      <div class="knobs">
+        <Knob label="Thresh" min={-90} max={0} step={0.5} reset={-50} color="var(--ok)" disabled={!gateOn} value={g('gate/threshold_db', -50)} format={db} onchange={set('gate/threshold_db')} />
+        <Knob label="Range" min={6} max={90} step={1} reset={60} color="var(--ok)" disabled={!gateOn} value={g('gate/range_db', 60)} format={(v) => `${Math.round(v)} dB`} onchange={set('gate/range_db')} />
+        <Knob label="Attack" min={0.1} max={100} scale="log" step={0.1} reset={2} color="var(--ok)" disabled={!gateOn} value={g('gate/attack_ms', 2)} format={ms} onchange={set('gate/attack_ms')} />
+        <Knob label="Release" min={5} max={1500} scale="log" step={1} reset={120} color="var(--ok)" disabled={!gateOn} value={g('gate/release_ms', 120)} format={ms} onchange={set('gate/release_ms')} />
+      </div>
     </div>
-    <Slider label="Threshold" value={g('gate/threshold_db', -50)} min={-90} max={0} step={0.5} unit=" dB" reset={-50} disabled={!gateOn} onchange={set('gate/threshold_db')} />
-    <Slider label="Attack" value={g('gate/attack_ms', 2)} min={0.1} max={100} step={0.1} unit=" ms" reset={2} disabled={!gateOn} onchange={set('gate/attack_ms')} />
-    <Slider label="Release" value={g('gate/release_ms', 120)} min={5} max={1500} step={5} digits={0} unit=" ms" reset={120} disabled={!gateOn} onchange={set('gate/release_ms')} />
-    <Slider label="Range" value={g('gate/range_db', 60)} min={6} max={90} step={1} digits={0} unit=" dB" reset={60} disabled={!gateOn} onchange={set('gate/range_db')} />
   </section>
 
-  <section class="block">
-    <div class="head">
-      <h2>Compressor</h2>
-      <div class="gr" title="Gain reduction" aria-label="Gain reduction {gr.toFixed(1)} dB">
-        <div class="grbar" style:width="{Math.min(gr / 24, 1) * 100}%"></div>
-        <span class="num">{compOn ? `−${gr.toFixed(1)} dB` : '—'}</span>
+  <section class="card panel wide" class:off={!compOn}>
+    <header>
+      <span class="ico warn"><Icon name="wave" size={16} /></span>
+      <h2 class="eyebrow">Compressor</h2>
+      <div class="gr" role="img" aria-label="Gain reduction {gr.toFixed(1)} dB">
+        <div class="grfill" style:width="{Math.min(gr / 18, 1) * 100}%"></div>
+        <span class="num">{compOn ? `−${gr.toFixed(1)} dB` : 'off'}</span>
       </div>
-      <button class="sw" class:on={compOn} onclick={() => engine.toggle(p('comp/enabled'))} aria-pressed={compOn}>{compOn ? 'On' : 'Off'}</button>
+      <Switch checked={compOn} label="Compressor" onchange={flag('comp/enabled')} />
+    </header>
+    <div class="body">
+      <CurveGraph
+        label="Compressor transfer curve"
+        width={210}
+        height={170}
+        thresholdDb={comp.thresholdDb}
+        active={compOn}
+        color="var(--warn)"
+        fn={(i) => outputDb(i, comp, makeup)}
+      />
+      <div class="knobs two">
+        <Knob label="Thresh" min={-60} max={0} step={0.5} reset={-18} color="var(--warn)" disabled={!compOn} value={comp.thresholdDb} format={db} onchange={set('comp/threshold_db')} />
+        <Knob label="Ratio" min={1} max={20} scale="log" step={0.1} reset={3} color="var(--warn)" disabled={!compOn} value={comp.ratio} format={(v) => `${v.toFixed(1)}:1`} onchange={set('comp/ratio')} />
+        <Knob label="Knee" min={0} max={24} step={0.5} reset={6} color="var(--warn)" disabled={!compOn} value={comp.kneeDb} format={(v) => `${v.toFixed(1)} dB`} onchange={set('comp/knee_db')} />
+        <Knob label="Attack" min={0.1} max={200} scale="log" step={0.1} reset={10} color="var(--warn)" disabled={!compOn} value={g('comp/attack_ms', 10)} format={ms} onchange={set('comp/attack_ms')} />
+        <Knob label="Release" min={10} max={2000} scale="log" step={1} reset={120} color="var(--warn)" disabled={!compOn} value={g('comp/release_ms', 120)} format={ms} onchange={set('comp/release_ms')} />
+        <Knob label="Make-up" min={0} max={24} step={0.5} reset={0} color="var(--warn)" disabled={!compOn} value={makeup} format={db} onchange={set('comp/makeup_db')} />
+      </div>
     </div>
-    <Slider label="Threshold" value={g('comp/threshold_db', -18)} min={-60} max={0} step={0.5} unit=" dB" reset={-18} disabled={!compOn} onchange={set('comp/threshold_db')} />
-    <Slider label="Ratio" value={g('comp/ratio', 3)} min={1} max={20} step={0.1} unit=" :1" reset={3} disabled={!compOn} onchange={set('comp/ratio')} />
-    <Slider label="Attack" value={g('comp/attack_ms', 10)} min={0.1} max={200} step={0.1} unit=" ms" reset={10} disabled={!compOn} onchange={set('comp/attack_ms')} />
-    <Slider label="Release" value={g('comp/release_ms', 120)} min={10} max={2000} step={5} digits={0} unit=" ms" reset={120} disabled={!compOn} onchange={set('comp/release_ms')} />
-    <Slider label="Knee" value={g('comp/knee_db', 6)} min={0} max={24} step={0.5} unit=" dB" reset={6} disabled={!compOn} onchange={set('comp/knee_db')} />
-    <Slider label="Make-up" value={g('comp/makeup_db', 0)} min={0} max={24} step={0.5} unit=" dB" reset={0} disabled={!compOn} onchange={set('comp/makeup_db')} />
   </section>
 </div>
 
 <style>
   .dyn {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
     align-items: start;
   }
 
-  .block {
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  .wide {
+    grid-column: 1 / -1;
   }
 
-  .head {
+  .card {
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: opacity 0.2s;
+  }
+
+  .card.off .body,
+  .card.off .copy {
+    opacity: 0.62;
+  }
+
+  header {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 6px;
   }
 
-  .head h2 {
-    margin: 0;
+  header h2 {
     flex: 1;
   }
 
-  .sw {
-    min-width: 46px;
-    height: 24px;
-    border-radius: 12px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 600;
+  .ico {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    color: var(--ok);
+    background: color-mix(in oklab, var(--ok) 14%, transparent);
   }
 
-  .sw.on {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #06101d;
-  }
-
-  .sw:disabled {
-    opacity: 0.4;
+  .ico.warn {
+    color: var(--warn);
+    background: color-mix(in oklab, var(--warn) 14%, transparent);
   }
 
   .led {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    background: var(--panel-3);
-    border: 1px solid var(--line);
+    background: var(--bg-4);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
   }
 
   .led.on {
     background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    box-shadow: 0 0 10px var(--ok);
   }
 
-  .note {
-    margin: 0;
-    font-size: 12px;
+  .copy {
+    font-size: 12.5px;
+    max-width: 52ch;
+  }
+
+  .body {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .knobs {
+    flex: 1;
+    min-width: 230px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px 8px;
+  }
+
+  .knobs.two {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .gr {
     position: relative;
-    width: 110px;
-    height: 20px;
-    border-radius: 4px;
-    background: var(--bg);
+    width: 130px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--bg-0);
     border: 1px solid var(--line);
     overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
   }
 
-  .grbar {
+  .grfill {
     position: absolute;
     inset: 0 auto 0 0;
-    background: rgba(255, 180, 84, 0.45);
+    background: linear-gradient(90deg, color-mix(in oklab, var(--warn) 25%, transparent), var(--warn));
+    opacity: 0.65;
+    transition: width 0.06s linear;
   }
 
   .gr span {
     position: relative;
     display: block;
     text-align: right;
-    padding-right: 6px;
+    padding-right: 8px;
     font-size: 11px;
-    line-height: 18px;
+    line-height: 22px;
   }
 </style>

@@ -12,6 +12,7 @@ import type {
   RecStatus,
   Reply,
   Stats,
+  TakeEntry,
 } from './protocol.ts';
 
 const WS_URL = 'ws://127.0.0.1:7879';
@@ -38,6 +39,7 @@ class EngineClient {
   gauges = $state<Record<string, number>>({});
   stats = $state<Stats>({ callbacks: 0, underruns: 0, drift_drops: 0, capture_drops: 0, device_errors: 0 });
   rec = $state<RecStatus>({ recording: false });
+  takes = $state<TakeEntry[]>([]);
   presets = $state<string[]>([]);
   devices = $state<DeviceEntry[]>([]);
   license = $state<LicenseStatus | null>(null);
@@ -104,7 +106,13 @@ class EngineClient {
       const sub = await this.call('subscribe', { hz: 30 });
       this.#meterPaths = sub.paths as string[];
       this.#lastMeterAt = performance.now();
-      await Promise.all([this.refreshPresets(), this.refreshDevices(), this.refreshRec(), this.refreshLicense()]);
+      await Promise.all([
+        this.refreshPresets(),
+        this.refreshDevices(),
+        this.refreshRec(),
+        this.refreshLicense(),
+        this.refreshTakes().catch(() => {}),
+      ]);
       if (this.info?.hardware) await this.refreshHardware();
       this.connected = true;
       this.connecting = false;
@@ -240,6 +248,10 @@ class EngineClient {
     this.rec = (await this.call('rec_status')) as unknown as RecStatus;
   }
 
+  async refreshTakes() {
+    this.takes = (await this.call('rec_list')).takes as TakeEntry[];
+  }
+
   async recStart(sources: string[]) {
     await this.call('rec_start', { sources });
     await this.refreshRec();
@@ -248,7 +260,20 @@ class EngineClient {
   async recStop() {
     const r = await this.call('rec_stop');
     await this.refreshRec();
+    await this.refreshTakes().catch(() => {});
     return r;
+  }
+
+  /** Shows a take in Explorer (desktop app only). */
+  async revealTake(path: string): Promise<boolean> {
+    if (!inTauri()) return false;
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('reveal_in_folder', { path });
+    return true;
+  }
+
+  get canReveal(): boolean {
+    return inTauri();
   }
 
   // ---- application volumes (Windows audio sessions) ------------------------

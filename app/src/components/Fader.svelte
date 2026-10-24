@@ -2,17 +2,20 @@
   import { formatDb } from '../lib/dsp.ts';
 
   interface Props {
-    /** Gain in dB; values at or below -100 mean "off" (−∞). */
+    /** Gain in dB; values at or below -100 mean "off" (minus infinity). */
     value: number;
     min?: number;
     max?: number;
     label?: string;
+    /** Colour of the cap's indicator line and the level fill. */
+    color?: string;
     onchange: (db: number) => void;
   }
-  let { value, min = -60, max = 12, label = 'Level', onchange }: Props = $props();
+  let { value, min = -60, max = 12, label = 'Level', color = 'var(--accent)', onchange }: Props = $props();
 
   const marks = [12, 6, 0, -6, -12, -24, -36, -48];
   const frac = $derived(value <= -100 ? 0 : (Math.min(Math.max(value, min), max) - min) / (max - min));
+  const zero = $derived((0 - min) / (max - min));
 
   let el: HTMLDivElement;
   let dragging = $state(false);
@@ -24,7 +27,8 @@
 
   function fromPointer(e: PointerEvent) {
     const r = el.getBoundingClientRect();
-    const t = 1 - (e.clientY - r.top) / r.height;
+    // the cap is 30 px tall; keep its centre under the pointer
+    const t = 1 - (e.clientY - r.top - 15) / (r.height - 30);
     emit(min + Math.min(Math.max(t, 0), 1) * (max - min));
   }
 
@@ -54,7 +58,7 @@
   }
 </script>
 
-<div class="wrap">
+<div class="wrap" style:--c={color}>
   <div
     class="fader"
     class:dragging
@@ -66,7 +70,7 @@
     aria-valuemin={min}
     aria-valuemax={max}
     aria-valuenow={value <= -100 ? min : value}
-    aria-valuetext={formatDb(value) + ' dB'}
+    aria-valuetext="{formatDb(value)} dB"
     {onpointerdown}
     onpointermove={(e) => dragging && fromPointer(e)}
     onpointerup={() => (dragging = false)}
@@ -78,16 +82,19 @@
     }}
     {onkeydown}
   >
-    <div class="rail"></div>
-    <div class="fill" style:height="{frac * 100}%"></div>
-    {#each marks as m (m)}
-      <span class="tick" class:zero={m === 0} style:bottom="{((m - min) / (max - min)) * 100}%">
-        <i></i>{m === 0 ? '0' : Math.abs(m)}
-      </span>
-    {/each}
-    <div class="thumb" style:bottom="calc({frac * 100}% - 9px)"></div>
+    <div class="travel">
+      <div class="groove"></div>
+      <div class="fill" style:height="{frac * 100}%"></div>
+      <div class="unity" style:bottom="{zero * 100}%"></div>
+      {#each marks as m (m)}
+        <span class="tick" class:zero={m === 0} style:bottom="{((m - min) / (max - min)) * 100}%">{m === 0 ? '0' : Math.abs(m)}</span>
+      {/each}
+      <div class="cap" style:bottom="calc({frac * 100}% - 15px)">
+        <i class="grip"></i><i class="line"></i><i class="grip"></i>
+      </div>
+    </div>
   </div>
-  <output class="num readout">{formatDb(value)}</output>
+  <output class="num readout" class:off={value <= -100}>{formatDb(value)}<small>dB</small></output>
 </div>
 
 <style>
@@ -95,7 +102,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 100%;
     min-height: 0;
   }
@@ -103,95 +110,142 @@
   .fader {
     position: relative;
     flex: 1;
-    min-height: 120px;
-    width: 52px;
+    min-height: 150px;
+    width: 64px;
+    padding: 15px 0;
     touch-action: none;
     cursor: ns-resize;
-    user-select: none;
   }
 
-  .rail {
+  .travel {
+    position: relative;
+    height: 100%;
+  }
+
+  .groove {
     position: absolute;
-    left: 8px;
+    left: 14px;
     top: 0;
     bottom: 0;
     width: 6px;
     border-radius: 3px;
-    background: var(--bg);
-    border: 1px solid var(--line);
+    background: var(--bg-0);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .fill {
     position: absolute;
-    left: 9px;
+    left: 15.5px;
     bottom: 0;
-    width: 4px;
+    width: 3px;
     border-radius: 2px;
-    background: linear-gradient(to top, #2b5f98, var(--accent));
-    opacity: 0.8;
+    background: linear-gradient(to top, color-mix(in oklab, var(--c) 40%, transparent), var(--c));
+    box-shadow: 0 0 10px color-mix(in oklab, var(--c) 55%, transparent);
+    transition: height 0.04s linear;
+  }
+
+  .unity {
+    position: absolute;
+    left: 6px;
+    width: 22px;
+    height: 1px;
+    background: var(--line-3);
+    transform: translateY(0.5px);
+    pointer-events: none;
   }
 
   .tick {
     position: absolute;
-    left: 20px;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 9px;
+    left: 36px;
+    font: 500 9px/1 var(--mono);
     color: var(--faint);
     transform: translateY(50%);
     pointer-events: none;
   }
 
-  .tick i {
-    width: 5px;
-    height: 1px;
-    background: var(--faint);
-  }
-
   .tick.zero {
-    color: var(--text);
+    color: var(--text-2);
   }
 
-  .tick.zero i {
-    width: 8px;
-    background: var(--text);
-  }
-
-  .thumb {
+  .cap {
     position: absolute;
-    left: 1px;
-    width: 20px;
-    height: 18px;
-    border-radius: 4px;
-    background: linear-gradient(#e9eef6, #b8c3d1);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    left: 0;
+    width: 34px;
+    height: 30px;
+    border-radius: 6px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 38%),
+      linear-gradient(180deg, #dfe5ee, #8e99a9 52%, #c7cfdb);
+    box-shadow:
+      0 6px 10px -2px rgba(0, 0, 0, 0.75),
+      0 1px 0 rgba(255, 255, 255, 0.6) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.35) inset;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px 5px;
     pointer-events: none;
+    transition: box-shadow 0.15s;
   }
 
-  .thumb::after {
-    content: '';
-    position: absolute;
-    left: 3px;
-    right: 3px;
-    top: 8px;
+  .grip {
+    display: block;
     height: 2px;
-    background: #4b5667;
     border-radius: 1px;
+    background: rgba(0, 0, 0, 0.28);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 
-  .fader:focus-visible .thumb,
-  .fader.dragging .thumb {
-    outline: 2px solid var(--accent);
+  .line {
+    display: block;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--c);
+    box-shadow: 0 0 8px var(--c);
+  }
+
+  .fader:focus-visible {
+    outline: none;
+  }
+
+  .fader:focus-visible .cap,
+  .fader.dragging .cap {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 6px 14px -2px rgba(0, 0, 0, 0.8),
+      0 1px 0 rgba(255, 255, 255, 0.6) inset;
   }
 
   .readout {
-    font-size: 12px;
-    min-width: 46px;
+    min-width: 62px;
+    padding: 4px 6px 3px;
     text-align: center;
-    padding: 2px 4px;
-    border-radius: 4px;
-    background: var(--bg);
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: var(--r-sm);
+    background: var(--bg-0);
     border: 1px solid var(--line);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+
+  .readout small {
+    margin-left: 2px;
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--faint);
+  }
+
+  .readout.off {
+    color: var(--faint);
+  }
+
+  @media (max-height: 780px) {
+    .fader {
+      min-height: 90px;
+    }
+
+    .wrap {
+      gap: 5px;
+    }
   }
 </style>

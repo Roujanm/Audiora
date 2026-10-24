@@ -122,8 +122,16 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
 - **Tauri 2 + Svelte 5 (TypeScript)**. The shell (`app/src-tauri`) starts the engine if it is not
   running and asks it to shut down cleanly (recordings finalized, session saved) when the app exits
   — but only if the app started it.
-- **Play skin**: the mixer — strips, buses, presets. **Studio skin** adds EQ & dynamics, recording,
-  routing matrix, interface control and system health.
+- **Design system**: bundled Inter and JetBrains Mono (no network), five graphite surface steps,
+  five switchable accent colours, one hue per channel, inline icon set. Hardware-style controls built
+  for the job: rotary knobs (drag, wheel, keyboard, double-click reset, log scales), machined faders,
+  canvas LED meters with peak hold, switches and segmented controls. Everything is keyboard
+  operable and carries ARIA slider semantics.
+- **Play skin**: the mixer (inputs and a console-style master section), application volumes, system
+  health, presets. **Studio skin** adds the EQ editor (response curve, four draggable bands with
+  knobs), gate and compressor with transfer-curve graphs and live gain reduction, the recorder
+  (timecode, track meters, takes list, show-in-folder), a patchbay routing view with cables, and the
+  audio-interface panel. Layouts adapt down to the 980 x 620 minimum window.
 - All state comes from the engine; the UI keeps no audio logic except display maths that mirrors the
   engine (EQ curve, meter ballistics), covered by tests against the same expectations as the Rust.
 

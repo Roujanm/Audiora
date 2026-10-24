@@ -32,6 +32,7 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | `preset_save` / `preset_load` / `preset_delete` | `name` | save: `saved`; load: `applied`, `skipped` |
 | `rec_start` | `sources[]` (default `["mix"]`) | `path`, `sample_rate`, `channels`, `sources` |
 | `rec_stop` | | `path`, `frames`, `seconds`, `dropped_frames` |
+| `rec_list` | | `takes[]` (newest first, up to 40): name, path, bytes, modified_ms, channels, sample_rate, seconds |
 | `rec_status` | | `recording`, and while recording `path`, `sources`, `seconds`, `dropped_frames`, `error` |
 | `hw_info` | | `model`, `serial`, `firmware`, `simulated`, `inputs`, `outputs` |
 | `hw_controls` | | `controls[]`: path, label, group, kind (`range`/`toggle`/`choice`), value |

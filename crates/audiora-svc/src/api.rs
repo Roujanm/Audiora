@@ -8,7 +8,7 @@
 //!   {"cmd":"set","path":"strip/0/eq/1/gain_db","value":3.5}
 //!   {"cmd":"meters"}
 //!   {"cmd":"preset_list"} / preset_save / preset_load / preset_delete  ("name")
-//!   {"cmd":"rec_start","sources":["mix"]} / rec_stop / rec_status
+//!   {"cmd":"rec_start","sources":["mix"]} / rec_stop / rec_status / rec_list
 //!   {"cmd":"apps"} / {"cmd":"app_set","device":"…","instance_id":"…","volume":0.5,"mute":false}
 //!
 //! Replies carry `"ok":true` or `"ok":false,"error":"..."`; `id` is echoed.
@@ -119,6 +119,7 @@ impl Api {
             }
             "rec_stop" => self.rec.stop().map(|s| rec::summary_json(&s)),
             "rec_status" => Ok(self.rec.status()),
+            "rec_list" => Ok(json!({ "takes": self.rec.list_takes(40) })),
             "get" => match path {
                 Some(p) => self
                     .params

@@ -214,6 +214,38 @@ impl RecController {
         rec.session.finish().map_err(|e| format!("finalizing file: {e}"))
     }
 
+    /// The newest `limit` takes in the recordings folder (this engine writes the headers, so
+    /// the channel count, rate and data offset are read from fixed positions).
+    pub fn list_takes(&self, limit: usize) -> Vec<Value> {
+        let Ok(dir) = std::fs::read_dir(&self.dir) else { return Vec::new() };
+        let mut takes: Vec<(std::time::SystemTime, Value)> = dir
+            .flatten()
+            .filter(|e| e.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("wav")))
+            .filter_map(|e| {
+                let meta = e.metadata().ok()?;
+                let modified = meta.modified().ok()?;
+                let (channels, rate, header) = wav_info(&e.path())?;
+                let bytes = meta.len();
+                let seconds = bytes.saturating_sub(header) as f64 / (channels as f64 * 4.0) / rate as f64;
+                let ms = modified.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
+                Some((
+                    modified,
+                    json!({
+                        "name": e.file_name().to_string_lossy(),
+                        "path": e.path().display().to_string(),
+                        "bytes": bytes,
+                        "modified_ms": ms,
+                        "channels": channels,
+                        "sample_rate": rate,
+                        "seconds": seconds,
+                    }),
+                ))
+            })
+            .collect();
+        takes.sort_by_key(|t| std::cmp::Reverse(t.0));
+        takes.into_iter().take(limit).map(|(_, v)| v).collect()
+    }
+
     pub fn status(&self) -> Value {
         let active = self.active.lock().unwrap();
         match active.as_ref() {
@@ -236,6 +268,24 @@ impl RecController {
     }
 }
 
+/// (channels, sample rate, header length) of a WAV written by `audiora-rec`.
+fn wav_info(path: &std::path::Path) -> Option<(u16, u32, u64)> {
+    use std::io::Read;
+    let mut head = [0u8; 64];
+    std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;
+    if &head[8..12] != b"WAVE" || &head[48..52] != b"fmt " {
+        return None;
+    }
+    let fmt_len = u32::from_le_bytes(head[52..56].try_into().ok()?) as u64;
+    let channels = u16::from_le_bytes(head[58..60].try_into().ok()?);
+    let rate = u32::from_le_bytes(head[60..64].try_into().ok()?);
+    if channels == 0 || rate == 0 {
+        return None;
+    }
+    // RIFF header (12) + JUNK chunk (36) + fmt chunk + fact chunk (12) + data chunk header (8)
+    Some((channels, rate, 48 + 8 + fmt_len + 12 + 8))
+}
+
 pub fn summary_json(s: &Summary) -> Value {
     json!({
         "path": s.path.display().to_string(),
@@ -248,6 +298,35 @@ pub fn summary_json(s: &Summary) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lists_takes_with_duration_channels_and_newest_first() {
+        use audiora_rec::WavWriter;
+        let dir = std::env::temp_dir().join(format!("audiora-takes-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let write = |name: &str, channels: u16, frames: usize| {
+            let f = std::fs::File::create_new(dir.join(name)).unwrap();
+            let mut w = WavWriter::new(f, 48_000, channels).unwrap();
+            w.write_samples(&vec![0.1; frames * channels as usize]).unwrap();
+            w.finish().unwrap();
+        };
+        write("old.wav", 2, 48_000);
+        std::thread::sleep(Duration::from_millis(30));
+        write("new.wav", 6, 96_000);
+        std::fs::write(dir.join("notes.txt"), b"ignore me").unwrap();
+        std::fs::write(dir.join("broken.wav"), b"not a wav").unwrap();
+
+        let ctl = RecController::new(Arc::new(TapSlot::default()), 48_000, dir.clone(), Layout::new(1, 1, 0));
+        let takes = ctl.list_takes(10);
+        assert_eq!(takes.len(), 2, "text and broken files are skipped: {takes:?}");
+        assert_eq!(takes[0]["name"], "new.wav");
+        assert_eq!(takes[0]["channels"], 6);
+        assert!((takes[0]["seconds"].as_f64().unwrap() - 2.0).abs() < 1e-6);
+        assert_eq!(takes[1]["name"], "old.wav");
+        assert!((takes[1]["seconds"].as_f64().unwrap() - 1.0).abs() < 1e-6);
+        assert_eq!(ctl.list_takes(1).len(), 1);
+        std::fs::remove_dir_all(dir).ok();
+    }
 
     #[test]
     fn layout_resolves_names_and_aliases() {

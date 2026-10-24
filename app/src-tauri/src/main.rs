@@ -72,6 +72,25 @@ fn ensure_engine(state: tauri::State<'_, OwnedEngine>) -> Result<String, String>
     Err("the audio engine did not start in time".into())
 }
 
+/// Opens Explorer with a recording selected. Only existing `.wav` files are accepted,
+/// so the engine's reply (or anything else) cannot make the shell open arbitrary paths.
+#[tauri::command]
+fn reveal_in_folder(path: String) -> Result<(), String> {
+    let file = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    let is_wav = file.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("wav"));
+    if !file.is_file() || !is_wav {
+        return Err("only recordings can be shown".into());
+    }
+    // canonicalize returns the \\?\ form, which Explorer does not understand
+    let shown = file.display().to_string();
+    let shown = shown.strip_prefix(r"\\?\").unwrap_or(&shown).to_string();
+    Command::new("explorer.exe")
+        .arg(format!("/select,{shown}"))
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 /// Asks the engine to stop itself (so it finalizes recordings and saves the
 /// session), then falls back to killing it.
 fn stop_engine(mut child: Child) {
@@ -94,7 +113,7 @@ fn stop_engine(mut child: Child) {
 fn main() {
     tauri::Builder::default()
         .manage(OwnedEngine::default())
-        .invoke_handler(tauri::generate_handler![ensure_engine])
+        .invoke_handler(tauri::generate_handler![ensure_engine, reveal_in_folder])
         .build(tauri::generate_context!())
         .expect("error while building the Audiora app")
         .run(|app, event| {

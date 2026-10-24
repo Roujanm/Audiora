@@ -1,5 +1,6 @@
 <script lang="ts">
   import { engine } from './lib/engine.svelte.ts';
+  import { ACCENTS, periodLabel, rateLabel, type AccentId } from './lib/theme.ts';
   import Strip from './components/Strip.svelte';
   import BusStrip from './components/BusStrip.svelte';
   import EqEditor from './components/EqEditor.svelte';
@@ -10,6 +11,9 @@
   import System from './components/System.svelte';
   import Apps from './components/Apps.svelte';
   import Presets from './components/Presets.svelte';
+  import Icon, { type IconName } from './components/Icon.svelte';
+  import Popover from './components/Popover.svelte';
+  import Segmented from './components/Segmented.svelte';
 
   engine.start();
 
@@ -25,23 +29,35 @@
     }
   }
 
+  const accentIds = ACCENTS.map((a) => a.id);
   let skin = $state<Skin>(remembered('audiora.skin', ['play', 'studio'], 'play'));
+  let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'azure'));
   let tab = $state<Tab>('mixer');
   let selected = $state(0);
 
   $effect(() => {
+    document.documentElement.dataset.accent = accent;
     try {
       localStorage.setItem('audiora.skin', skin);
+      localStorage.setItem('audiora.accent', accent);
     } catch {
-      /* private mode: preference just is not remembered */
+      /* private mode: preferences just are not remembered */
     }
   });
 
-  const PLAY_TABS: Tab[] = ['mixer', 'apps'];
+  const NAV: { id: Tab; label: string; icon: IconName; studio: boolean; title: string }[] = [
+    { id: 'mixer', label: 'Mixer', icon: 'mixer', studio: false, title: 'Mixer' },
+    { id: 'apps', label: 'Apps', icon: 'apps', studio: false, title: 'Applications' },
+    { id: 'processing', label: 'EQ · FX', icon: 'eq', studio: true, title: 'EQ & Dynamics' },
+    { id: 'record', label: 'Record', icon: 'record', studio: true, title: 'Recorder' },
+    { id: 'routing', label: 'Routing', icon: 'routing', studio: true, title: 'Routing' },
+    { id: 'hardware', label: 'Interface', icon: 'interface', studio: true, title: 'Audio interface' },
+    { id: 'system', label: 'System', icon: 'system', studio: false, title: 'System' },
+  ];
 
-  // The play skin has only the mixer and application volumes; leaving studio returns to those.
+  const visibleNav = $derived(NAV.filter((n) => skin === 'studio' || !n.studio));
   $effect(() => {
-    if (skin === 'play' && !PLAY_TABS.includes(tab)) tab = 'mixer';
+    if (!visibleNav.some((n) => n.id === tab)) tab = 'mixer';
   });
 
   const strips = $derived(engine.info?.strips ?? []);
@@ -50,360 +66,618 @@
     if (selected >= strips.length) selected = 0;
   });
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'mixer', label: 'Mixer' },
-    { id: 'apps', label: 'Apps' },
-    { id: 'processing', label: 'EQ & Dynamics' },
-    { id: 'record', label: 'Record' },
-    { id: 'routing', label: 'Routing' },
-    { id: 'hardware', label: 'Interface' },
-    { id: 'system', label: 'System' },
-  ];
-
+  const current = $derived(NAV.find((n) => n.id === tab)!);
+  const master = $derived(buses[0]);
   const s = $derived(engine.stats);
-  const health = $derived(s.underruns + s.drift_drops + s.capture_drops + s.device_errors);
+  const glitches = $derived(s.underruns + s.drift_drops + s.capture_drops + s.device_errors);
+  const subtitle = $derived(
+    tab === 'mixer'
+      ? `${strips.filter((x) => x.kind === 'input').length} inputs · ${buses.length} output${buses.length === 1 ? '' : 's'}`
+      : tab === 'apps'
+        ? 'Volume per application, like the Windows mixer'
+        : tab === 'processing'
+          ? 'Per-channel equalizer, gate and compressor'
+          : tab === 'record'
+            ? '32-bit float WAV, multitrack'
+            : tab === 'routing'
+              ? 'Which input goes to which output'
+              : tab === 'hardware'
+                ? 'Preamps, phantom power, monitoring'
+                : 'Devices, audio health and licence',
+  );
 </script>
 
 <div class="app">
-  <header class="top">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 14v-4M7 18V6M11 21V3M15 17V7M19 14v-4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none" /></svg>
-      </span>
-      <span class="name">AUDIORA</span>
-      <span class="by muted">Roujan Digital Agency</span>
+  <nav class="rail" aria-label="Sections">
+    <div class="logo" aria-label="Audiora">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 14v-4M7 18V6M11 21V3M15 17V7M19 14v-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none" /></svg>
     </div>
+    <div class="items">
+      {#each visibleNav as n (n.id)}
+        <button class="item" class:active={tab === n.id} aria-current={tab === n.id ? 'page' : undefined} onclick={() => (tab = n.id)}>
+          <span class="ico"><Icon name={n.icon} size={20} />{#if n.id === 'record' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}</span>
+          <span class="lbl">{n.label}</span>
+        </button>
+      {/each}
+    </div>
+    <span class="brand-foot">Roujan<br />Digital</span>
+  </nav>
 
-    <nav class="tabs" aria-label="Sections">
-      {#each tabs.filter((t) => skin === 'studio' || PLAY_TABS.includes(t.id)) as t (t.id)}
-          <button class="tab" class:active={tab === t.id} aria-current={tab === t.id ? 'page' : undefined} onclick={() => (tab = t.id)}>
-            {t.label}
-            {#if t.id === 'record' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}
+  <div class="shell">
+    <header class="top">
+      <div class="title">
+        <h1>{current.title}</h1>
+        <p class="muted">{subtitle}</p>
+      </div>
+
+      <div class="spacer"></div>
+
+      {#if engine.connected && master}
+        <div class="status-pill" title="Master output">
+          <span class="dot"></span>
+          <span class="state">Engine running</span>
+          <span class="sep"></span>
+          <span class="num">{rateLabel(master.sample_rate)} · {periodLabel(master.sample_rate, master.period_frames)}</span>
+          {#if master.exclusive}<span class="chip accent">EXCLUSIVE</span>{:else if master.low_latency}<span class="chip accent">LOW LATENCY</span>{/if}
+        </div>
+      {/if}
+
+      {#if engine.connected}<Presets />{/if}
+
+      <Popover width={196}>
+        {#snippet trigger({ open, toggle })}
+          <button class="btn ghost icon" class:open aria-label="Accent colour" title="Accent colour" onclick={toggle}>
+            <Icon name="palette" size={18} />
           </button>
-        {/each}
-      </nav>
+        {/snippet}
+        {#snippet children({ close })}
+          <p class="eyebrow pop-title">Accent colour</p>
+          <div class="swatches">
+            {#each ACCENTS as a (a.id)}
+              <button
+                class="swatch"
+                class:on={accent === a.id}
+                style:--s={a.swatch}
+                aria-label={a.label}
+                aria-pressed={accent === a.id}
+                title={a.label}
+                onclick={() => {
+                  accent = a.id;
+                  close();
+                }}
+              ></button>
+            {/each}
+          </div>
+        {/snippet}
+      </Popover>
 
-    <div class="spacer"></div>
-    {#if engine.connected}<Presets />{/if}
+      <Segmented
+        label="Interface mode"
+        value={skin}
+        options={[
+          { id: 'play', label: 'Play' },
+          { id: 'studio', label: 'Studio' },
+        ]}
+        onchange={(id) => (skin = id as Skin)}
+      />
+    </header>
 
-    <div class="skin" role="group" aria-label="Interface mode">
-      <button class:active={skin === 'play'} aria-pressed={skin === 'play'} onclick={() => (skin = 'play')}>Play</button>
-      <button class:active={skin === 'studio'} aria-pressed={skin === 'studio'} onclick={() => (skin = 'studio')}>Studio</button>
-    </div>
-  </header>
-
-  <main>
-    {#if !engine.connected}
-      <div class="connect card" role="status">
-        <div class="spin" aria-hidden="true"></div>
-        <div>
-          <h2>{engine.connecting ? 'Connecting to the Audiora engine…' : 'Engine not reachable'}</h2>
-          <p class="muted">
-            Start <code>audiora-svc</code> (the app does this automatically when installed). Retrying every second.
-          </p>
-          {#if engine.lastError}<p class="chip bad">{engine.lastError}</p>{/if}
+    <main>
+      {#if !engine.connected}
+        <div class="connect panel pad" role="status">
+          <div class="pulse" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div>
+            <h2>{engine.connecting ? 'Connecting to the audio engine…' : 'Engine not reachable'}</h2>
+            <p class="muted">
+              The app starts <code>audiora-svc</code> for you when installed. Retrying every second.
+            </p>
+            {#if engine.lastError}<p class="chip bad err">{engine.lastError}</p>{/if}
+          </div>
         </div>
-      </div>
-    {:else if tab === 'mixer'}
-      <div class="mixer">
-        <div class="strips" role="group" aria-label="Input strips">
-          {#each strips as _s, i (i)}
-            <Strip index={i} advanced={skin === 'studio'} selected={selected === i} onselect={() => { selected = i; tab = 'processing'; }} />
-          {/each}
+      {:else if tab === 'mixer'}
+        <div class="mixer">
+          <section class="group inputs" aria-label="Inputs">
+            <h2 class="eyebrow">Inputs</h2>
+            <div class="row">
+              {#each strips as _s, i (i)}
+                <Strip index={i} advanced={skin === 'studio'} selected={selected === i && skin === 'studio'} onselect={() => { selected = i; tab = 'processing'; }} />
+              {/each}
+            </div>
+          </section>
+          <div class="divider"></div>
+          <section class="group outputs" aria-label="Outputs">
+            <h2 class="eyebrow">Outputs</h2>
+            <div class="row">
+              {#each buses as _b, i (i)}
+                <BusStrip index={i} />
+              {/each}
+            </div>
+          </section>
         </div>
-        <div class="divider"></div>
-        <div class="buses" role="group" aria-label="Output buses">
-          {#each buses as _b, i (i)}
-            <BusStrip index={i} />
-          {/each}
-        </div>
-      </div>
-    {:else if tab === 'apps'}
-      <div class="scroll"><Apps /></div>
-    {:else if tab === 'processing'}
-      <div class="scroll">
-        <div class="picker" role="tablist" aria-label="Strip">
+      {:else if tab === 'apps'}
+        <div class="scroll"><Apps /></div>
+      {:else if tab === 'processing'}
+        <div class="scroll"><div class="proc"><nav class="picker" aria-label="Channel">
           {#each strips as s2, i (i)}
-            <button role="tab" aria-selected={selected === i} class:active={selected === i} onclick={() => (selected = i)}>
-              {s2.kind === 'input' ? `Input ${i + 1}` : 'Tone'} <span class="muted">{s2.name}</span>
+            <button class:active={selected === i} aria-pressed={selected === i} onclick={() => (selected = i)}>
+              <span class="n">{s2.kind === 'input' ? i + 1 : 'T'}</span>
+              <span class="t">{s2.kind === 'input' ? s2.name.replace(/\s*\(.*\)\s*$/, '') : 'Tone generator'}</span>
             </button>
           {/each}
-        </div>
-        <section class="card"><EqEditor strip={selected} /></section>
-        <DynamicsPanel strip={selected} />
-      </div>
-    {:else if tab === 'record'}
-      <div class="scroll"><section class="card"><Recorder /></section></div>
-    {:else if tab === 'routing'}
-      <div class="scroll"><section class="card"><h2>Routing matrix</h2><Routing /></section></div>
-    {:else if tab === 'hardware'}
-      <div class="scroll"><Hardware /></div>
-    {:else}
-      <div class="scroll"><System /></div>
-    {/if}
-  </main>
+        </nav>
+        <div class="stack"><EqEditor strip={selected} /><DynamicsPanel strip={selected} /></div></div></div>
+      {:else if tab === 'record'}
+        <div class="scroll"><Recorder /></div>
+      {:else if tab === 'routing'}
+        <div class="scroll"><Routing /></div>
+      {:else if tab === 'hardware'}
+        <div class="scroll"><Hardware /></div>
+      {:else}
+        <div class="scroll"><System /></div>
+      {/if}
+    </main>
 
-  <footer class="status">
-    <span class="dot" class:on={engine.connected} aria-hidden="true"></span>
-    <span>{engine.connected ? 'Engine running' : 'Offline'}</span>
-    {#if engine.connected}
-      <span class="chip" class:warn={health > 6}>{health === 0 ? 'No audio glitches' : `${health} glitch events`}</span>
-      {#if engine.rec.recording}<span class="chip bad">● Recording</span>{/if}
-      {#if engine.hwInfo?.simulated}<span class="chip warn">Interface simulator</span>{/if}
-      {#if engine.lastError}<span class="chip bad" title={engine.lastError}>{engine.lastError.slice(0, 80)}</span>{/if}
-    {/if}
-    <span class="spacer"></span>
-    <span class="muted">v0.1 · {engine.license?.state === 'valid' ? `${engine.license.edition} licence` : 'Play edition'}</span>
-  </footer>
+    <footer class="foot">
+      {#if engine.connected}
+        <span class="chip" class:warn={glitches > 6} title="Underruns, drift drops, dropped blocks and device errors since start">
+          {glitches === 0 ? 'No audio glitches' : `${glitches} glitch events`}
+        </span>
+        {#if engine.rec.recording}<span class="chip bad">● Recording</span>{/if}
+        {#if engine.hwInfo?.simulated}<span class="chip warn">Interface simulator</span>{/if}
+        {#if engine.lastError}<span class="chip bad" title={engine.lastError}>{engine.lastError.slice(0, 90)}</span>{/if}
+      {:else}
+        <span class="chip bad">Offline</span>
+      {/if}
+      <span class="spacer"></span>
+      <span class="muted ver">Audiora 0.1 · {engine.license?.state === 'valid' ? `${engine.license.edition} licence` : 'Play edition'}</span>
+    </footer>
+  </div>
 </div>
 
 <style>
   .app {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 84px 1fr;
     height: 100%;
   }
 
-  .top {
+  /* ----- rail */
+  .rail {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
-    flex-wrap: wrap;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    gap: 22px;
+    padding: 18px 0 14px;
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+    border-right: 1px solid var(--line);
   }
 
   .logo {
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #3d8bff, #6c5cff);
-    color: #fff;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 45%, #7b5cff));
+    box-shadow: 0 8px 24px -8px var(--accent-glow), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
   }
 
-  .name {
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    font-size: 14px;
-  }
-
-  .by {
-    font-size: 11px;
-    padding-left: 10px;
-    border-left: 1px solid var(--line);
-  }
-
-  .tabs {
+  .items {
     display: flex;
-    gap: 2px;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding: 0 10px;
+    flex: 1;
   }
 
-  @media (max-width: 1500px) {
-    .by {
-      display: none;
-    }
-  }
-
-  .tab {
-    position: relative;
-    height: 30px;
-    padding: 0 12px;
-    background: none;
+  .item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 0 7px;
     border: 0;
-    border-radius: var(--radius-sm);
+    border-radius: 12px;
+    background: none;
     color: var(--muted);
+    position: relative;
+    transition: color 0.15s, background 0.15s;
   }
 
-  .tab:hover {
-    background: var(--panel-2);
+  .item:hover {
     color: var(--text);
+    background: var(--bg-2);
   }
 
-  .tab.active {
+  .item.active {
+    color: var(--accent-hi);
     background: var(--accent-soft);
-    color: var(--accent);
+  }
+
+  .item.active::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  .ico {
+    position: relative;
+    display: grid;
+  }
+
+  .lbl {
+    font-size: 10.5px;
     font-weight: 600;
   }
 
   .recdot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    margin-left: 6px;
+    position: absolute;
+    top: -2px;
+    right: -5px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--rec);
+    box-shadow: 0 0 8px var(--rec);
     animation: pulse 1.2s infinite;
   }
 
   @keyframes pulse {
     50% {
-      opacity: 0.25;
+      opacity: 0.3;
     }
+  }
+
+  .brand-foot {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ----- shell */
+  .shell {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .top {
+    position: relative;
+    z-index: 20; /* popovers open over the page below */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in oklab, var(--bg-1) 70%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
+  .title {
+    min-width: 0;
+  }
+
+  .title p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .title h1 {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+  }
+
+  .title p {
+    font-size: 12px;
   }
 
   .spacer {
     flex: 1;
   }
 
-  .skin {
+  .status-pill {
+    flex: none;
+    white-space: nowrap;
     display: flex;
-    padding: 2px;
-    border-radius: var(--radius-sm);
-    background: var(--bg);
-    border: 1px solid var(--line);
+    align-items: center;
+    gap: 9px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: var(--bg-2);
+    border: 1px solid var(--line-2);
+    font-size: 12px;
+    color: var(--text-2);
   }
 
-  .skin button {
-    height: 26px;
-    padding: 0 14px;
-    border: 0;
-    border-radius: 4px;
-    background: none;
-    color: var(--muted);
+  .status-pill .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 10px var(--ok);
   }
 
-  .skin button.active {
-    background: var(--panel-3);
+  .status-pill .sep {
+    width: 1px;
+    height: 14px;
+    background: var(--line-2);
+  }
+
+  .btn.icon {
+    width: 32px;
+    padding: 0;
+  }
+
+  .btn.icon.open {
+    background: var(--bg-3);
     color: var(--text);
-    font-weight: 600;
+  }
+
+  .pop-title {
+    padding: 4px 6px 8px;
+  }
+
+  .swatches {
+    display: flex;
+    gap: 10px;
+    padding: 2px 6px 6px;
+  }
+
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--s);
+    box-shadow: 0 0 0 1px var(--line-3), 0 4px 10px -2px color-mix(in oklab, var(--s) 60%, transparent);
+    transition: transform 0.12s;
+  }
+
+  .swatch:hover {
+    transform: scale(1.12);
+  }
+
+  .swatch.on {
+    border-color: var(--bg-2);
+    box-shadow: 0 0 0 2px var(--s), 0 4px 14px -2px color-mix(in oklab, var(--s) 70%, transparent);
   }
 
   main {
     min-height: 0;
-    padding: 14px 16px;
+    min-width: 0;
+    padding: 18px 22px;
     overflow: hidden;
   }
 
   .mixer {
     display: flex;
-    gap: 14px;
+    gap: 18px;
     height: 100%;
     min-height: 0;
-    overflow-x: auto;
-    padding-bottom: 6px;
   }
 
-  .strips,
-  .buses {
+  .group {
     display: flex;
+    flex-direction: column;
     gap: 10px;
     min-height: 0;
+    flex: none;
   }
 
-  .strips > :global(*),
-  .buses > :global(*) {
-    height: 100%;
-    max-height: 560px;
+  /* inputs take the free width and scroll on their own; the outputs stay pinned right, like a console */
+  .group.inputs {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .group.inputs .row {
+    overflow-x: auto;
+    padding: 2px 4px 8px 2px;
+    margin: 0 -4px 0 -2px;
+  }
+
+  .group h2 {
+    padding-left: 4px;
+  }
+
+  .group .row {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .group .row > :global(*) {
+    max-height: 640px;
   }
 
   .divider {
     width: 1px;
-    background: var(--line);
     flex: none;
+    background: linear-gradient(180deg, transparent, var(--line-2) 12%, var(--line-2) 88%, transparent);
   }
 
   .scroll {
     height: 100%;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding-right: 4px;
+    padding-right: 6px;
+  }
+
+  .proc {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
   }
 
   .picker {
     display: flex;
+    flex-direction: column;
     gap: 6px;
-    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
   }
 
   .picker button {
-    height: 30px;
-    padding: 0 12px;
-    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--r-md);
     border: 1px solid var(--line);
-    background: var(--panel-2);
-    max-width: 280px;
+    background: var(--bg-2);
+    color: var(--text-2);
+    text-align: left;
+    font-weight: 550;
+    transition: all 0.12s;
+  }
+
+  .picker button:hover {
+    border-color: var(--line-3);
+    color: var(--text);
+  }
+
+  .picker button.active {
+    color: var(--text);
+    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+    background: var(--accent-soft);
+  }
+
+  .picker .n {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    font: 700 11px var(--mono);
+    background: var(--bg-0);
+    color: var(--accent-hi);
+  }
+
+  .picker .t {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .picker button.active {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
   }
 
   .connect {
     display: flex;
     align-items: center;
-    gap: 16px;
-    max-width: 560px;
+    gap: 22px;
+    max-width: 580px;
     margin: 12vh auto 0;
   }
 
   .connect h2 {
+    font-size: 16px;
+    font-weight: 650;
     color: var(--text);
-    font-size: 15px;
     letter-spacing: 0;
     text-transform: none;
+    margin-bottom: 4px;
   }
 
-  .connect p {
-    margin: 0 0 8px;
+  .connect .err {
+    margin-top: 10px;
+    height: auto;
+    padding: 4px 10px;
+    white-space: normal;
   }
 
   code {
     font-family: var(--mono);
-    background: var(--bg);
-    padding: 1px 5px;
-    border-radius: 4px;
+    background: var(--bg-0);
+    padding: 1px 6px;
+    border-radius: 5px;
+    border: 1px solid var(--line);
   }
 
-  .spin {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 3px solid var(--panel-3);
-    border-top-color: var(--accent);
-    animation: spin 0.9s linear infinite;
+  .pulse {
+    position: relative;
     flex: none;
+    width: 44px;
+    height: 44px;
   }
 
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
+  .pulse i {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    animation: ripple 2.1s infinite var(--ease);
+  }
+
+  .pulse i:nth-child(2) {
+    animation-delay: 0.7s;
+  }
+
+  .pulse i:nth-child(3) {
+    animation-delay: 1.4s;
+  }
+
+  @keyframes ripple {
+    0% {
+      transform: scale(0.35);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
     }
   }
 
-  .status {
+  .foot {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 16px;
+    gap: 8px;
+    padding: 9px 22px;
     border-top: 1px solid var(--line);
-    background: var(--panel);
+    background: color-mix(in oklab, var(--bg-1) 70%, transparent);
     font-size: 12px;
   }
 
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--bad);
+  .ver {
+    font-size: 11px;
   }
 
-  .dot.on {
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+  @media (max-width: 1180px) {
+    .status-pill .state,
+    .status-pill .sep {
+      display: none;
+    }
+
+    .top {
+      gap: 8px;
+      padding-inline: 16px;
+    }
+
+    main {
+      padding-inline: 16px;
+    }
   }
 </style>
