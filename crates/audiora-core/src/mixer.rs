@@ -1,11 +1,17 @@
 //! Strip -> bus mixer. `process` never allocates, locks or blocks.
+//!
+//! Strip chain:  denoise -> gate -> EQ -> compressor -> fader/balance -> buses
+//! Bus chain:    sum -> fader -> limiter -> output
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use audiora_dsp::{db_to_lin, Biquad, BiquadCoeffs, FilterKind};
+use audiora_dsp::{
+    db_to_lin, Biquad, BiquadCoeffs, Compressor, Denoiser, FilterKind, Gate, Limiter,
+    DENOISE_SAMPLE_RATE,
+};
 
-use crate::params::{MixerParams, EQ_BANDS};
+use crate::params::{MixerParams, StripParams, EQ_BANDS};
 
 /// Longest block handled in one pass; longer inputs are chunked internally.
 pub const MAX_BLOCK_FRAMES: usize = 4096;
@@ -14,6 +20,11 @@ const BAND_KINDS: [FilterKind; EQ_BANDS] =
     [FilterKind::LowShelf, FilterKind::Peak, FilterKind::Peak, FilterKind::HighShelf];
 
 struct StripState {
+    denoiser: Option<Box<Denoiser>>,
+    gate: Gate,
+    comp: Compressor,
+    gate_on: bool,
+    comp_on: bool,
     eq: [[Biquad; 2]; EQ_BANDS],
     /// (freq, gain_db, q) the filters were last configured with.
     eq_cache: [(f32, f32, f32); EQ_BANDS],
@@ -24,6 +35,8 @@ struct StripState {
 
 struct BusState {
     gain: f32,
+    limiter: Box<Limiter>,
+    limiter_on: bool,
 }
 
 pub struct Mixer {
@@ -37,11 +50,17 @@ pub struct Mixer {
 impl Mixer {
     pub fn new(sample_rate: f32, strips: usize, buses: usize) -> (Self, Arc<MixerParams>) {
         let params = Arc::new(MixerParams::new(strips, buses));
+        let denoise_ok = sample_rate as u32 == DENOISE_SAMPLE_RATE;
         let mixer = Self {
             sample_rate,
             params: params.clone(),
             strips: (0..strips)
                 .map(|_| StripState {
+                    denoiser: denoise_ok.then(|| Box::new(Denoiser::new())),
+                    gate: Gate::new(sample_rate),
+                    comp: Compressor::new(sample_rate),
+                    gate_on: false,
+                    comp_on: false,
                     eq: [[Biquad::default(); 2]; EQ_BANDS],
                     eq_cache: [(f32::NAN, 0.0, 0.0); EQ_BANDS],
                     eq_active: false,
@@ -49,7 +68,13 @@ impl Mixer {
                     gain_r: 1.0,
                 })
                 .collect(),
-            buses: (0..buses).map(|_| BusState { gain: 1.0 }).collect(),
+            buses: (0..buses)
+                .map(|_| BusState {
+                    gain: 1.0,
+                    limiter: Box::new(Limiter::new(sample_rate)),
+                    limiter_on: false,
+                })
+                .collect(),
             scratch: vec![0.0; MAX_BLOCK_FRAMES * 2],
         };
         (mixer, params)
@@ -113,14 +138,39 @@ impl Mixer {
             let buf = &mut self.scratch[..frames * 2];
             buf.copy_from_slice(&inputs[i][range.clone()]);
 
+            if p.denoise.load(Ordering::Relaxed) {
+                if let Some(d) = st.denoiser.as_mut() {
+                    d.process(buf);
+                }
+            }
+
+            if p.gate.enabled.load(Ordering::Relaxed) {
+                let open = st.gate.process(buf, &p.gate.settings());
+                p.gate.open.set(open as u8 as f32);
+                st.gate_on = true;
+            } else if st.gate_on {
+                st.gate.reset();
+                p.gate.open.set(1.0);
+                st.gate_on = false;
+            }
+
             update_eq(st, p, self.sample_rate);
             if st.eq_active {
                 for f in buf.chunks_exact_mut(2) {
-                    for band in 0..EQ_BANDS {
-                        f[0] = st.eq[band][0].process(f[0]);
-                        f[1] = st.eq[band][1].process(f[1]);
+                    for band in st.eq.iter_mut() {
+                        f[0] = band[0].process(f[0]);
+                        f[1] = band[1].process(f[1]);
                     }
                 }
+            }
+
+            if p.comp.enabled.load(Ordering::Relaxed) {
+                p.comp.gr_db.set(st.comp.process(buf, &p.comp.settings()));
+                st.comp_on = true;
+            } else if st.comp_on {
+                st.comp.reset();
+                p.comp.gr_db.set(0.0);
+                st.comp_on = false;
             }
 
             let step_l = (target_l - st.gain_l) * inv;
@@ -152,21 +202,34 @@ impl Mixer {
             let target = if p.mute.load(Ordering::Relaxed) { 0.0 } else { db_to_lin(p.gain_db.get()) };
             let step = (target - st.gain) * inv;
             let mut g = st.gain;
-            let (mut pl, mut pr) = (peaks_b[b][0], peaks_b[b][1]);
-            for f in outputs[b][range.clone()].chunks_exact_mut(2) {
+            let out = &mut outputs[b][range.clone()];
+            for f in out.chunks_exact_mut(2) {
                 g += step;
                 f[0] *= g;
                 f[1] *= g;
+            }
+            st.gain = target;
+
+            if p.limiter.enabled.load(Ordering::Relaxed) {
+                p.limiter.gr_db.set(st.limiter.process(out, &p.limiter.settings()));
+                st.limiter_on = true;
+            } else if st.limiter_on {
+                st.limiter.reset();
+                p.limiter.gr_db.set(0.0);
+                st.limiter_on = false;
+            }
+
+            let (mut pl, mut pr) = (peaks_b[b][0], peaks_b[b][1]);
+            for f in out.chunks_exact(2) {
                 pl = pl.max(f[0].abs());
                 pr = pr.max(f[1].abs());
             }
             peaks_b[b] = [pl, pr];
-            st.gain = target;
         }
     }
 }
 
-fn update_eq(st: &mut StripState, p: &crate::params::StripParams, fs: f32) {
+fn update_eq(st: &mut StripState, p: &StripParams, fs: f32) {
     let mut active = false;
     for band in 0..EQ_BANDS {
         let cur = (p.eq[band].freq.get(), p.eq[band].gain_db.get(), p.eq[band].q.get());
@@ -203,6 +266,15 @@ mod tests {
 
     fn dc(v: f32) -> Vec<f32> {
         vec![v; FRAMES * 2]
+    }
+
+    fn sine(amp: f32, hz: f32) -> Vec<f32> {
+        (0..FRAMES)
+            .flat_map(|n| {
+                let s = amp * (2.0 * std::f32::consts::PI * hz * n as f32 / 48_000.0).sin();
+                [s, s]
+            })
+            .collect()
     }
 
     #[test]
@@ -268,18 +340,85 @@ mod tests {
         let (mut m, p) = Mixer::new(48_000.0, 1, 1);
         p.strips[0].eq[1].gain_db.set(12.0);
         p.strips[0].eq[1].freq.set(1000.0);
-        let sine: Vec<f32> = (0..FRAMES)
-            .flat_map(|n| {
-                let s = 0.1 * (2.0 * std::f32::consts::PI * 1000.0 * n as f32 / 48_000.0).sin();
-                [s, s]
-            })
-            .collect();
-        // run several blocks so the filter reaches steady state
+        let input = sine(0.1, 1000.0);
         let mut last_peak = 0.0;
         for _ in 0..20 {
-            run(&mut m, std::slice::from_ref(&sine), 1);
+            run(&mut m, std::slice::from_ref(&input), 1);
             last_peak = p.strips[0].peak_l.get();
         }
         assert!(last_peak > 0.3, "expected ~0.4 after +12 dB, got {last_peak}");
+    }
+
+    #[test]
+    fn gate_silences_quiet_strip_and_reports_closed() {
+        let (mut m, p) = Mixer::new(44_100.0, 1, 1); // 44.1k: denoise unavailable, gate still works
+        p.strips[0].gate.enabled.store(true, Ordering::Relaxed);
+        p.strips[0].gate.threshold_db.set(-30.0);
+        p.strips[0].gate.release_ms.set(5.0);
+        let quiet = sine(0.003, 440.0); // about -50 dBFS
+        for _ in 0..40 {
+            run(&mut m, std::slice::from_ref(&quiet), 1);
+        }
+        assert_eq!(p.strips[0].gate.open.get(), 0.0);
+        assert!(p.strips[0].peak_l.get() < 0.0005);
+    }
+
+    #[test]
+    fn compressor_reports_gain_reduction() {
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        p.strips[0].comp.enabled.store(true, Ordering::Relaxed);
+        p.strips[0].comp.threshold_db.set(-20.0);
+        p.strips[0].comp.ratio.set(4.0);
+        p.strips[0].comp.attack_ms.set(1.0);
+        p.strips[0].comp.knee_db.set(0.0);
+        let loud = sine(0.5, 1000.0);
+        for _ in 0..40 {
+            run(&mut m, std::slice::from_ref(&loud), 1);
+        }
+        let gr = p.strips[0].comp.gr_db.get();
+        assert!(gr > 8.0 && gr < 12.0, "gr {gr}");
+    }
+
+    #[test]
+    fn bus_limiter_caps_output() {
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        p.buses[0].limiter.enabled.store(true, Ordering::Relaxed);
+        p.buses[0].limiter.ceiling_db.set(-6.0);
+        let hot = sine(1.5, 200.0);
+        let mut worst = 0f32;
+        for _ in 0..30 {
+            let out = run(&mut m, std::slice::from_ref(&hot), 1);
+            worst = worst.max(out[0].iter().fold(0.0, |a, &b| a.max(b.abs())));
+        }
+        assert!(worst <= db_to_lin(-6.0) + 1e-3, "worst {worst}");
+        assert!(p.buses[0].limiter.gr_db.get() > 1.0);
+    }
+
+    #[test]
+    fn denoise_flag_is_inert_at_unsupported_rates_and_adds_latency_at_48k() {
+        let (mut m, p) = Mixer::new(44_100.0, 1, 1);
+        p.strips[0].denoise.store(true, Ordering::Relaxed);
+        let out = run(&mut m, &[dc(0.5)], 1);
+        assert!(out[0].iter().all(|&s| (s - 0.5).abs() < 1e-6), "bypassed at 44.1k");
+
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        p.strips[0].denoise.store(true, Ordering::Relaxed);
+        let out = run(&mut m, &[dc(0.5)], 1);
+        assert!(out[0][..100].iter().all(|&s| s.abs() < 1e-3), "10 ms of latency, silent first");
+    }
+
+    #[test]
+    fn disabling_processors_restores_passthrough() {
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        p.strips[0].comp.enabled.store(true, Ordering::Relaxed);
+        p.strips[0].comp.threshold_db.set(-40.0);
+        let loud = sine(0.5, 1000.0);
+        for _ in 0..10 {
+            run(&mut m, std::slice::from_ref(&loud), 1);
+        }
+        assert!(p.strips[0].comp.gr_db.get() > 1.0);
+        p.strips[0].comp.enabled.store(false, Ordering::Relaxed);
+        run(&mut m, std::slice::from_ref(&loud), 1);
+        assert_eq!(p.strips[0].comp.gr_db.get(), 0.0);
     }
 }

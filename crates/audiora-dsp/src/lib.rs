@@ -2,9 +2,13 @@
 //! after construction, so every type is safe to use on the audio thread.
 
 mod biquad;
+mod denoise;
+mod dynamics;
 mod resample;
 
 pub use biquad::{Biquad, BiquadCoeffs, FilterKind};
+pub use denoise::{Denoiser, DENOISE_FRAME, DENOISE_SAMPLE_RATE};
+pub use dynamics::{CompSettings, Compressor, Gate, GateSettings, Limiter, LimiterSettings};
 pub use resample::LinearResampler;
 
 /// Silence floor used when converting linear gain to dB.
