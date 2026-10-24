@@ -6,6 +6,9 @@
 //!   {"cmd":"state"}
 //!   {"cmd":"get","path":"strip/0/gain_db"}
 //!   {"cmd":"set","path":"strip/0/eq/1/gain_db","value":3.5}
+//!   {"cmd":"meters"}
+//!   {"cmd":"preset_list"} / preset_save / preset_load / preset_delete  ("name")
+//!   {"cmd":"rec_start","sources":["mix"]} / rec_stop / rec_status
 //!
 //! Replies carry `"ok":true` or `"ok":false,"error":"..."`; `id` is echoed.
 
@@ -16,6 +19,7 @@ use audiora_core::MixerParams;
 use serde_json::{json, Map, Value};
 
 use crate::engine::Stats;
+use crate::presets::{PresetStore, LAST};
 use crate::rec::{self, RecController};
 
 pub const API_VERSION: u32 = 1;
@@ -24,6 +28,7 @@ pub struct Api {
     pub params: Arc<MixerParams>,
     pub stats: Arc<Stats>,
     pub rec: Arc<RecController>,
+    pub presets: Arc<PresetStore>,
     /// Static engine description returned by `info`.
     pub info: Value,
 }
@@ -45,6 +50,19 @@ impl Api {
             "info" => Ok(self.info.clone()),
             "devices" => self.devices(),
             "state" => Ok(self.state()),
+            "meters" => Ok(self.meters_json()),
+            "preset_list" => Ok(json!({ "presets": self.presets.list() })),
+            "preset_save" => self.with_name(&req, |n| {
+                self.presets.save(n, &self.params).map(|c| json!({ "name": n, "saved": c }))
+            }),
+            "preset_load" => self.with_name(&req, |n| {
+                self.presets
+                    .load(n, &self.params)
+                    .map(|(a, s)| json!({ "name": n, "applied": a, "skipped": s }))
+            }),
+            "preset_delete" => self.with_name(&req, |n| {
+                self.presets.delete(n).map(|_| json!({ "name": n }))
+            }),
             "rec_start" => {
                 let sources: Vec<String> = req
                     .get("sources")
@@ -85,6 +103,33 @@ impl Api {
             }
             Err(e) => err_reply(&id, &e),
         }
+    }
+
+    fn with_name(
+        &self,
+        req: &Value,
+        f: impl FnOnce(&str) -> Result<Value, String>,
+    ) -> Result<Value, String> {
+        match req.get("name").and_then(Value::as_str) {
+            Some(n) if n != LAST => f(n),
+            Some(_) => Err("that name is reserved".into()),
+            None => Err("missing \"name\"".into()),
+        }
+    }
+
+    /// Paths of every meter, in the order `meter_values` reports them.
+    pub fn meter_paths(&self) -> Vec<String> {
+        self.params.paths().into_iter().filter(|p| self.params.is_meter(p)).collect()
+    }
+
+    pub fn meter_values(&self, paths: &[String]) -> Vec<f64> {
+        paths.iter().map(|p| self.params.get(p).unwrap_or(0.0)).collect()
+    }
+
+    fn meters_json(&self) -> Value {
+        let paths = self.meter_paths();
+        let values = self.meter_values(&paths);
+        json!({ "paths": paths, "values": values })
     }
 
     fn state(&self) -> Value {
@@ -140,7 +185,8 @@ mod tests {
         let (_m, params) = Mixer::new(48_000.0, 2, 1);
         let dir = std::env::temp_dir().join(format!("audiora-api-test-{}", std::process::id()));
         let rec = Arc::new(RecController::new(Default::default(), 48_000, dir, crate::rec::Layout::new(2, 1, 1)));
-        Api { params, stats: Arc::new(Stats::default()), rec, info: json!({}) }
+        let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
+        Api { params, stats: Arc::new(Stats::default()), rec, presets, info: json!({}) }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -182,6 +228,30 @@ mod tests {
         let r = call(&a, r#"{"cmd":"rec_start","sources":["nope"]}"#);
         assert_eq!(r["ok"], false);
         assert!(r["error"].as_str().unwrap().contains("unknown source"));
+    }
+
+    #[test]
+    fn presets_via_api() {
+        let a = api();
+        call(&a, r#"{"cmd":"set","path":"strip/0/gain_db","value":-12}"#);
+        assert_eq!(call(&a, r#"{"cmd":"preset_save","name":"api test"}"#)["ok"], true);
+        call(&a, r#"{"cmd":"set","path":"strip/0/gain_db","value":0}"#);
+        let r = call(&a, r#"{"cmd":"preset_load","name":"api test"}"#);
+        assert_eq!(r["skipped"], 0);
+        assert_eq!(call(&a, r#"{"cmd":"get","path":"strip/0/gain_db"}"#)["value"], -12.0);
+        assert!(call(&a, r#"{"cmd":"preset_list"}"#)["presets"].as_array().unwrap().iter().any(|p| p == "api test"));
+        assert_eq!(call(&a, r#"{"cmd":"preset_delete","name":"api test"}"#)["ok"], true);
+        assert_eq!(call(&a, r#"{"cmd":"preset_save","name":"_last"}"#)["ok"], false);
+        assert_eq!(call(&a, r#"{"cmd":"preset_save","name":"../x"}"#)["ok"], false);
+    }
+
+    #[test]
+    fn meters_report_paths_and_values_in_step() {
+        let a = api();
+        let m = call(&a, r#"{"cmd":"meters"}"#);
+        assert_eq!(m["paths"].as_array().unwrap().len(), m["values"].as_array().unwrap().len());
+        assert!(m["paths"].as_array().unwrap().iter().any(|p| p == "bus/0/limiter/gr_db"));
+        assert!(!m["paths"].as_array().unwrap().iter().any(|p| p == "strip/0/gain_db"));
     }
 
     #[test]

@@ -2,7 +2,8 @@
 //!
 //! ```text
 //! audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency]
-//!             [--port N] [--rec-dir DIR] [--secs S]
+//!             [--port N] [--ws-port N] [--allow-origin URL]... [--rec-dir DIR]
+//!             [--data-dir DIR] [--fresh] [--secs S]
 //! ```
 //!
 //! `--in` / `--out` can be repeated: every input becomes a mixer strip, every
@@ -10,6 +11,7 @@
 
 mod api;
 mod engine;
+mod presets;
 mod rec;
 mod server;
 
@@ -20,6 +22,7 @@ use std::time::{Duration, Instant};
 
 use api::Api;
 use engine::{Engine, EngineConfig, NodeInfo};
+use presets::PresetStore;
 use serde_json::{json, Value};
 
 fn arg<T: std::str::FromStr>(args: &[String], name: &str) -> Option<T> {
@@ -95,10 +98,20 @@ fn main() -> ExitCode {
 
     let strips: Vec<Value> = engine.info.strips.iter().enumerate().map(|(i, n)| node_json(i, n)).collect();
     let buses: Vec<Value> = engine.info.buses.iter().enumerate().map(|(i, n)| node_json(i, n)).collect();
+    let data_dir = arg::<std::path::PathBuf>(&args, "--data-dir").unwrap_or_else(presets::default_data_dir);
+    let presets = Arc::new(PresetStore::new(&data_dir));
+    if !args.iter().any(|a| a == "--fresh") && presets.exists(presets::LAST) {
+        match presets.load(presets::LAST, &engine.params) {
+            Ok((applied, skipped)) => println!("restored last session ({applied} settings, {skipped} skipped)"),
+            Err(e) => eprintln!("could not restore last session: {e}"),
+        }
+    }
+
     let api = Arc::new(Api {
         params: engine.params.clone(),
         stats: engine.stats.clone(),
         rec: engine.rec.clone(),
+        presets: presets.clone(),
         info: json!({
             "api": api::API_VERSION,
             "recordings_dir": engine.rec.dir().display().to_string(),
@@ -119,8 +132,23 @@ fn main() -> ExitCode {
         });
     }
 
-    println!("control API on 127.0.0.1:{port} (JSON lines)");
-    let result = server::serve(api, port, stop);
+    let ws_port: u16 = arg(&args, "--ws-port").unwrap_or(7879);
+    let mut origins: Vec<String> = server::DEFAULT_ORIGINS.iter().map(|s| s.to_string()).collect();
+    origins.extend(args_all(&args, "--allow-origin"));
+    {
+        let (api, stop) = (api.clone(), stop.clone());
+        std::thread::spawn(move || {
+            if let Err(e) = server::serve_ws(api, ws_port, origins, stop) {
+                eprintln!("websocket server error: {e}");
+            }
+        });
+    }
+    println!("control API: tcp 127.0.0.1:{port} (JSON lines), websocket 127.0.0.1:{ws_port}");
+    let result = server::serve(api.clone(), port, stop);
+    match presets.save(presets::LAST, &engine.params) {
+        Ok(n) => println!("session saved ({n} settings)"),
+        Err(e) => eprintln!("could not save session: {e}"),
+    }
 
     let s = &engine.stats;
     println!(
