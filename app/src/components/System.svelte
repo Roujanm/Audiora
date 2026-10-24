@@ -26,7 +26,7 @@
             <td class="dev" title={n.name}>{n.name}</td>
             <td class="num">{n.sample_rate ? `${n.sample_rate / 1000} kHz` : '—'}</td>
             <td class="num">
-              {#if latencyMs(n) !== null}{latencyMs(n)!.toFixed(1)} ms{n.low_latency ? ' · LL' : ''}{:else}—{/if}
+              {#if latencyMs(n) !== null}{latencyMs(n)!.toFixed(1)} ms{n.exclusive ? ` · EXCLUSIVE ${n.bit_depth}-bit` : n.low_latency ? ' · LL' : ''}{:else}—{/if}
             </td>
           </tr>
         {/each}
@@ -41,10 +41,12 @@
       <dt>Underruns</dt><dd class="num" class:bad={s.underruns > 0}>{s.underruns}</dd>
       <dt>Drift drops</dt><dd class="num" class:bad={s.drift_drops > 0}>{s.drift_drops}</dd>
       <dt>Dropped blocks</dt><dd class="num" class:bad={s.capture_drops > 0}>{s.capture_drops}</dd>
+      <dt>Device errors</dt><dd class="num" class:bad={s.device_errors > 0}>{s.device_errors}</dd>
     </dl>
     <p class="muted note">
       Underruns: a device ran out of audio. Drift drops: two device clocks diverged more than the resampler can trim.
-      A few at start-up are normal.
+      Device errors: a device disappeared (unplugged, or another app took it exclusively); the engine keeps running
+      and reconnects by itself. A few underruns at start-up are normal.
     </p>
   </section>
 

@@ -3,6 +3,7 @@
 
 import { stepMeter, type MeterState } from './ballistics.ts';
 import type {
+  AppSessionEntry,
   DeviceEntry,
   EngineInfo,
   HwControl,
@@ -35,11 +36,12 @@ class EngineClient {
   meters = $state<Record<string, MeterState>>({});
   /** Other meters as reported: gain reduction in dB, gate open flag. */
   gauges = $state<Record<string, number>>({});
-  stats = $state<Stats>({ callbacks: 0, underruns: 0, drift_drops: 0, capture_drops: 0 });
+  stats = $state<Stats>({ callbacks: 0, underruns: 0, drift_drops: 0, capture_drops: 0, device_errors: 0 });
   rec = $state<RecStatus>({ recording: false });
   presets = $state<string[]>([]);
   devices = $state<DeviceEntry[]>([]);
   license = $state<LicenseStatus | null>(null);
+  apps = $state<AppSessionEntry[]>([]);
 
   hwInfo = $state<HwInfo | null>(null);
   hwControls = $state<HwControl[]>([]);
@@ -247,6 +249,32 @@ class EngineClient {
     const r = await this.call('rec_stop');
     await this.refreshRec();
     return r;
+  }
+
+  // ---- application volumes (Windows audio sessions) ------------------------
+
+  async refreshApps() {
+    const now = performance.now();
+    const incoming = (await this.call('apps')).apps as AppSessionEntry[];
+    // keep a slider the user is dragging from jumping back to a stale value
+    this.apps = incoming.map((a) => {
+      const touched = this.#dirty.get(`app:${a.instance_id}`);
+      if (touched === undefined || now - touched > DIRTY_GRACE_MS) return a;
+      const old = this.apps.find((o) => o.instance_id === a.instance_id && o.device_id === a.device_id);
+      return old ? { ...a, volume: old.volume, muted: old.muted } : a;
+    });
+  }
+
+  setApp(app: AppSessionEntry, change: { volume?: number; mute?: boolean }) {
+    this.#dirty.set(`app:${app.instance_id}`, performance.now());
+    this.apps = this.apps.map((a) =>
+      a.instance_id === app.instance_id && a.device_id === app.device_id
+        ? { ...a, volume: change.volume ?? a.volume, muted: change.mute ?? a.muted }
+        : a,
+    );
+    this.call('app_set', { device: app.device_id, instance_id: app.instance_id, ...change }).catch(
+      (e) => (this.lastError = String(e)),
+    );
   }
 
   // ---- devices, license, hardware ---------------------------------------

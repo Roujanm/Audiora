@@ -19,8 +19,10 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | Command | Request fields | Reply fields |
 |---|---|---|
 | `ping` | | `api` |
-| `info` | | `strips[]`, `buses[]` (index, kind, name, device_id, sample_rate, channels, period_frames, low_latency), `rec_sources[]`, `recordings_dir`, `hardware` |
+| `info` | | `strips[]`, `buses[]` (index, kind, name, device_id, sample_rate, channels, period_frames, low_latency, exclusive, bit_depth), `rec_sources[]`, `recordings_dir`, `hardware` |
 | `devices` | | `devices[]`: id, name, flow, default, sample_rate, channels |
+| `apps` | | `apps[]`: instance_id, device_id, device_name, pid, name, volume (0–1), muted, peak, active, system_sounds — what the Windows volume mixer shows |
+| `app_set` | `device`, `instance_id`, `volume` and/or `mute` | |
 | `state` | | `params` (every path → value, meters included), `stats` |
 | `get` / `set` | `path` (`value` for set) | `path`, `value` (after clamping) |
 | `meters` | | `paths[]`, `values[]` (index-aligned) |
@@ -86,7 +88,7 @@ keep up with (whole blocks are dropped, so channels never shift).
 ## Starting the engine
 
 ```text
-audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency]
+audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency | --exclusive]
             [--port N] [--ws-port N] [--allow-origin URL]... [--rec-dir DIR]
             [--data-dir DIR] [--fresh] [--sim-r] [--secs S]
 ```
@@ -95,6 +97,14 @@ audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency]
 Interface **simulator** (clearly labelled in `hw_info`). `--fresh` skips restoring the last session.
 Device ids come from the `devices` command or `audiora devices`.
 
+`--low-latency` opens shared streams at the smallest period the Windows audio engine offers.
+`--exclusive` takes the devices exclusively in their native format (24/32-bit integer or float,
+smallest period, about 3 ms on typical onboard audio) — lowest latency and bit-perfect, but no other
+application can use those devices meanwhile and Windows system sounds on them are silenced. If the
+device refuses every exclusive format the engine does not start and says why.
+
 `stats` explains audio health: `underruns` (a device read from an empty ring), `drift_drops` (a ring
-overfilled beyond what the resampler can trim), `capture_drops` (a ring was full). A few at start-up
-are normal.
+overfilled beyond what the resampler can trim), `capture_drops` (a ring was full), `device_errors`
+(a device stream died — unplugged, or another application took it exclusively). After a device
+error the engine keeps running with silence on that path and reopens the device by itself once it is
+back with the same rate and channel count. A few underruns at start-up are normal.

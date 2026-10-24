@@ -2,11 +2,18 @@
 //! exclusive, the Audiora ASIO driver and the R Interface native backend,
 //! all behind the same device/stream vocabulary defined here.
 
+mod format;
+#[cfg(windows)]
+mod sessions;
 #[cfg(windows)]
 mod wasapi;
 
 #[cfg(windows)]
+pub use sessions::{list_sessions, set_session, AppSession};
+#[cfg(windows)]
 pub use wasapi::{default_device_id, list_devices, CaptureStream, RenderStream};
+
+pub use format::SampleFormat;
 
 use std::fmt;
 
@@ -26,6 +33,19 @@ pub struct DeviceInfo {
     pub channels: u16,
 }
 
+/// How a device stream is opened.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Mode {
+    /// Shared mode with the device's default period.
+    #[default]
+    Shared,
+    /// Shared mode with the smallest period the audio engine offers (`IAudioClient3`).
+    LowLatency,
+    /// Exclusive mode: the application owns the device and talks to its native format.
+    /// Lowest latency and bit-perfect, but no other application can use the device.
+    Exclusive,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct StreamFormat {
     pub sample_rate: u32,
@@ -36,6 +56,10 @@ pub struct StreamFormat {
     pub period_frames: u32,
     /// True when the IAudioClient3 minimum-period path is active.
     pub low_latency: bool,
+    /// True when the device is opened in exclusive mode.
+    pub exclusive: bool,
+    /// Valid bits per sample on the wire (32 for float).
+    pub bit_depth: u16,
 }
 
 #[derive(Debug)]

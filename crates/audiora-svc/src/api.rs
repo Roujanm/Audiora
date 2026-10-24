@@ -9,6 +9,7 @@
 //!   {"cmd":"meters"}
 //!   {"cmd":"preset_list"} / preset_save / preset_load / preset_delete  ("name")
 //!   {"cmd":"rec_start","sources":["mix"]} / rec_stop / rec_status
+//!   {"cmd":"apps"} / {"cmd":"app_set","device":"…","instance_id":"…","volume":0.5,"mute":false}
 //!
 //! Replies carry `"ok":true` or `"ok":false,"error":"..."`; `id` is echoed.
 
@@ -61,6 +62,21 @@ impl Api {
             "shutdown" => {
                 self.stop.store(true, Relaxed);
                 Ok(json!({ "stopping": true }))
+            }
+            "apps" => Self::apps(),
+            "app_set" => {
+                let dev = req.get("device").and_then(Value::as_str);
+                let inst = req.get("instance_id").and_then(Value::as_str);
+                let volume = req.get("volume").and_then(Value::as_f64).map(|v| v as f32);
+                let mute = req.get("mute").and_then(Value::as_bool);
+                match (dev, inst) {
+                    (Some(d), Some(i)) if volume.is_some() || mute.is_some() => {
+                        audiora_hal::set_session(d, i, volume, mute)
+                            .map(|_| json!({}))
+                            .map_err(|e| e.to_string())
+                    }
+                    _ => Err("\"app_set\" needs \"device\", \"instance_id\" and \"volume\" and/or \"mute\"".into()),
+                }
             }
             "license_status" => Ok(self.license_status()),
             "hw_info" => self.hw_info(),
@@ -163,6 +179,21 @@ impl Api {
         }
     }
 
+    fn apps() -> Result<Value, String> {
+        let list = audiora_hal::list_sessions().map_err(|e| e.to_string())?;
+        let apps: Vec<Value> = list
+            .into_iter()
+            .map(|a| {
+                json!({
+                    "instance_id": a.instance_id, "device_id": a.device_id, "device_name": a.device_name,
+                    "pid": a.pid, "name": a.name, "volume": a.volume, "muted": a.muted,
+                    "peak": a.peak, "active": a.active, "system_sounds": a.system_sounds,
+                })
+            })
+            .collect();
+        Ok(json!({ "apps": apps }))
+    }
+
     fn hw_with(&self, f: impl FnOnce(&mut dyn HardwareInterface) -> Result<Value, String>) -> Result<Value, String> {
         let hw = self.hw.as_ref().ok_or("no interface hardware connected")?;
         let mut guard = hw.lock().map_err(|_| "hardware lock poisoned".to_string())?;
@@ -237,6 +268,7 @@ impl Api {
                 "underruns": self.stats.underruns.load(Relaxed),
                 "drift_drops": self.stats.drift_drops.load(Relaxed),
                 "capture_drops": self.stats.capture_drops.load(Relaxed),
+                "device_errors": self.stats.device_errors.load(Relaxed),
             }
         })
     }
@@ -351,6 +383,15 @@ mod tests {
         assert_eq!(call(&a, r#"{"cmd":"hw_set","path":"input/0/gain_db","value":900}"#)["ok"], false);
         assert_eq!(call(&a, r#"{"cmd":"hw_get","path":"bogus"}"#)["ok"], false);
         assert!(call(&a, r#"{"cmd":"hw_meters"}"#)["meters"]["input/0/peak"].is_number());
+    }
+
+    #[test]
+    fn app_commands_validate_arguments() {
+        let a = api();
+        assert_eq!(call(&a, r#"{"cmd":"app_set"}"#)["ok"], false);
+        assert_eq!(call(&a, r#"{"cmd":"app_set","device":"d","instance_id":"i"}"#)["ok"], false, "needs volume or mute");
+        let r = call(&a, r#"{"cmd":"app_set","device":"no-such-device","instance_id":"x","volume":0.5}"#);
+        assert_eq!(r["ok"], false);
     }
 
     #[test]

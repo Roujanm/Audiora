@@ -9,6 +9,8 @@ export interface NodeInfo {
   channels: number | null;
   period_frames: number | null;
   low_latency: boolean | null;
+  exclusive: boolean | null;
+  bit_depth: number | null;
 }
 
 export interface EngineInfo {
@@ -25,6 +27,7 @@ export interface Stats {
   underruns: number;
   drift_drops: number;
   capture_drops: number;
+  device_errors: number;
 }
 
 export interface RecStatus {
@@ -73,6 +76,19 @@ export interface LicenseStatus {
   edition?: string;
   issued_to?: string;
   error?: string;
+}
+
+export interface AppSessionEntry {
+  instance_id: string;
+  device_id: string;
+  device_name: string;
+  pid: number;
+  name: string;
+  volume: number;
+  muted: boolean;
+  peak: number;
+  active: boolean;
+  system_sounds: boolean;
 }
 
 export interface Reply {

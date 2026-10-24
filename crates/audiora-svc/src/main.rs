@@ -1,7 +1,7 @@
 //! `audiora-svc` — Audiora engine. Runs the live graph and the control API.
 //!
 //! ```text
-//! audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency]
+//! audiora-svc [--in ID]... [--no-input] [--out ID]... [--tone HZ] [--low-latency | --exclusive]
 //!             [--port N] [--ws-port N] [--allow-origin URL]... [--rec-dir DIR]
 //!             [--data-dir DIR] [--fresh] [--sim-r] [--secs S]
 //! ```
@@ -48,7 +48,13 @@ fn config_from_args(args: &[String]) -> EngineConfig {
         outputs: if outs.is_empty() { vec![None] } else { outs.into_iter().map(Some).collect() },
         tone_hz: arg(args, "--tone"),
         rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
-        low_latency: args.iter().any(|a| a == "--low-latency"),
+        mode: if args.iter().any(|a| a == "--exclusive") {
+            audiora_hal::Mode::Exclusive
+        } else if args.iter().any(|a| a == "--low-latency") {
+            audiora_hal::Mode::LowLatency
+        } else {
+            audiora_hal::Mode::Shared
+        },
     }
 }
 
@@ -62,6 +68,8 @@ fn node_json(index: usize, n: &NodeInfo) -> Value {
         "channels": n.format.map(|f| f.channels),
         "period_frames": n.format.map(|f| f.period_frames),
         "low_latency": n.format.map(|f| f.low_latency),
+        "exclusive": n.format.map(|f| f.exclusive),
+        "bit_depth": n.format.map(|f| f.bit_depth),
     })
 }
 
@@ -79,7 +87,7 @@ fn main() -> ExitCode {
     };
     for (i, b) in engine.info.buses.iter().enumerate() {
         if let Some(f) = b.format {
-            println!("bus {i} -> {} ({} Hz, {} ch, period {} frames{})", b.name, f.sample_rate, f.channels, f.period_frames, if f.low_latency { ", low latency" } else { "" });
+            println!("bus {i} -> {} ({} Hz, {} ch, period {} frames{})", b.name, f.sample_rate, f.channels, f.period_frames, if f.exclusive { format!(", EXCLUSIVE {}-bit", f.bit_depth) } else if f.low_latency { ", low latency".to_string() } else { String::new() });
         }
     }
     for (i, s) in engine.info.strips.iter().enumerate() {
@@ -159,11 +167,12 @@ fn main() -> ExitCode {
 
     let s = &engine.stats;
     println!(
-        "callbacks {} | underruns {} | drift drops {} | capture drops {}",
+        "callbacks {} | underruns {} | drift drops {} | capture drops {} | device errors {}",
         s.callbacks.load(Ordering::Relaxed),
         s.underruns.load(Ordering::Relaxed),
         s.drift_drops.load(Ordering::Relaxed),
-        s.capture_drops.load(Ordering::Relaxed)
+        s.capture_drops.load(Ordering::Relaxed),
+        s.device_errors.load(Ordering::Relaxed)
     );
     engine.stop();
     match result {

@@ -19,7 +19,7 @@ use std::thread::JoinHandle;
 
 use arrayvec::ArrayVec;
 use audiora_core::{ring, DriftResampler, Mixer, MixerParams, MAX_BLOCK_FRAMES};
-use audiora_hal::{list_devices, CaptureStream, Flow, RenderStream, StreamFormat};
+use audiora_hal::{list_devices, CaptureStream, Flow, Mode, RenderStream, StreamFormat};
 
 use crate::rec::{self, AudioTap, RecController, TapSlot};
 
@@ -38,8 +38,8 @@ pub struct EngineConfig {
     pub tone_hz: Option<f32>,
     /// Where takes are written; `None` = `%USERPROFILE%\Music\Audiora\Recordings`.
     pub rec_dir: Option<PathBuf>,
-    /// Use the smallest shared-mode period the audio engine offers.
-    pub low_latency: bool,
+    /// How device streams are opened: shared, low-latency shared, or exclusive.
+    pub mode: Mode,
 }
 
 #[derive(Default)]
@@ -51,6 +51,8 @@ pub struct Stats {
     pub drift_drops: AtomicU64,
     /// A producer could not enqueue (ring full).
     pub capture_drops: AtomicU64,
+    /// A device stream ended unexpectedly (unplugged, taken exclusively, driver reset).
+    pub device_errors: AtomicU64,
 }
 
 #[derive(Clone, Debug)]
@@ -124,7 +126,7 @@ impl Engine {
             let (rate_tx, rate_rx) = mpsc::channel::<StreamFormat>();
             rate_txs.push(rate_tx);
             let (tx, rx) = mpsc::channel::<Result<StreamFormat, String>>();
-            let (dev, stop2, stats2, ll) = (cfg.outputs[b].clone(), stop.clone(), stats.clone(), cfg.low_latency);
+            let (dev, stop2, stats2, ll) = (cfg.outputs[b].clone(), stop.clone(), stats.clone(), cfg.mode);
             threads.push(std::thread::spawn(move || output_thread(dev, ll, cons, rate_rx, stop2, stats2, tx)));
             match rx.recv() {
                 Ok(Ok(f)) => out_formats[b] = Some(f),
@@ -139,7 +141,7 @@ impl Engine {
         for (i, dev) in cfg.inputs.iter().enumerate() {
             let (prod, cons) = ring::ring(RING_SAMPLES);
             let (tx, rx) = mpsc::channel::<Result<StreamFormat, String>>();
-            let (dev, stop2, stats2, ll) = (dev.clone(), stop.clone(), stats.clone(), cfg.low_latency);
+            let (dev, stop2, stats2, ll) = (dev.clone(), stop.clone(), stats.clone(), cfg.mode);
             threads.push(std::thread::spawn(move || capture_thread(dev, ll, prod, stop2, stats2, tx)));
             match rx.recv() {
                 Ok(Ok(f)) => in_formats.push(f),
@@ -154,7 +156,7 @@ impl Engine {
         {
             let args = MasterArgs {
                 device: cfg.outputs[0].clone(),
-                low_latency: cfg.low_latency,
+                mode: cfg.mode,
                 tone_hz: cfg.tone_hz,
                 in_cons,
                 in_formats: in_formats.clone(),
@@ -212,6 +214,41 @@ impl Engine {
     }
 }
 
+/// Sleeps up to `ms` in short slices; returns true if the engine was asked to stop meanwhile.
+fn stop_requested_within(stop: &AtomicBool, ms: u64) -> bool {
+    let end = std::time::Instant::now() + std::time::Duration::from_millis(ms);
+    while std::time::Instant::now() < end {
+        if stop.load(Ordering::Relaxed) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    stop.load(Ordering::Relaxed)
+}
+
+/// After a device stream dies, keeps trying to reopen it every second. It only
+/// counts as back when it offers the same rate and channel count the graph was
+/// built for. Returns `None` once the engine is stopping.
+fn reopen<T>(
+    stop: &AtomicBool,
+    want: StreamFormat,
+    open: impl Fn() -> audiora_hal::Result<T>,
+    format_of: impl Fn(&T) -> StreamFormat,
+) -> Option<T> {
+    loop {
+        if stop_requested_within(stop, 1000) {
+            return None;
+        }
+        if let Ok(s) = open() {
+            let f = format_of(&s);
+            if f.sample_rate == want.sample_rate && f.channels == want.channels {
+                eprintln!("device is back");
+                return Some(s);
+            }
+        }
+    }
+}
+
 /// Frames to keep buffered between two clock domains: one producer period plus
 /// one consumer period, with 50 % margin, expressed in producer-rate frames.
 fn target_frames(prod: &StreamFormat, cons: &StreamFormat) -> usize {
@@ -221,7 +258,7 @@ fn target_frames(prod: &StreamFormat, cons: &StreamFormat) -> usize {
 
 struct MasterArgs {
     device: Option<String>,
-    low_latency: bool,
+    mode: Mode,
     tone_hz: Option<f32>,
     in_cons: Vec<ring::Consumer>,
     in_formats: Vec<StreamFormat>,
@@ -237,7 +274,7 @@ fn master_thread(
     slot: Arc<TapSlot>,
     ready: mpsc::Sender<Result<(StreamFormat, Arc<MixerParams>), String>>,
 ) {
-    let stream = match RenderStream::open(a.device.as_deref(), a.low_latency) {
+    let stream = match RenderStream::open(a.device.as_deref(), a.mode) {
         Ok(s) => s,
         Err(e) => {
             let _ = ready.send(Err(e.to_string()));
@@ -276,7 +313,7 @@ fn master_thread(
     let mut phase = 0f32;
     let mut tap = AudioTap::new(slot, cap / 2, n_strips + a.n_buses);
 
-    let result = stream.run_until(&stop, None, |out, frames| {
+    let mut render = |out: &mut [f32], frames: usize| {
         let n = frames * 2;
         stats.callbacks.fetch_add(1, Ordering::Relaxed);
         tap.poll();
@@ -325,23 +362,33 @@ fn master_thread(
                 frame[1] = bus_bufs[0][i * 2 + 1];
             }
         }
-    });
-    if let Err(e) = result {
-        eprintln!("master render stopped: {e}");
-        stop.store(true, Ordering::Relaxed);
+    };
+
+    let mut stream = stream;
+    loop {
+        let result = stream.run_until(&stop, None, &mut render);
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        stats.device_errors.fetch_add(1, Ordering::Relaxed);
+        eprintln!("master output lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
+        match reopen(&stop, fmt, || RenderStream::open(a.device.as_deref(), a.mode), |s| s.format()) {
+            Some(s) => stream = s,
+            None => break,
+        }
     }
 }
 
 fn output_thread(
     device: Option<String>,
-    low_latency: bool,
+    mode: Mode,
     mut cons: ring::Consumer,
     master_rx: mpsc::Receiver<StreamFormat>,
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
     ready: mpsc::Sender<Result<StreamFormat, String>>,
 ) {
-    let stream = match RenderStream::open(device.as_deref(), low_latency) {
+    let stream = match RenderStream::open(device.as_deref(), mode) {
         Ok(s) => s,
         Err(e) => {
             let _ = ready.send(Err(e.to_string()));
@@ -356,7 +403,7 @@ fn output_thread(
     let mut rs = DriftResampler::new(master.sample_rate, fmt.sample_rate, target_frames(&master, &fmt));
     let mut scratch = vec![0f32; (fmt.buffer_frames as usize).max(MAX_BLOCK_FRAMES) * 2];
     let ch = fmt.channels as usize;
-    let result = stream.run_until(&stop, None, |out, frames| {
+    let mut render = |out: &mut [f32], frames: usize| {
         let r = rs.fill(&mut cons, &mut scratch[..frames * 2]);
         if r.underrun {
             stats.underruns.fetch_add(1, Ordering::Relaxed);
@@ -370,22 +417,32 @@ fn output_thread(
                 frame[1] = scratch[i * 2 + 1];
             }
         }
-    });
-    if let Err(e) = result {
-        eprintln!("output stopped: {e}");
-        stop.store(true, Ordering::Relaxed);
+    };
+
+    let mut stream = stream;
+    loop {
+        let result = stream.run_until(&stop, None, &mut render);
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        stats.device_errors.fetch_add(1, Ordering::Relaxed);
+        eprintln!("output lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
+        match reopen(&stop, fmt, || RenderStream::open(device.as_deref(), mode), |s| s.format()) {
+            Some(s) => stream = s,
+            None => break,
+        }
     }
 }
 
 fn capture_thread(
     device: Option<String>,
-    low_latency: bool,
+    mode: Mode,
     mut prod: ring::Producer,
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
     ready: mpsc::Sender<Result<StreamFormat, String>>,
 ) {
-    let stream = match CaptureStream::open(device.as_deref(), low_latency) {
+    let stream = match CaptureStream::open(device.as_deref(), mode) {
         Ok(s) => s,
         Err(e) => {
             let _ = ready.send(Err(e.to_string()));
@@ -397,7 +454,7 @@ fn capture_thread(
 
     let ch = fmt.channels as usize;
     let mut stereo = vec![0f32; fmt.buffer_frames as usize * 2 * 2];
-    let result = stream.run_until(&stop, |data, frames| {
+    let mut on_audio = |data: &[f32], frames: usize| {
         if frames * 2 > stereo.len() {
             return;
         }
@@ -411,9 +468,19 @@ fn capture_thread(
         } else {
             prod.push_slice(block);
         }
-    });
-    if let Err(e) = result {
-        eprintln!("capture stopped: {e}");
-        stop.store(true, Ordering::Relaxed);
+    };
+
+    let mut stream = stream;
+    loop {
+        let result = stream.run_until(&stop, &mut on_audio);
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        stats.device_errors.fetch_add(1, Ordering::Relaxed);
+        eprintln!("capture lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
+        match reopen(&stop, fmt, || CaptureStream::open(device.as_deref(), mode), |s| s.format()) {
+            Some(s) => stream = s,
+            None => break,
+        }
     }
 }

@@ -1,13 +1,13 @@
 //! `audiora` developer CLI.
 //!
 //!   audiora devices
-//!   audiora tone [--device ID] [--freq HZ] [--secs S] [--gain DB] [--bass DB]
+//!   audiora tone [--device ID] [--freq HZ] [--secs S] [--gain DB] [--bass DB] [--low-latency | --exclusive]
 
 use std::f32::consts::TAU;
 use std::process::ExitCode;
 
 use audiora_core::{Mixer, MAX_BLOCK_FRAMES};
-use audiora_hal::{list_devices, Flow, RenderStream};
+use audiora_hal::{list_devices, Flow, Mode, RenderStream};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -53,10 +53,11 @@ fn tone(args: &[String]) -> Res {
     let gain_db: f32 = flag(args, "--gain", -20.0);
     let bass_db: f32 = flag(args, "--bass", 0.0);
     let device: String = flag(args, "--device", String::new());
+    let mode = if args.iter().any(|a| a == "--exclusive") { Mode::Exclusive } else if args.iter().any(|a| a == "--low-latency") { Mode::LowLatency } else { Mode::Shared };
 
-    let stream = RenderStream::open((!device.is_empty()).then_some(device.as_str()), false)?;
+    let stream = RenderStream::open((!device.is_empty()).then_some(device.as_str()), mode)?;
     let fmt = stream.format();
-    println!("{} Hz, {} ch, buffer {} frames; {freq} Hz at {gain_db} dB for {secs} s", fmt.sample_rate, fmt.channels, fmt.buffer_frames);
+    println!("{} Hz, {} ch, {}-bit{}, buffer {} frames (period {}); {freq} Hz at {gain_db} dB for {secs} s", fmt.sample_rate, fmt.channels, fmt.bit_depth, if fmt.exclusive { " EXCLUSIVE" } else { "" }, fmt.buffer_frames, fmt.period_frames);
 
     let (mut mixer, params) = Mixer::new(fmt.sample_rate as f32, 1, 1);
     params.strips[0].gain_db.set(gain_db);

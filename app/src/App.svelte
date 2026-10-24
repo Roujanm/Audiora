@@ -8,12 +8,13 @@
   import Recorder from './components/Recorder.svelte';
   import Hardware from './components/Hardware.svelte';
   import System from './components/System.svelte';
+  import Apps from './components/Apps.svelte';
   import Presets from './components/Presets.svelte';
 
   engine.start();
 
   type Skin = 'play' | 'studio';
-  type Tab = 'mixer' | 'processing' | 'record' | 'routing' | 'hardware' | 'system';
+  type Tab = 'mixer' | 'apps' | 'processing' | 'record' | 'routing' | 'hardware' | 'system';
 
   function remembered<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
     try {
@@ -36,9 +37,11 @@
     }
   });
 
-  // The play skin only has the mixer; leaving studio returns to it.
+  const PLAY_TABS: Tab[] = ['mixer', 'apps'];
+
+  // The play skin has only the mixer and application volumes; leaving studio returns to those.
   $effect(() => {
-    if (skin === 'play') tab = 'mixer';
+    if (skin === 'play' && !PLAY_TABS.includes(tab)) tab = 'mixer';
   });
 
   const strips = $derived(engine.info?.strips ?? []);
@@ -49,6 +52,7 @@
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'mixer', label: 'Mixer' },
+    { id: 'apps', label: 'Apps' },
     { id: 'processing', label: 'EQ & Dynamics' },
     { id: 'record', label: 'Record' },
     { id: 'routing', label: 'Routing' },
@@ -57,7 +61,7 @@
   ];
 
   const s = $derived(engine.stats);
-  const health = $derived(s.underruns + s.drift_drops + s.capture_drops);
+  const health = $derived(s.underruns + s.drift_drops + s.capture_drops + s.device_errors);
 </script>
 
 <div class="app">
@@ -70,16 +74,14 @@
       <span class="by muted">Roujan Digital Agency</span>
     </div>
 
-    {#if skin === 'studio'}
-      <nav class="tabs" aria-label="Sections">
-        {#each tabs as t (t.id)}
+    <nav class="tabs" aria-label="Sections">
+      {#each tabs.filter((t) => skin === 'studio' || PLAY_TABS.includes(t.id)) as t (t.id)}
           <button class="tab" class:active={tab === t.id} aria-current={tab === t.id ? 'page' : undefined} onclick={() => (tab = t.id)}>
             {t.label}
             {#if t.id === 'record' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}
           </button>
         {/each}
       </nav>
-    {/if}
 
     <div class="spacer"></div>
     {#if engine.connected}<Presets />{/if}
@@ -116,6 +118,8 @@
           {/each}
         </div>
       </div>
+    {:else if tab === 'apps'}
+      <div class="scroll"><Apps /></div>
     {:else if tab === 'processing'}
       <div class="scroll">
         <div class="picker" role="tablist" aria-label="Strip">
