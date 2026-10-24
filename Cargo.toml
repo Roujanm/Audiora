@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/audiora-dsp",
+    "crates/audiora-core",
+    "crates/audiora-hal",
+    "crates/audiora-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Roujan Digital Agency"]
+license = "LicenseRef-Proprietary"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"

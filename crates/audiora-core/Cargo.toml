@@ -1,0 +1,11 @@
+[package]
+name = "audiora-core"
+description = "Audiora mixing engine: strips, buses, routing, lock-free parameters"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+audiora-dsp = { path = "../audiora-dsp" }

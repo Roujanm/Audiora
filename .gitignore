@@ -1,0 +1,12 @@
+/target
+**/*.rs.bk
+*.wav
+*.pdb
+.vs/
+# driver build output
+/drivers/**/x64/
+/drivers/**/Debug/
+/drivers/**/Release/
+*.cer
+*.pfx
+*.snk

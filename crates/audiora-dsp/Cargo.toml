@@ -1,0 +1,10 @@
+[package]
+name = "audiora-dsp"
+description = "Real-time safe DSP primitives for Audiora"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
