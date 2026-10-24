@@ -224,7 +224,8 @@
   }
 
   .readout {
-    min-width: 62px;
+    white-space: nowrap;
+    min-width: 66px;
     padding: 4px 6px 3px;
     text-align: center;
     font-size: 12.5px;
