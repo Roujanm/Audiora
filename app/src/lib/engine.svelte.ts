@@ -1,0 +1,300 @@
+// Reactive client for the Audiora engine's WebSocket control API.
+// Components read `engine.*` and call its methods; nothing else touches the socket.
+
+import { stepMeter, type MeterState } from './ballistics.ts';
+import type {
+  DeviceEntry,
+  EngineInfo,
+  HwControl,
+  HwInfo,
+  LicenseStatus,
+  RecStatus,
+  Reply,
+  Stats,
+} from './protocol.ts';
+
+const WS_URL = 'ws://127.0.0.1:7879';
+const STATE_POLL_MS = 1000;
+const HW_POLL_MS = 100;
+const DIRTY_GRACE_MS = 600;
+
+type Pending = { resolve: (r: Reply) => void; reject: (e: Error) => void; timer: number };
+
+function inTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+class EngineClient {
+  connected = $state(false);
+  connecting = $state(true);
+  lastError = $state('');
+
+  info = $state<EngineInfo | null>(null);
+  params = $state<Record<string, number>>({});
+  /** Peak meters with ballistics (instant attack, steady decay, peak hold). */
+  meters = $state<Record<string, MeterState>>({});
+  /** Other meters as reported: gain reduction in dB, gate open flag. */
+  gauges = $state<Record<string, number>>({});
+  stats = $state<Stats>({ callbacks: 0, underruns: 0, drift_drops: 0, capture_drops: 0 });
+  rec = $state<RecStatus>({ recording: false });
+  presets = $state<string[]>([]);
+  devices = $state<DeviceEntry[]>([]);
+  license = $state<LicenseStatus | null>(null);
+
+  hwInfo = $state<HwInfo | null>(null);
+  hwControls = $state<HwControl[]>([]);
+  hwMeters = $state<Record<string, number>>({});
+
+  #ws: WebSocket | null = null;
+  #nextId = 1;
+  #pending = new Map<number, Pending>();
+  #meterPaths: string[] = [];
+  #lastMeterAt = 0;
+  #dirty = new Map<string, number>();
+  #timers: number[] = [];
+  #started = false;
+
+  start() {
+    if (this.#started) return;
+    this.#started = true;
+    void this.#connect();
+  }
+
+  async #connect() {
+    this.connecting = true;
+    if (inTauri()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('ensure_engine');
+      } catch (e) {
+        this.lastError = `Could not start the engine: ${e}`;
+      }
+    }
+    const ws = new WebSocket(WS_URL);
+    this.#ws = ws;
+    ws.onopen = () => void this.#bootstrap();
+    ws.onmessage = (ev) => this.#onMessage(ev.data as string);
+    ws.onclose = () => {
+      this.#teardown();
+      setTimeout(() => void this.#connect(), 1000);
+    };
+    ws.onerror = () => {
+      /* onclose follows and handles the retry */
+    };
+  }
+
+  #teardown() {
+    this.connected = false;
+    this.connecting = true;
+    this.#timers.forEach(clearInterval);
+    this.#timers = [];
+    for (const p of this.#pending.values()) {
+      clearTimeout(p.timer);
+      p.reject(new Error('disconnected'));
+    }
+    this.#pending.clear();
+  }
+
+  async #bootstrap() {
+    try {
+      this.info = (await this.call('info')) as unknown as EngineInfo;
+      await this.refreshState();
+      const sub = await this.call('subscribe', { hz: 30 });
+      this.#meterPaths = sub.paths as string[];
+      this.#lastMeterAt = performance.now();
+      await Promise.all([this.refreshPresets(), this.refreshDevices(), this.refreshRec(), this.refreshLicense()]);
+      if (this.info?.hardware) await this.refreshHardware();
+      this.connected = true;
+      this.connecting = false;
+      this.lastError = '';
+
+      this.#timers.push(window.setInterval(() => void this.refreshState().catch(() => {}), STATE_POLL_MS));
+      this.#timers.push(
+        window.setInterval(() => {
+          if (this.rec.recording) void this.refreshRec().catch(() => {});
+        }, 500),
+      );
+      if (this.info?.hardware) {
+        this.#timers.push(window.setInterval(() => void this.#pollHwMeters().catch(() => {}), HW_POLL_MS));
+      }
+    } catch (e) {
+      this.lastError = String(e);
+    }
+  }
+
+  #onMessage(text: string) {
+    let msg: Reply & { event?: string; v?: number[] };
+    try {
+      msg = JSON.parse(text);
+    } catch {
+      return;
+    }
+    if (msg.event === 'meters' && msg.v) {
+      this.#applyMeters(msg.v);
+      return;
+    }
+    if (msg.id != null) {
+      const p = this.#pending.get(msg.id);
+      if (!p) return;
+      this.#pending.delete(msg.id);
+      clearTimeout(p.timer);
+      if (msg.ok) p.resolve(msg);
+      else p.reject(new Error(msg.error ?? 'request failed'));
+    }
+  }
+
+  #applyMeters(values: number[]) {
+    const now = performance.now();
+    const elapsed = now - this.#lastMeterAt;
+    this.#lastMeterAt = now;
+    const meters: Record<string, MeterState> = {};
+    const gauges: Record<string, number> = {};
+    this.#meterPaths.forEach((path, i) => {
+      const v = values[i] ?? 0;
+      if (path.endsWith('/peak_l') || path.endsWith('/peak_r')) {
+        meters[path] = stepMeter(this.meters[path], v, now, elapsed);
+      } else {
+        gauges[path] = v;
+      }
+    });
+    this.meters = meters;
+    this.gauges = gauges;
+  }
+
+  /** Sends a command and resolves with the reply; rejects on `ok: false`. */
+  call(cmd: string, fields: Record<string, unknown> = {}): Promise<Reply> {
+    return new Promise((resolve, reject) => {
+      const ws = this.#ws;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        reject(new Error('not connected'));
+        return;
+      }
+      const id = this.#nextId++;
+      const timer = window.setTimeout(() => {
+        this.#pending.delete(id);
+        reject(new Error(`${cmd} timed out`));
+      }, 5000);
+      this.#pending.set(id, { resolve, reject, timer });
+      ws.send(JSON.stringify({ id, cmd, ...fields }));
+    });
+  }
+
+  // ---- mixer parameters -------------------------------------------------
+
+  get(path: string, fallback = 0): number {
+    return this.params[path] ?? fallback;
+  }
+
+  /** Optimistic update; the engine clamps and the next poll reconciles. */
+  set(path: string, value: number | boolean) {
+    const v = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+    this.params[path] = v;
+    this.#dirty.set(path, performance.now());
+    this.call('set', { path, value: v }).catch((e) => (this.lastError = String(e)));
+  }
+
+  toggle(path: string) {
+    this.set(path, this.get(path) < 0.5);
+  }
+
+  async refreshState() {
+    const r = await this.call('state');
+    const now = performance.now();
+    const incoming = r.params as Record<string, number>;
+    const next: Record<string, number> = { ...this.params };
+    for (const [k, v] of Object.entries(incoming)) {
+      const touched = this.#dirty.get(k);
+      if (touched !== undefined && now - touched < DIRTY_GRACE_MS) continue;
+      next[k] = v;
+    }
+    this.params = next;
+    this.stats = r.stats as Stats;
+  }
+
+  // ---- presets ----------------------------------------------------------
+
+  async refreshPresets() {
+    this.presets = (await this.call('preset_list')).presets as string[];
+  }
+
+  async savePreset(name: string) {
+    await this.call('preset_save', { name });
+    await this.refreshPresets();
+  }
+
+  async loadPreset(name: string) {
+    await this.call('preset_load', { name });
+    await this.refreshState();
+  }
+
+  async deletePreset(name: string) {
+    await this.call('preset_delete', { name });
+    await this.refreshPresets();
+  }
+
+  // ---- recording --------------------------------------------------------
+
+  async refreshRec() {
+    this.rec = (await this.call('rec_status')) as unknown as RecStatus;
+  }
+
+  async recStart(sources: string[]) {
+    await this.call('rec_start', { sources });
+    await this.refreshRec();
+  }
+
+  async recStop() {
+    const r = await this.call('rec_stop');
+    await this.refreshRec();
+    return r;
+  }
+
+  // ---- devices, license, hardware ---------------------------------------
+
+  async refreshDevices() {
+    this.devices = (await this.call('devices')).devices as DeviceEntry[];
+  }
+
+  async refreshLicense() {
+    this.license = (await this.call('license_status')) as unknown as LicenseStatus;
+  }
+
+  async refreshHardware() {
+    this.hwInfo = (await this.call('hw_info')) as unknown as HwInfo;
+    this.hwControls = (await this.call('hw_controls')).controls as HwControl[];
+  }
+
+  async #pollHwMeters() {
+    this.hwMeters = (await this.call('hw_meters')).meters as Record<string, number>;
+  }
+
+  async setHw(path: string, value: number | boolean) {
+    const v = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+    this.hwControls = this.hwControls.map((c) => (c.path === path ? { ...c, value: v } : c));
+    try {
+      const r = await this.call('hw_set', { path, value: v });
+      this.hwControls = this.hwControls.map((c) => (c.path === path ? { ...c, value: r.value as number } : c));
+      // a change can have side effects (source change drops +48 V): re-read everything
+      this.hwControls = (await this.call('hw_controls')).controls as HwControl[];
+    } catch (e) {
+      this.lastError = String(e);
+      await this.refreshHardware();
+    }
+  }
+
+  // ---- helpers for components -------------------------------------------
+
+  peakDb(path: string): number {
+    return this.meters[path]?.db ?? -120;
+  }
+
+  holdDb(path: string): number {
+    return this.meters[path]?.hold ?? -120;
+  }
+
+  gauge(path: string): number {
+    return this.gauges[path] ?? 0;
+  }
+}
+
+export const engine = new EngineClient();
