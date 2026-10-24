@@ -6,7 +6,7 @@
 mod wasapi;
 
 #[cfg(windows)]
-pub use wasapi::{default_device_id, list_devices, RenderStream};
+pub use wasapi::{default_device_id, list_devices, CaptureStream, RenderStream};
 
 use std::fmt;
 

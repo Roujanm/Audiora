@@ -65,8 +65,8 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
 
 ### 4.2 Engine service `audiora-svc` (Rust)
 - **HAL** (`audiora-hal`): one trait family over WASAPI shared, WASAPI exclusive, IAudioClient3
-  low-latency shared, ASIO, and the R Interface backend. *Implemented: WASAPI shared render,
-  device enumeration.*
+  low-latency shared, ASIO, and the R Interface backend. *Implemented: WASAPI shared render and
+  capture, device enumeration.*
 - **Mixer graph** (`audiora-core`): strips → buses, per-strip EQ/gain/balance/mute/solo,
   smoothed parameters, peak metering. *Implemented.* Next: sends, inserts, mono strips, N-channel
   buses, sidechain.
@@ -79,6 +79,7 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
 
 ### 4.3 Control plane
 - Transport: named pipe (ACL: current user + service) and a loopback WebSocket for the UI.
+  Today: loopback TCP, JSON lines — see `CONTROL-API.md`.
 - Schema: versioned, MessagePack/JSON via serde; parameter paths like `strip/3/eq/1/gain_db`.
 - Meters stream at 30–60 Hz, parameters are request/response + change events.
 - Persistence: profiles/presets as JSON in `%AppData%\Roujan\Audiora`.
@@ -134,11 +135,11 @@ UI and logged.
 ```
 Audiora/
 ├─ crates/
-│  ├─ audiora-dsp/    biquads, dB helpers            (done)
-│  ├─ audiora-core/   mixer, params, SPSC ring       (done)
-│  ├─ audiora-hal/    WASAPI backend                 (done: enumerate + render)
+│  ├─ audiora-dsp/    biquads, dB helpers, linear resampler (done)
+│  ├─ audiora-core/   mixer, param paths, SPSC ring  (done)
+│  ├─ audiora-hal/    WASAPI backend                 (done: enumerate, render, capture)
 │  ├─ audiora-cli/    `audiora devices|tone`         (done)
-│  ├─ audiora-svc/    engine service + control API   (next)
+│  ├─ audiora-svc/    engine + JSON-lines control API (done, runs as a console app; Windows service wrapper next)
 │  └─ audiora-rec/    recorder                       (next)
 ├─ drivers/           virtual-audio, asio, r-interface (planned)
 ├─ app/               Tauri + Svelte UI              (planned)

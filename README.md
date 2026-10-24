@@ -8,9 +8,10 @@ Proprietary — all rights reserved.
 
 ## Status
 
-Phase 0 (foundation) is done: DSP, mixer engine, lock-free ring buffer, WASAPI backend, CLI.
+Phase 0 (foundation) is done; phase 1 is under way: live engine service (`audiora-svc`) with WASAPI
+capture/render and a JSON-lines control API.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md) and
-[docs/R-INTERFACE.md](docs/R-INTERFACE.md).
+[docs/R-INTERFACE.md](docs/R-INTERFACE.md); the control protocol is in [docs/CONTROL-API.md](docs/CONTROL-API.md).
 
 ## Try it
 
@@ -18,6 +19,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP
 cargo test
 cargo run -p audiora-cli -- devices
 cargo run -p audiora-cli -- tone --gain -30 --secs 1      # default output; start quiet
+cargo run -p audiora-svc -- --no-input --tone 440 --secs 10   # engine + control API on 127.0.0.1:7878
 ```
 
 ## Requirements

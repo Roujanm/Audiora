@@ -2,8 +2,10 @@
 //! after construction, so every type is safe to use on the audio thread.
 
 mod biquad;
+mod resample;
 
 pub use biquad::{Biquad, BiquadCoeffs, FilterKind};
+pub use resample::LinearResampler;
 
 /// Silence floor used when converting linear gain to dB.
 pub const MIN_DB: f32 = -120.0;

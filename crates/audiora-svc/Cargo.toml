@@ -1,0 +1,19 @@
+[package]
+name = "audiora-svc"
+description = "Audiora engine service: live audio graph and local control API"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "audiora-svc"
+path = "src/main.rs"
+
+[dependencies]
+audiora-core = { path = "../audiora-core" }
+audiora-dsp = { path = "../audiora-dsp" }
+audiora-hal = { path = "../audiora-hal" }
+ctrlc = "3.5.2"
+serde_json = "1.0.154"

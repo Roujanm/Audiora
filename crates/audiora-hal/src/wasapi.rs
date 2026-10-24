@@ -1,14 +1,15 @@
 //! WASAPI shared-mode backend (event driven).
 
 use std::slice;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use windows::core::{Interface, PCWSTR};
+use windows::core::PCWSTR;
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
-    eCapture, eConsole, eRender, IAudioClient, IAudioRenderClient, IMMDevice, IMMDeviceEnumerator,
-    MMDeviceEnumerator, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-    DEVICE_STATE_ACTIVE, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
+    eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IAudioRenderClient, IMMDevice,
+    IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, DEVICE_STATE_ACTIVE, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
@@ -106,89 +107,129 @@ pub fn list_devices() -> Result<Vec<DeviceInfo>> {
     Ok(out)
 }
 
-/// Shared-mode render stream on one device, driven by the device's event.
-/// Must be used on the thread that created it.
-pub struct RenderStream {
+struct Shared {
     client: IAudioClient,
-    render: IAudioRenderClient,
     event: HANDLE,
     format: StreamFormat,
 }
 
+impl Drop for Shared {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseHandle(self.event);
+        }
+    }
+}
+
+fn open_shared(flow: Flow, id: Option<&str>) -> Result<Shared> {
+    let e = enumerator()?;
+    let dev = unsafe {
+        match id {
+            Some(id) => {
+                let wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
+                e.GetDevice(PCWSTR(wide.as_ptr()))?
+            }
+            None => e.GetDefaultAudioEndpoint(
+                if flow == Flow::Render { eRender } else { eCapture },
+                eConsole,
+            )?,
+        }
+    };
+    let client: IAudioClient = unsafe { dev.Activate(CLSCTX_ALL, None) }
+        .map_err(|e| HalError(format!("activate: {e}")))?;
+    let (fmt, is_float) = mix_format(&client).map_err(|e| HalError(format!("mix format: {e}")))?;
+    if !is_float || fmt.wBitsPerSample != 32 {
+        return Err(HalError(format!(
+            "mix format is not 32-bit float (tag {}, {} bits)",
+            { fmt.wFormatTag },
+            { fmt.wBitsPerSample }
+        )));
+    }
+    unsafe {
+        let ptr = client.GetMixFormat()?;
+        let init = client.Initialize(
+            AUDCLNT_SHAREMODE_SHARED,
+            AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+            0,
+            0,
+            ptr,
+            None,
+        );
+        CoTaskMemFree(Some(ptr as *const _));
+        init.map_err(|e| HalError(format!("initialize: {e}")))?;
+        let event = CreateEventW(None, false, false, None)?;
+        client.SetEventHandle(event)?;
+        let buffer_frames = client.GetBufferSize()?;
+        Ok(Shared {
+            client,
+            event,
+            format: StreamFormat {
+                sample_rate: fmt.nSamplesPerSec,
+                channels: fmt.nChannels,
+                buffer_frames,
+            },
+        })
+    }
+}
+
+/// Waits up to 100 ms (keeps stop requests responsive); a timeout is not an error.
+fn wait_event(event: HANDLE) -> Result<bool> {
+    match unsafe { WaitForSingleObject(event, 100) } {
+        r if r == WAIT_OBJECT_0 => Ok(true),
+        r if r == WAIT_TIMEOUT => Ok(false),
+        _ => Err(HalError("wait on device event failed".into())),
+    }
+}
+
+/// Shared-mode render stream on one device, driven by the device's event.
+/// Must be used on the thread that created it.
+pub struct RenderStream {
+    s: Shared,
+    render: IAudioRenderClient,
+}
+
 impl RenderStream {
     /// `None` opens the default render device.
-    pub fn open(device_id_opt: Option<&str>) -> Result<Self> {
-        let e = enumerator()?;
-        let dev = unsafe {
-            match device_id_opt {
-                Some(id) => {
-                    let wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
-                    e.GetDevice(PCWSTR(wide.as_ptr()))?
-                }
-                None => e.GetDefaultAudioEndpoint(eRender, eConsole)?,
-            }
-        };
-        let client: IAudioClient = unsafe { dev.Activate(CLSCTX_ALL, None)? };
-        let (fmt, is_float) = mix_format(&client)?;
-        if !is_float || fmt.wBitsPerSample != 32 {
-            return Err(HalError(format!(
-                "mix format is not 32-bit float (tag {}, {} bits)",
-                { fmt.wFormatTag },
-                { fmt.wBitsPerSample }
-            )));
-        }
-        unsafe {
-            let ptr = client.GetMixFormat()?;
-            let init = client.Initialize(
-                AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                0,
-                0,
-                ptr,
-                None,
-            );
-            CoTaskMemFree(Some(ptr as *const _));
-            init?;
-            let event = CreateEventW(None, false, false, None)?;
-            client.SetEventHandle(event)?;
-            let buffer_frames = client.GetBufferSize()?;
-            let render: IAudioRenderClient = client.GetService()?;
-            Ok(Self {
-                client,
-                render,
-                event,
-                format: StreamFormat {
-                    sample_rate: fmt.nSamplesPerSec,
-                    channels: fmt.nChannels,
-                    buffer_frames,
-                },
-            })
-        }
+    pub fn open(device_id: Option<&str>) -> Result<Self> {
+        let s = open_shared(Flow::Render, device_id)?;
+        let render: IAudioRenderClient = unsafe { s.client.GetService()? };
+        Ok(Self { s, render })
     }
 
     pub fn format(&self) -> StreamFormat {
-        self.format
+        self.s.format
+    }
+
+    /// Runs for `seconds` of wall-clock time.
+    pub fn run(&self, seconds: f32, fill: impl FnMut(&mut [f32], usize)) -> Result<()> {
+        let stop = AtomicBool::new(false);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs_f32(seconds);
+        self.run_until(&stop, Some(deadline), fill)
     }
 
     /// Calls `fill(interleaved_samples, frames)` whenever the device wants
-    /// audio, for `seconds` of wall-clock time. The buffer is already zeroed.
-    pub fn run(&self, seconds: f32, mut fill: impl FnMut(&mut [f32], usize)) -> Result<()> {
-        let ch = self.format.channels as usize;
+    /// audio until `stop` is set or `deadline` passes. The buffer is pre-zeroed.
+    pub fn run_until(
+        &self,
+        stop: &AtomicBool,
+        deadline: Option<std::time::Instant>,
+        mut fill: impl FnMut(&mut [f32], usize),
+    ) -> Result<()> {
+        let f = self.s.format;
+        let ch = f.channels as usize;
         unsafe {
             // Prime the device with one buffer of silence before starting.
-            self.render.GetBuffer(self.format.buffer_frames)?;
-            self.render
-                .ReleaseBuffer(self.format.buffer_frames, windows::Win32::Media::Audio::AUDCLNT_BUFFERFLAGS_SILENT.0 as u32)?;
-            self.client.Start()?;
-
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs_f32(seconds);
+            self.render.GetBuffer(f.buffer_frames)?;
+            self.render.ReleaseBuffer(f.buffer_frames, AUDCLNT_BUFFERFLAGS_SILENT.0 as u32)?;
+            self.s.client.Start()?;
             let result = (|| -> Result<()> {
-                while std::time::Instant::now() < deadline {
-                    if WaitForSingleObject(self.event, 2000) != WAIT_OBJECT_0 {
-                        return Err(HalError("timed out waiting for device buffer event".into()));
+                while !stop.load(Ordering::Relaxed)
+                    && deadline.map_or(true, |d| std::time::Instant::now() < d)
+                {
+                    if !wait_event(self.s.event)? {
+                        continue;
                     }
-                    let padding = self.client.GetCurrentPadding()?;
-                    let frames = self.format.buffer_frames - padding;
+                    let frames = f.buffer_frames - self.s.client.GetCurrentPadding()?;
                     if frames == 0 {
                         continue;
                     }
@@ -200,19 +241,70 @@ impl RenderStream {
                 }
                 Ok(())
             })();
-            let _ = self.client.Stop();
+            let _ = self.s.client.Stop();
             result
         }
     }
 }
 
-impl Drop for RenderStream {
-    fn drop(&mut self) {
+/// Shared-mode capture stream. Must be used on the thread that created it.
+pub struct CaptureStream {
+    s: Shared,
+    capture: IAudioCaptureClient,
+}
+
+impl CaptureStream {
+    /// `None` opens the default capture device.
+    pub fn open(device_id: Option<&str>) -> Result<Self> {
+        let s = open_shared(Flow::Capture, device_id)?;
+        let capture: IAudioCaptureClient = unsafe { s.client.GetService()? };
+        Ok(Self { s, capture })
+    }
+
+    pub fn format(&self) -> StreamFormat {
+        self.s.format
+    }
+
+    /// Calls `on_audio(interleaved_samples, frames)` for every captured packet
+    /// (silent packets are delivered as zeros) until `stop` is set.
+    pub fn run_until(
+        &self,
+        stop: &AtomicBool,
+        mut on_audio: impl FnMut(&[f32], usize),
+    ) -> Result<()> {
+        let ch = self.s.format.channels as usize;
+        let mut zeros = vec![0f32; self.s.format.buffer_frames as usize * ch];
         unsafe {
-            let _ = CloseHandle(self.event);
+            self.s.client.Start()?;
+            let result = (|| -> Result<()> {
+                while !stop.load(Ordering::Relaxed) {
+                    if !wait_event(self.s.event)? {
+                        continue;
+                    }
+                    loop {
+                        if self.capture.GetNextPacketSize()? == 0 {
+                            break;
+                        }
+                        let mut data = std::ptr::null_mut();
+                        let mut frames = 0u32;
+                        let mut flags = 0u32;
+                        self.capture.GetBuffer(&mut data, &mut frames, &mut flags, None, None)?;
+                        let n = frames as usize * ch;
+                        if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 || data.is_null() {
+                            if zeros.len() < n {
+                                zeros.resize(n, 0.0);
+                            }
+                            on_audio(&zeros[..n], frames as usize);
+                        } else {
+                            on_audio(slice::from_raw_parts(data as *const f32, n), frames as usize);
+                        }
+                        self.capture.ReleaseBuffer(frames)?;
+                    }
+                }
+                Ok(())
+            })();
+            let _ = self.s.client.Stop();
+            result
         }
     }
 }
-
-#[allow(dead_code)]
-fn _assert_interface<T: Interface>() {}

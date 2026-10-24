@@ -6,8 +6,10 @@
 mod atomic;
 mod mixer;
 mod params;
+mod paths;
 pub mod ring;
 
 pub use atomic::AtomicF32;
 pub use mixer::{Mixer, MAX_BLOCK_FRAMES};
 pub use params::{BusParams, EqBandParams, MixerParams, StripParams, EQ_BANDS};
+pub use paths::ParamError;

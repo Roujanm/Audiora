@@ -5,6 +5,7 @@ members = [
     "crates/audiora-core",
     "crates/audiora-hal",
     "crates/audiora-cli",
+    "crates/audiora-svc",
 ]
 
 [workspace.package]
