@@ -12,22 +12,24 @@
 </script>
 
 <script lang="ts">
+  import LedMeter from './LedMeter.svelte';
+
   interface Props {
     /** Gain in dB (0 dB = 100 %). */
     db: number;
-    /** Live level in dBFS for the meter inside the track. */
-    level?: number;
+    /** Live levels per side in dBFS, shown on a separate meter beside the fader. */
+    levels?: number[];
+    holds?: number[];
     color?: string;
     label: string;
     muted?: boolean;
     disabled?: boolean;
     onchange: (db: number) => void;
   }
-  let { db, level = -120, color = 'var(--accent)', label, muted = false, disabled = false, onchange }: Props = $props();
+  let { db, levels = [-120, -120], holds = [], color = 'var(--accent)', label, muted = false, disabled = false, onchange }: Props = $props();
 
   const pct = $derived(dbToPercent(db));
-  // meter: -60..0 dBFS over the full height
-  const meter = $derived(Math.min(1, Math.max(0, (level + 60) / 60)));
+  const MARKS = [100, 75, 50, 25, 0];
 
   let track: HTMLDivElement;
   let dragging = $state(false);
@@ -49,39 +51,46 @@
 </script>
 
 <div class="vol" class:muted class:disabled style:--c={color}>
-  <div
-    class="hit"
-    class:dragging
-    role="slider"
-    tabindex={disabled ? -1 : 0}
-    aria-label={label}
-    aria-orientation="vertical"
-    aria-valuemin={0}
-    aria-valuemax={100}
-    aria-valuenow={pct}
-    aria-valuetext="{pct} %"
-    aria-disabled={disabled}
-    onpointerdown={(e) => {
-      if (disabled) return;
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      dragging = true;
-      fromPointer(e);
-    }}
-    onpointermove={(e) => dragging && fromPointer(e)}
-    onpointerup={() => (dragging = false)}
-    onpointercancel={() => (dragging = false)}
-    ondblclick={() => !disabled && onchange(0)}
-    onwheel={(e) => {
-      if (disabled) return;
-      e.preventDefault();
-      onchange(percentToDb(Math.min(100, Math.max(0, pct + (e.deltaY < 0 ? 2 : -2)))));
-    }}
-    {onkeydown}
-  >
-    <div class="track" bind:this={track}>
-      <i class="fill" style:height="{pct}%"></i>
-      <i class="meter" style:height="{meter * 100}%"></i>
-      <i class="thumb" style:bottom="{pct}%"></i>
+  <div class="body">
+    <div class="marks" aria-hidden="true">
+      {#each MARKS as m (m)}<span style:bottom="{m}%">{m}</span>{/each}
+    </div>
+    <div
+      class="hit"
+      class:dragging
+      role="slider"
+      tabindex={disabled ? -1 : 0}
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      aria-valuetext="{pct} %"
+      aria-disabled={disabled}
+      onpointerdown={(e) => {
+        if (disabled) return;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        dragging = true;
+        fromPointer(e);
+      }}
+      onpointermove={(e) => dragging && fromPointer(e)}
+      onpointerup={() => (dragging = false)}
+      onpointercancel={() => (dragging = false)}
+      ondblclick={() => !disabled && onchange(0)}
+      onwheel={(e) => {
+        if (disabled) return;
+        e.preventDefault();
+        onchange(percentToDb(Math.min(100, Math.max(0, pct + (e.deltaY < 0 ? 2 : -2)))));
+      }}
+      {onkeydown}
+    >
+      <div class="track" bind:this={track}>
+        <i class="fill" style:height="{pct}%"></i>
+        <i class="cap" style:bottom="{pct}%"><b></b></i>
+      </div>
+    </div>
+    <div class="meter">
+      <LedMeter levels={muted ? [-120, -120] : levels} holds={muted ? [] : holds} thickness={4} scale={false} />
     </div>
   </div>
   <output class="num">{pct}<small>%</small></output>
@@ -97,24 +106,42 @@
     gap: 10px;
   }
 
-  .hit {
+  .body {
     flex: 1;
     min-height: 100px;
-    width: 64px;
+    display: flex;
+    gap: 6px;
+    padding: 14px 0;
+  }
+
+  .marks {
+    position: relative;
+    width: 20px;
+    font: 500 9px var(--mono);
+    color: var(--faint);
+  }
+
+  .marks span {
+    position: absolute;
+    right: 0;
+    transform: translateY(50%);
+  }
+
+  .hit {
+    width: 40px;
     display: flex;
     justify-content: center;
-    padding: 12px 0;
     cursor: ns-resize;
     touch-action: none;
   }
 
   .track {
     position: relative;
-    width: 14px;
+    width: 4px;
     height: 100%;
-    border-radius: 999px;
+    border-radius: 2px;
     background: var(--bg-0);
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .fill {
@@ -122,45 +149,48 @@
     left: 0;
     right: 0;
     bottom: 0;
-    border-radius: 999px;
-    background: linear-gradient(to top, color-mix(in oklab, var(--c) 30%, transparent), color-mix(in oklab, var(--c) 70%, transparent));
-    transition: height 0.05s linear;
-  }
-
-  /* live level, drawn as a bright core inside the volume fill */
-  .meter {
-    position: absolute;
-    left: 4px;
-    right: 4px;
-    bottom: 3px;
-    max-height: calc(100% - 6px);
-    border-radius: 999px;
-    background: linear-gradient(to top, #fff, color-mix(in oklab, var(--c) 40%, #fff));
+    border-radius: 2px;
+    background: var(--c);
     opacity: 0.85;
-    box-shadow: 0 0 10px var(--c);
-    transition: height 0.06s linear;
   }
 
-  .thumb {
+  /* a console-style fader cap: flat, machined, with a coloured index line */
+  .cap {
     position: absolute;
     left: 50%;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
+    width: 34px;
+    height: 20px;
     transform: translate(-50%, 50%);
-    background: radial-gradient(circle at 50% 35%, #ffffff, #c9d1dd 70%);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 0 4px color-mix(in oklab, var(--c) 35%, transparent);
+    border-radius: 5px;
+    background: linear-gradient(180deg, #eef1f6 0%, #c3cad5 48%, #9aa3b1 52%, #c9d0da 100%);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
     pointer-events: none;
     transition: box-shadow 0.15s;
+  }
+
+  .cap b {
+    position: absolute;
+    left: 5px;
+    right: 5px;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    border-radius: 1px;
+    background: var(--c);
   }
 
   .hit:focus-visible {
     outline: none;
   }
 
-  .hit:focus-visible .thumb,
-  .hit.dragging .thumb {
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7), 0 0 0 6px color-mix(in oklab, var(--c) 55%, transparent);
+  .hit:focus-visible .cap,
+  .hit.dragging .cap {
+    box-shadow: 0 0 0 2px var(--c), 0 3px 10px rgba(0, 0, 0, 0.7);
+  }
+
+  .meter {
+    display: flex;
+    width: 11px;
   }
 
   output {
@@ -175,10 +205,8 @@
     margin-left: 1px;
   }
 
-  .muted .fill,
-  .muted .meter {
-    filter: grayscale(1);
-    opacity: 0.35;
+  .muted .fill {
+    background: var(--faint);
   }
 
   .muted output {

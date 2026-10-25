@@ -8,7 +8,8 @@
   const p = (leaf: string) => `bus/0/${leaf}`;
   const muted = $derived(engine.get(p('mute')) > 0.5);
   const device = $derived(shortName(engine.channels?.master_out.device_name ?? engine.info?.buses[0]?.name ?? 'Output'));
-  const level = $derived(Math.max(engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))));
+  const levels = $derived([engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))]);
+  const holds = $derived([engine.holdDb(p('peak_l')), engine.holdDb(p('peak_r'))]);
   const clipping = $derived(engine.holdDb(p('peak_l')) > -0.5 || engine.holdDb(p('peak_r')) > -0.5);
   const lufs = $derived(engine.loudness.s <= -100 ? '—' : engine.loudness.s.toFixed(0).replace('-', '−'));
 </script>
@@ -24,7 +25,7 @@
     </header>
 
     <div class="body">
-      <VolumeSlider db={engine.get(p('gain_db'))} {level} {muted} label="Master volume" onchange={(db) => engine.set(p('gain_db'), db)} />
+      <VolumeSlider db={engine.get(p('gain_db'))} {levels} {holds} {muted} label="Master volume" onchange={(db) => engine.set(p('gain_db'), db)} />
       <div class="info">
         <button class="round" class:on={muted} aria-pressed={muted} title={muted ? 'Unmute everything' : 'Mute everything'} aria-label="Mute master" onclick={() => engine.toggle(p('mute'))}>
           <Icon name={muted ? 'mute' : 'volume'} size={17} />

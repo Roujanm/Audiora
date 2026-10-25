@@ -21,7 +21,8 @@
   const muted = $derived(engine.get(p('mute')) > 0.5);
   const apps = $derived(engine.appGroups.filter((a) => a.route === ch.key));
   const over = $derived(dnd.over === ch.key && dnd.drag !== null);
-  const level = $derived(Math.max(engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))));
+  const levels = $derived([engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))]);
+  const holds = $derived([engine.holdDb(p('peak_l')), engine.holdDb(p('peak_r'))]);
   const monitoring = $derived((engine.get(p('bus_mask')) & 1) === 1);
   const status = $derived(
     !ch.online
@@ -48,7 +49,8 @@
 
   <VolumeSlider
     db={engine.get(p('gain_db'))}
-    {level}
+    {levels}
+    {holds}
     color={meta.color}
     {muted}
     disabled={!ch.online}
