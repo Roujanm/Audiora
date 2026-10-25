@@ -43,7 +43,7 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | `hw_meters` | | `meters` (path → linear peak) |
 | `license_status` | | `state` (`dev-build`, `none`, `valid`, `invalid`), `edition`, … |
 | `channels` | | `channels[]` (key, name, strip, kind `apps`/`mic`, device_id, device_name, auto, online, error), `master_out`, `mic_out`, `config` |
-| `config_set` | any of `master_out`, `mic_in`, `mic_out` (id or null), `devices` (`{game: id\|null, …}`) | `restart: true` — saved to `channels.json`; applies after the engine restarts |
+| `config_set` | any of `master_out`, `mic_in`, `mic_out`, `parking` (id or null), `mic_raw`, `sim_r` (booleans), `devices` (`{game: id\|null, …}`) | `restart: true` — saved to `channels.json`; applies after the engine restarts |
 | `app_route` | `app` (executable name), `channel` (`game`/`chat`/`media`/`aux`/null) | `live` — sends the program to that channel's virtual output (null: back to where it was) |
 | `routes` | | `routes`: program → channel |
 | `cpreset_list` | `channel` | `factory[]`, `user[]`, `favorites[]` |
@@ -51,6 +51,8 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | `cpreset_favorite` | `channel`, `name`, `on` | |
 | `app_profile_set` | `app`, `channel`, `preset` (or null) | loads that preset when the program starts making sound |
 | `app_profiles` | | `profiles`: program → channel → preset |
+| `mic_test` | `action` (`record`/`play`/`stop`), `seconds` (record, 1–10, default 5) | records the processed microphone into memory, or plays it into the master |
+| `mic_test_status` | | `state` (`idle`/`recording`/`playing`), `seconds`, `length` |
 | `shutdown` | | `stopping` — the engine finalizes recordings, saves the session, releases routed programs and exits |
 
 Booleans may be sent as `true`/`false`; they are stored as 1/0. `hw_*` commands fail with
@@ -69,11 +71,15 @@ tone strip; every output device is a bus. Bus 0 is the master.
 | `strip/N/gain_db` | -120 … 24 | |
 | `strip/N/balance` | -1 … 1 | 0 = unity on both channels |
 | `strip/N/boost_db` | 0 … 12 | volume boost ahead of the chain |
+| `strip/N/lowcut/enabled`, `freq` (20…300) | | 24 dB/oct high-pass |
+| `strip/N/denoise_mix` | 0 … 1 | noise-suppression strength (rest is the aligned original) |
+| `strip/N/deess/enabled`, `threshold_db` (-60…0) | | de-esser; `deess/gr_db` read-only |
+| `strip/N/limiter/enabled`, `ceiling_db`, `release_ms` | | end-of-chain limiter; `limiter/gr_db` read-only |
 | `strip/N/smart/enabled`, `target_db` (-40…-10) | | Smart Volume; `smart/gain_db` is a read-only meter |
 | `strip/N/mute`, `strip/N/solo` | 0/1 | |
 | `strip/N/bus_mask` | integer | bit *b* sends to bus *b*; capture strips start at 0 (unrouted) so a microphone never feeds back by default |
 | `strip/N/denoise` | 0/1 | needs a 48 kHz master; +10 ms latency |
-| `strip/N/gate/enabled`, `threshold_db` (-100…0), `attack_ms`, `release_ms`, `range_db` | | `gate/open` is a read-only meter |
+| `strip/N/gate/enabled`, `threshold_db` (-100…0), `attack_ms`, `release_ms`, `range_db`, `hold_ms` | | 4 dB hysteresis; `gate/open` is a read-only meter |
 | `strip/N/eq/B/freq`, `gain_db` (±24), `q` (0.1…18) | | B: 0 low shelf (sub bass), 1–4 peaks (bass, low mids, mids, upper mids), 5 high shelf (highs) |
 | `strip/N/comp/enabled`, `threshold_db`, `ratio`, `attack_ms`, `release_ms`, `makeup_db`, `knee_db` | | `comp/gr_db` read-only |
 | `strip/N/peak_l`, `peak_r` | read-only | linear peak of the last audio block |
@@ -81,7 +87,7 @@ tone strip; every output device is a bus. Bus 0 is the master.
 | `bus/N/limiter/enabled`, `ceiling_db` (-30…0), `release_ms` | | `limiter/gr_db` read-only; on by default for bus 0 at -1 dB |
 | `bus/N/peak_l`, `peak_r` | read-only | |
 
-Strip chain: boost → denoise → gate → EQ → Smart Volume → compressor → fader/balance → buses.
+Strip chain: boost → low cut → denoise → gate → EQ → de-esser → Smart Volume → compressor → limiter → fader/balance → buses.
 Bus chain: sum → fader → limiter.
 
 ## Recording

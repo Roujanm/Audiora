@@ -4,12 +4,13 @@
   import { shortName } from '../lib/theme.ts';
   import { toast } from '../lib/toast.svelte.ts';
   import Icon from './Icon.svelte';
+  import Switch from './Switch.svelte';
 
   const cfg = $derived(engine.channels?.config);
   const renders = $derived(engine.devices.filter((d) => d.flow === 'render'));
   const captures = $derived(engine.devices.filter((d) => d.flow === 'capture'));
 
-  type Draft = { master_out: string; mic_in: string; mic_out: string; parking: string; devices: Record<string, string> };
+  type Draft = { master_out: string; mic_in: string; mic_out: string; parking: string; mic_raw: boolean; sim_r: boolean; devices: Record<string, string> };
   let draft = $state<Draft | null>(null);
   let busy = $state(false);
 
@@ -22,6 +23,8 @@
       mic_in: c.mic_in ?? '',
       mic_out: c.mic_out ?? '',
       parking: c.parking ?? '',
+      mic_raw: c.mic_raw ?? true,
+      sim_r: c.sim_r ?? false,
       devices: Object.fromEntries(APP_CHANNEL_KEYS.map((k) => [k, c.devices[k] ?? ''])),
     };
   });
@@ -37,6 +40,8 @@
       draft.mic_in !== (cfg.mic_in ?? '') ||
       draft.mic_out !== (cfg.mic_out ?? '') ||
       draft.parking !== (cfg.parking ?? '') ||
+      draft.mic_raw !== (cfg.mic_raw ?? true) ||
+      draft.sim_r !== (cfg.sim_r ?? false) ||
       APP_CHANNEL_KEYS.some((k) => draft!.devices[k] !== (cfg.devices[k] ?? ''))
     );
   });
@@ -62,6 +67,8 @@
         mic_in: draft.mic_in || null,
         mic_out: draft.mic_out || null,
         parking: draft.parking || null,
+        mic_raw: draft.mic_raw,
+        sim_r: draft.sim_r,
         devices: Object.fromEntries(APP_CHANNEL_KEYS.map((k) => [k, draft!.devices[k] || null])),
       });
       toast('Saved. Restarting the audio engine…', 'ok');
@@ -118,6 +125,20 @@
             {#each renders as d (d.id)}<option value={d.id}>{label(d)}</option>{/each}
           </select>
         </label>
+        <div class="toggle">
+          <div>
+            <strong>Pure microphone signal</strong>
+            <p class="muted tiny">Skips Windows and driver "enhancements" (their noise suppression and auto-gain can make a voice sound robotic). Audiora's own processing does the work.</p>
+          </div>
+          <Switch checked={draft.mic_raw} label="Pure microphone signal" onchange={(v) => (draft!.mic_raw = v)} />
+        </div>
+        <div class="toggle">
+          <div>
+            <strong>R Interface simulator</strong>
+            <p class="muted tiny">For development without the hardware: a simulated R Interface appears on the Interface page.</p>
+          </div>
+          <Switch checked={draft.sim_r} label="R Interface simulator" onchange={(v) => (draft!.sim_r = v)} />
+        </div>
         <p class="muted tiny">
           For other programs to use your cleaned-up voice, pick a cable here and choose that cable's <em>output</em> as the microphone in them.
         </p>
@@ -263,6 +284,20 @@
 
   small {
     color: var(--faint);
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--bg-2);
+  }
+
+  .toggle strong {
+    font-size: 12.5px;
+    color: var(--text);
   }
 
   .tiny {

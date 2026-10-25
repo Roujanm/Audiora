@@ -20,13 +20,29 @@ fn valid_name(name: &str) -> bool {
 
 /// Strip-relative paths a preset may contain.
 fn is_sound_path(rel: &str) -> bool {
-    rel == "boost_db" || rel == "denoise" || ["eq/", "smart/", "gate/", "comp/"].iter().any(|p| rel.starts_with(p))
+    matches!(rel, "boost_db" | "denoise" | "denoise_mix")
+        || ["eq/", "smart/", "gate/", "comp/", "lowcut/", "deess/", "limiter/"].iter().any(|p| rel.starts_with(p))
 }
 
 /// The state every preset starts from, so applying one never inherits the last one's leftovers.
 fn baseline() -> Settings {
     let mut v: Settings = (0..EQ_BANDS).map(|b| (format!("eq/{b}/gain_db"), 0.0)).collect();
-    for (p, x) in [("boost_db", 0.0), ("denoise", 0.0), ("smart/enabled", 0.0), ("smart/target_db", -24.0), ("gate/enabled", 0.0), ("comp/enabled", 0.0)] {
+    for (p, x) in [
+        ("boost_db", 0.0),
+        ("denoise", 0.0),
+        ("denoise_mix", 1.0),
+        ("lowcut/enabled", 0.0),
+        ("lowcut/freq", 80.0),
+        ("smart/enabled", 0.0),
+        ("smart/target_db", -24.0),
+        ("gate/enabled", 0.0),
+        ("gate/hold_ms", 80.0),
+        ("deess/enabled", 0.0),
+        ("deess/threshold_db", -30.0),
+        ("comp/enabled", 0.0),
+        ("limiter/enabled", 0.0),
+        ("limiter/ceiling_db", -1.0),
+    ] {
         v.push((p.into(), x));
     }
     v
@@ -43,24 +59,53 @@ fn with(mut base: Settings, extra: &[(&str, f64)]) -> Settings {
 
 const SMART: &str = "smart/enabled";
 
-/// Noise suppression, gate and compressor with an EQ, the usual microphone chain.
-fn mic_chain(g: [f64; 6], gate_threshold: f64, gate_range: f64, (threshold, ratio, makeup): (f64, f64, f64)) -> Settings {
-    with(
-        eq(g),
-        &[
-            ("denoise", 1.0),
-            ("gate/enabled", 1.0),
-            ("gate/threshold_db", gate_threshold),
-            ("gate/range_db", gate_range),
-            ("comp/enabled", 1.0),
-            ("comp/threshold_db", threshold),
-            ("comp/ratio", ratio),
-            ("comp/attack_ms", 8.0),
-            ("comp/release_ms", 140.0),
-            ("comp/makeup_db", makeup),
-            ("comp/knee_db", 6.0),
-        ],
-    )
+/// A broadcast-style voice chain, in signal order: low cut -> noise suppression -> gate -> EQ ->
+/// de-esser -> compressor -> limiter. The gate is used as a gentle expander (limited range, long
+/// hold) so pauses get quieter without words being chopped.
+struct Voice {
+    lowcut_hz: f64,
+    denoise: f64,
+    gate_db: Option<f64>,
+    gate_range: f64,
+    eq: [f64; 6],
+    deess_db: Option<f64>,
+    comp: (f64, f64, f64),
+}
+
+fn voice(v: Voice) -> Settings {
+    let mut out = eq(v.eq);
+    let mut add = |p: &str, x: f64| out.push((p.to_owned(), x));
+    add("lowcut/enabled", 1.0);
+    add("lowcut/freq", v.lowcut_hz);
+    add("denoise", (v.denoise > 0.0) as u8 as f64);
+    add("denoise_mix", v.denoise.max(0.0));
+    if let Some(t) = v.gate_db {
+        add("gate/enabled", 1.0);
+        add("gate/threshold_db", t);
+        add("gate/range_db", v.gate_range);
+        add("gate/attack_ms", 2.0);
+        add("gate/release_ms", 180.0);
+        add("gate/hold_ms", 140.0);
+    }
+    if let Some(t) = v.deess_db {
+        add("deess/enabled", 1.0);
+        add("deess/threshold_db", t);
+    }
+    let (threshold, ratio, makeup) = v.comp;
+    for (p, x) in [
+        ("comp/enabled", 1.0),
+        ("comp/threshold_db", threshold),
+        ("comp/ratio", ratio),
+        ("comp/attack_ms", 6.0),
+        ("comp/release_ms", 120.0),
+        ("comp/makeup_db", makeup),
+        ("comp/knee_db", 8.0),
+        ("limiter/enabled", 1.0),
+        ("limiter/ceiling_db", -1.0),
+    ] {
+        add(p, x);
+    }
+    out
 }
 
 /// Built-in presets per channel. EQ order: sub bass, bass, low mids, mids, upper mids, highs.
@@ -96,10 +141,30 @@ fn factory(channel: &str) -> Vec<(&'static str, Settings)> {
         ],
         "mic" => vec![
             ("Flat", vec![]),
-            ("Clean voice", mic_chain([-12.0, -3.0, 0.0, 1.0, 3.0, 1.0], -45.0, 60.0, (-18.0, 3.0, 3.0))),
-            ("Broadcast", mic_chain([-12.0, 2.0, -1.0, 1.0, 3.0, 2.0], -42.0, 60.0, (-20.0, 4.0, 4.0))),
-            ("Podcast", mic_chain([-10.0, 3.0, 0.0, 0.0, 2.0, 0.0], -48.0, 60.0, (-18.0, 3.0, 3.0))),
-            ("Noisy room", mic_chain([-12.0, -4.0, 0.0, 2.0, 3.0, 0.0], -35.0, 80.0, (-20.0, 4.0, 3.0))),
+            (
+                "Studio voice",
+                voice(Voice { lowcut_hz: 80.0, denoise: 0.85, gate_db: Some(-50.0), gate_range: 18.0, eq: [-2.0, 1.5, -2.0, 1.0, 2.5, 2.0], deess_db: Some(-32.0), comp: (-20.0, 3.0, 4.0) }),
+            ),
+            (
+                "Broadcast",
+                voice(Voice { lowcut_hz: 100.0, denoise: 0.9, gate_db: Some(-46.0), gate_range: 24.0, eq: [-3.0, 3.0, -3.0, 0.0, 3.0, 2.5], deess_db: Some(-30.0), comp: (-24.0, 4.0, 6.0) }),
+            ),
+            (
+                "Podcast",
+                voice(Voice { lowcut_hz: 80.0, denoise: 0.8, gate_db: Some(-52.0), gate_range: 15.0, eq: [0.0, 2.0, -2.0, 1.0, 2.0, 1.0], deess_db: Some(-32.0), comp: (-20.0, 3.0, 4.0) }),
+            ),
+            (
+                "Gaming clear",
+                voice(Voice { lowcut_hz: 120.0, denoise: 1.0, gate_db: Some(-44.0), gate_range: 30.0, eq: [-6.0, -2.0, -1.0, 2.0, 3.0, 0.0], deess_db: Some(-30.0), comp: (-22.0, 4.0, 5.0) }),
+            ),
+            (
+                "Noisy room",
+                voice(Voice { lowcut_hz: 120.0, denoise: 1.0, gate_db: Some(-38.0), gate_range: 40.0, eq: [-8.0, -3.0, 0.0, 2.0, 3.0, 0.0], deess_db: Some(-28.0), comp: (-22.0, 4.0, 4.0) }),
+            ),
+            (
+                "Natural",
+                voice(Voice { lowcut_hz: 70.0, denoise: 0.6, gate_db: None, gate_range: 0.0, eq: [0.0; 6], deess_db: None, comp: (-16.0, 2.0, 2.0) }),
+            ),
         ],
         _ => vec![],
     }
@@ -239,7 +304,7 @@ mod tests {
     fn factory_presets_apply_and_reset_leftovers() {
         let (s, dir) = store();
         let p = MixerParams::new(2, 1);
-        s.load("mic", "Clean voice", 1, &p).unwrap();
+        s.load("mic", "Studio voice", 1, &p).unwrap();
         assert_eq!(p.get("strip/1/denoise").unwrap(), 1.0);
         assert_eq!(p.get("strip/1/gate/enabled").unwrap(), 1.0);
         assert_eq!(p.get("strip/1/comp/enabled").unwrap(), 1.0);

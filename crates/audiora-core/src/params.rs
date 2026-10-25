@@ -26,6 +26,7 @@ pub struct GateParams {
     pub attack_ms: AtomicF32,
     pub release_ms: AtomicF32,
     pub range_db: AtomicF32,
+    pub hold_ms: AtomicF32,
     /// Meter: 1.0 while open.
     pub open: AtomicF32,
 }
@@ -39,6 +40,7 @@ impl GateParams {
             attack_ms: AtomicF32::new(d.attack_ms),
             release_ms: AtomicF32::new(d.release_ms),
             range_db: AtomicF32::new(d.range_db),
+            hold_ms: AtomicF32::new(d.hold_ms),
             open: AtomicF32::new(1.0),
         }
     }
@@ -49,6 +51,7 @@ impl GateParams {
             attack_ms: self.attack_ms.get(),
             release_ms: self.release_ms.get(),
             range_db: self.range_db.get(),
+            hold_ms: self.hold_ms.get(),
         }
     }
 }
@@ -93,6 +96,23 @@ impl CompParams {
     }
 }
 
+/// 24 dB/octave high-pass ("low cut") ahead of everything else.
+#[derive(Debug)]
+pub struct LowCutParams {
+    pub enabled: AtomicBool,
+    pub freq: AtomicF32,
+}
+
+/// Dynamic-EQ de-esser.
+#[derive(Debug)]
+pub struct DeEssParams {
+    pub enabled: AtomicBool,
+    /// Sibilance level (dBFS above 4.5 kHz) where the dip begins.
+    pub threshold_db: AtomicF32,
+    /// Meter: current dip in dB.
+    pub gr_db: AtomicF32,
+}
+
 /// Smart Volume: automatic leveling towards a target loudness.
 #[derive(Debug)]
 pub struct SmartParams {
@@ -135,7 +155,8 @@ impl LimiterParams {
 
 /// Control-thread view of one input strip. Band layout is fixed:
 /// 0 = low shelf (sub bass), 1-4 = peaks (bass, low mids, mids, upper mids), 5 = high shelf.
-/// Signal order: boost -> denoise -> gate -> EQ -> smart volume -> compressor -> fader/balance.
+/// Signal order: boost -> low cut -> denoise -> gate -> EQ -> de-esser -> smart volume ->
+/// compressor -> limiter -> fader/balance.
 #[derive(Debug)]
 pub struct StripParams {
     pub gain_db: AtomicF32,
@@ -148,10 +169,16 @@ pub struct StripParams {
     /// Bit `n` set = strip feeds bus `n`.
     pub bus_mask: AtomicU32,
     pub denoise: AtomicBool,
+    /// 0..1: how much of the noise suppression is applied (the rest is the original signal).
+    pub denoise_mix: AtomicF32,
+    pub lowcut: LowCutParams,
     pub gate: GateParams,
     pub eq: [EqBandParams; EQ_BANDS],
+    pub deess: DeEssParams,
     pub smart: SmartParams,
     pub comp: CompParams,
+    /// Brick-wall limiter at the end of the chain (keeps a voice from ever clipping).
+    pub limiter: LimiterParams,
     /// Post-fader peak of the last processed call (linear).
     pub peak_l: AtomicF32,
     pub peak_r: AtomicF32,
@@ -167,6 +194,8 @@ impl StripParams {
             solo: AtomicBool::new(false),
             bus_mask: AtomicU32::new(1),
             denoise: AtomicBool::new(false),
+            denoise_mix: AtomicF32::new(1.0),
+            lowcut: LowCutParams { enabled: AtomicBool::new(false), freq: AtomicF32::new(80.0) },
             gate: GateParams::new(),
             eq: [
                 EqBandParams::new(60.0, 0.707),
@@ -176,8 +205,10 @@ impl StripParams {
                 EqBandParams::new(5000.0, 1.0),
                 EqBandParams::new(10000.0, 0.707),
             ],
+            deess: DeEssParams { enabled: AtomicBool::new(false), threshold_db: AtomicF32::new(-30.0), gr_db: AtomicF32::new(0.0) },
             smart: SmartParams::new(),
             comp: CompParams::new(),
+            limiter: LimiterParams::new(),
             peak_l: AtomicF32::new(0.0),
             peak_r: AtomicF32::new(0.0),
         }

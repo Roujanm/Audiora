@@ -7,7 +7,8 @@ use windows::core::{w, Interface, PCWSTR};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
-    eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IAudioClient3, IAudioRenderClient, IMMDevice,
+    eCapture, eConsole, eRender, AudioCategory_Other, AudioClientProperties, IAudioCaptureClient, IAudioClient, IAudioClient2,
+    IAudioClient3, AUDCLNT_STREAMOPTIONS_RAW, IAudioRenderClient, IMMDevice,
     IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_EXCLUSIVE,
     AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, AUDCLNT_STREAMFLAGS_LOOPBACK,
     AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, DEVICE_STATE_ACTIVE, WAVEFORMATEX,
@@ -183,7 +184,7 @@ fn open_device(flow: Flow, id: Option<&str>) -> Result<IMMDevice> {
 }
 
 fn open_stream(flow: Flow, id: Option<&str>, mode: Mode) -> Result<Shared> {
-    open_stream_inner(flow, id, mode, false, false)
+    open_stream_inner(flow, id, mode, false, false, false)
 }
 
 /// `loopback` taps what a render device is playing; it needs shared mode and the default period.
@@ -191,7 +192,10 @@ fn open_stream(flow: Flow, id: Option<&str>, mode: Mode) -> Result<Shared> {
 /// `switchable` opens the default output the way routing-aware applications do (class activation,
 /// automatic format conversion) so Windows can move the running stream to another device when the
 /// user — or Audiora — sends this program somewhere else.
-fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool, switchable: bool) -> Result<Shared> {
+///
+/// `raw` asks for the device's signal without Windows or driver effects (noise suppression, AGC,
+/// "enhancements"), which often make a voice sound processed or robotic. Ignored where unsupported.
+fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool, switchable: bool, raw: bool) -> Result<Shared> {
     let dev = open_device(flow, id)?;
     if mode == Mode::Exclusive && !loopback {
         return open_exclusive(&dev);
@@ -209,6 +213,18 @@ fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool, s
     } else {
         unsafe { dev.Activate(CLSCTX_ALL, None) }.map_err(|e| HalError(format!("activate: {e}")))?
     };
+    if raw {
+        if let Ok(c2) = client.cast::<IAudioClient2>() {
+            let props = AudioClientProperties {
+                cbSize: size_of::<AudioClientProperties>() as u32,
+                bIsOffload: false.into(),
+                // "other", not "communications": that category would make Windows duck other sounds
+                eCategory: AudioCategory_Other,
+                Options: AUDCLNT_STREAMOPTIONS_RAW,
+            };
+            let _ = unsafe { c2.SetClientProperties(&props) };
+        }
+    }
     let (fmt, is_float) = mix_format(&client).map_err(|e| HalError(format!("mix format: {e}")))?;
     if !is_float || fmt.wBitsPerSample != 32 {
         return Err(HalError(format!(
@@ -424,7 +440,7 @@ impl RenderStream {
     /// The default output, opened so that Windows' per-app output routing moves the running
     /// stream live. Used by test tones and any client that should behave like a well-made app.
     pub fn open_switchable() -> Result<Self> {
-        let s = open_stream_inner(Flow::Render, None, Mode::Shared, false, true)?;
+        let s = open_stream_inner(Flow::Render, None, Mode::Shared, false, true, false)?;
         let render: IAudioRenderClient = unsafe { s.client.GetService()? };
         Ok(Self { s, render })
     }
@@ -510,9 +526,20 @@ impl CaptureStream {
         Ok(Self { s, capture })
     }
 
+    /// Like [`open`](Self::open) but asks for the unprocessed signal (no Windows/driver effects).
+    pub fn open_raw(device_id: Option<&str>, mode: Mode) -> Result<Self> {
+        let s = if mode == Mode::Exclusive {
+            open_stream(Flow::Capture, device_id, mode)?
+        } else {
+            open_stream_inner(Flow::Capture, device_id, mode, false, false, true)?
+        };
+        let capture: IAudioCaptureClient = unsafe { s.client.GetService()? };
+        Ok(Self { s, capture })
+    }
+
     /// Taps what the render device `device_id` is playing (`None` = default output).
     pub fn open_loopback(device_id: Option<&str>) -> Result<Self> {
-        let s = open_stream_inner(Flow::Render, device_id, Mode::Shared, true, false)?;
+        let s = open_stream_inner(Flow::Render, device_id, Mode::Shared, true, false, false)?;
         let capture: IAudioCaptureClient = unsafe { s.client.GetService()? };
         Ok(Self { s, capture })
     }

@@ -7,6 +7,7 @@ mod dynamics;
 mod leveler;
 mod loudness;
 mod spectrum;
+mod voice;
 mod resample;
 
 pub use biquad::{Biquad, BiquadCoeffs, FilterKind};
@@ -16,6 +17,7 @@ pub use leveler::Leveler;
 pub use loudness::{LoudnessMeter, LUFS_FLOOR};
 pub use spectrum::{band_frequency, SpectrumAnalyzer, SPECTRUM_BANDS, SPECTRUM_FFT, SPECTRUM_FLOOR};
 pub use resample::LinearResampler;
+pub use voice::{DeEsser, LowCut};
 
 /// Silence floor used when converting linear gain to dB.
 pub const MIN_DB: f32 = -120.0;

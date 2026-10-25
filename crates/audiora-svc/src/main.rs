@@ -53,6 +53,7 @@ fn config_from_args(args: &[String]) -> EngineConfig {
         tone_hz: arg(args, "--tone"),
         rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
         tolerant_inputs: false,
+        mic_strip: None,
         master_fallback: None,
         mode: if args.iter().any(|a| a == "--exclusive") {
             audiora_hal::Mode::Exclusive
@@ -68,7 +69,8 @@ fn config_from_args(args: &[String]) -> EngineConfig {
 fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig, channels::Resolved) {
     let devs = audiora_hal::list_devices().unwrap_or_default();
     let running = audiora_hal::running_process_names();
-    let mut resolved = channels::resolve(&channels::Config::load(data_dir), &devs, &running);
+    let saved = channels::Config::load(data_dir);
+    let mut resolved = channels::resolve(&saved, &devs, &running);
     let forced_out = args_all(args, "--out").into_iter().next();
     if let Some(out) = &forced_out {
         resolved.master_out = Some(out.clone());
@@ -82,6 +84,7 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
             name: Some(CHANNELS[i].1.to_string()),
             channel: Some(CHANNELS[i].0),
             note: resolved.blocked[i].clone(),
+            raw: false,
         })
         .collect();
     inputs.push(InputSpec {
@@ -91,6 +94,7 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
         name: Some("Mic".into()),
         channel: Some("mic"),
         note: None,
+        raw: saved.mic_raw,
     });
     let mut outputs = vec![resolved.master_out.clone()];
     if let Some(m) = &resolved.mic_out {
@@ -102,6 +106,7 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
         tone_hz: arg(args, "--tone"),
         rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
         tolerant_inputs: true,
+        mic_strip: Some(channels::MIC),
         // if the speakers vanish, play on whatever the automatic choice is now (never a channel's device)
         master_fallback: forced_out.is_none().then(|| {
             let dir = data_dir.to_owned();
@@ -205,7 +210,9 @@ fn main() -> ExitCode {
     });
     let watcher = channel_state.as_ref().map(|c| c.watch(stop.clone()));
 
+    let sim_r = args.iter().any(|a| a == "--sim-r") || (channel_mode && channels::Config::load(&data_dir).sim_r);
     let api = Arc::new(Api {
+        mic_test: Some(engine.mic_test.clone()),
         channels: channel_state.clone(),
         params: engine.params.clone(),
         stats: engine.stats.clone(),
@@ -214,7 +221,7 @@ fn main() -> ExitCode {
         presets: presets.clone(),
         stop: stop.clone(),
         data_dir: data_dir.clone(),
-        hw: args.iter().any(|a| a == "--sim-r").then(|| {
+        hw: sim_r.then(|| {
             println!("R Interface SIMULATOR enabled (no real hardware is being controlled)");
             std::sync::Mutex::new(Box::new(audiora_device::SimulatedR::new()) as Box<dyn audiora_device::HardwareInterface>)
         }),
@@ -225,7 +232,7 @@ fn main() -> ExitCode {
             "rec_sources": engine.rec.layout().list(),
             "strips": strips,
             "buses": buses,
-            "hardware": args.iter().any(|a| a == "--sim-r"),
+            "hardware": sim_r,
         }),
     });
 

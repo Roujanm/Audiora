@@ -32,7 +32,7 @@ pub fn channel_index(key: &str) -> Option<usize> {
 }
 
 /// User-chosen devices; `None` = automatic.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     pub master_out: Option<String>,
     pub mic_in: Option<String>,
@@ -43,6 +43,16 @@ pub struct Config {
     /// An output nobody listens to (an unused S/PDIF or HDMI port). Channels without a virtual
     /// device send their applications there and capture them directly — no driver needed.
     pub parking: Option<String>,
+    /// Capture the microphone without Windows/driver effects (default on).
+    pub mic_raw: bool,
+    /// Run the R Interface simulator (development without the hardware).
+    pub sim_r: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self { master_out: None, mic_in: None, mic_out: None, devices: Default::default(), parking: None, mic_raw: true, sim_r: false }
+    }
 }
 
 fn opt(v: &Value) -> Option<String> {
@@ -60,6 +70,8 @@ impl Config {
             mic_in: opt(&v["mic_in"]),
             mic_out: opt(&v["mic_out"]),
             parking: opt(&v["parking"]),
+            mic_raw: v["mic_raw"].as_bool().unwrap_or(true),
+            sim_r: v["sim_r"].as_bool().unwrap_or(false),
             ..Default::default()
         };
         for (i, (key, _)) in CHANNELS[..APP_CHANNELS].iter().enumerate() {
@@ -73,7 +85,10 @@ impl Config {
         for (i, (key, _)) in CHANNELS[..APP_CHANNELS].iter().enumerate() {
             devices.insert((*key).into(), json!(self.devices[i]));
         }
-        json!({ "master_out": self.master_out, "mic_in": self.mic_in, "mic_out": self.mic_out, "parking": self.parking, "devices": devices })
+        json!({
+            "master_out": self.master_out, "mic_in": self.mic_in, "mic_out": self.mic_out, "parking": self.parking,
+            "mic_raw": self.mic_raw, "sim_r": self.sim_r, "devices": devices,
+        })
     }
 
     pub fn save(&self, dir: &Path) -> Result<(), String> {
@@ -386,6 +401,11 @@ impl Channels {
         ] {
             if let Some(v) = req.get(field) {
                 *slot = take(v).ok_or_else(|| format!("\"{field}\" must be a device id or null"))?;
+            }
+        }
+        for (field, slot) in [("mic_raw", &mut next.mic_raw), ("sim_r", &mut next.sim_r)] {
+            if let Some(v) = req.get(field) {
+                *slot = v.as_bool().ok_or_else(|| format!("\"{field}\" must be true or false"))?;
             }
         }
         if let Some(d) = req.get("devices").and_then(Value::as_object) {

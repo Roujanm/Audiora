@@ -55,6 +55,8 @@ export interface ChannelsInfo {
     mic_in: string | null;
     mic_out: string | null;
     parking?: string | null;
+    mic_raw?: boolean;
+    sim_r?: boolean;
     devices: Record<string, string | null>;
   };
 }

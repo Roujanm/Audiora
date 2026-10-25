@@ -44,8 +44,10 @@ if ($Uninstall) {
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 # A running copy would keep the files locked; the app asks its engine to stop when it closes.
 Get-Process audiora-app -ErrorAction SilentlyContinue | Stop-Process
-Start-Sleep -Milliseconds 500
-Get-Process audiora-svc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$target*" } | Stop-Process
+Get-Process audiora-app -ErrorAction SilentlyContinue | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+$engines = Get-Process audiora-svc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$target*" }
+$engines | Stop-Process
+$engines | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $Source "audiora-svc.exe") $target -Force
 Copy-Item (Join-Path $Source "audiora.exe") $target -Force
 $app = Join-Path $target "audiora-app.exe"

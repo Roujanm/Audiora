@@ -43,11 +43,22 @@ impl Denoiser {
 
     /// In-place on interleaved stereo.
     pub fn process(&mut self, buf: &mut [f32]) {
+        self.process_mix(buf, 1.0);
+    }
+
+    /// Like [`process`](Self::process), blending in `1 - strength` of the original signal (delayed
+    /// by the same 10 ms, so nothing smears). Less than full strength keeps a little room tone and
+    /// avoids the "underwater" sound full suppression can leave on difficult voices.
+    pub fn process_mix(&mut self, buf: &mut [f32], strength: f32) {
+        let wet = strength.clamp(0.0, 1.0);
+        let dry = 1.0 - wet;
         for f in buf.chunks_exact_mut(2) {
             for (c, s) in self.ch.iter_mut().zip(f.iter_mut()) {
                 let delayed = c.out[self.pos];
+                // the input written one block ago at this position is the dry signal aligned with `delayed`
+                let dry_then = c.inp[self.pos];
                 c.inp[self.pos] = *s * SCALE;
-                *s = delayed / SCALE;
+                *s = (delayed * wet + dry_then * dry) / SCALE;
             }
             self.pos += 1;
             if self.pos == DENOISE_FRAME {

@@ -18,29 +18,40 @@ pub struct GateSettings {
     pub release_ms: f32,
     /// Attenuation applied while closed (positive dB, e.g. 60).
     pub range_db: f32,
+    /// How long the gate stays open after the level falls below the threshold, so word endings and
+    /// short pauses are not chopped.
+    pub hold_ms: f32,
 }
 
 impl Default for GateSettings {
     fn default() -> Self {
-        Self { threshold_db: -50.0, attack_ms: 2.0, release_ms: 120.0, range_db: 60.0 }
+        Self { threshold_db: -50.0, attack_ms: 2.0, release_ms: 120.0, range_db: 60.0, hold_ms: 80.0 }
     }
 }
 
-/// Downward expander/gate with hysteresis-free smoothed gain.
+/// The gate opens at the threshold but only closes this far below it, so a voice hovering at the
+/// threshold does not make it chatter.
+const HYSTERESIS_DB: f32 = 4.0;
+
+/// Downward expander/gate with hold, hysteresis and smoothed gain.
 pub struct Gate {
     fs: f32,
     env: f32,
     gain: f32,
+    open: bool,
+    hold_left: u32,
 }
 
 impl Gate {
     pub fn new(sample_rate: f32) -> Self {
-        Self { fs: sample_rate, env: 0.0, gain: 1.0 }
+        Self { fs: sample_rate, env: 0.0, gain: 1.0, open: true, hold_left: 0 }
     }
 
     /// Returns true when the gate is (mostly) open at the end of the block.
     pub fn process(&mut self, buf: &mut [f32], s: &GateSettings) -> bool {
-        let thr = db_to_lin(s.threshold_db);
+        let open_at = db_to_lin(s.threshold_db);
+        let close_at = db_to_lin(s.threshold_db - HYSTERESIS_DB);
+        let hold = (s.hold_ms.max(0.0) * 0.001 * self.fs) as u32;
         let floor = db_to_lin(-s.range_db.abs());
         let att = time_coeff(s.attack_ms, self.fs);
         let rel = time_coeff(s.release_ms, self.fs);
@@ -48,7 +59,17 @@ impl Gate {
         for f in buf.chunks_exact_mut(2) {
             let level = f[0].abs().max(f[1].abs());
             self.env = if level > self.env { level } else { level + (self.env - level) * env_rel };
-            let target = if self.env >= thr { 1.0 } else { floor };
+            if self.env >= open_at {
+                self.open = true;
+                self.hold_left = hold;
+            } else if self.env < close_at {
+                if self.hold_left > 0 {
+                    self.hold_left -= 1;
+                } else {
+                    self.open = false;
+                }
+            }
+            let target = if self.open { 1.0 } else { floor };
             let c = if target > self.gain { att } else { rel };
             self.gain = target + (self.gain - target) * c;
             f[0] *= self.gain;
@@ -60,6 +81,8 @@ impl Gate {
     pub fn reset(&mut self) {
         self.env = 0.0;
         self.gain = 1.0;
+        self.open = true;
+        self.hold_left = 0;
     }
 }
 

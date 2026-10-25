@@ -1,13 +1,14 @@
 //! Strip -> bus mixer. `process` never allocates, locks or blocks.
 //!
-//! Strip chain:  boost -> denoise -> gate -> EQ -> smart volume -> compressor -> fader/balance -> buses
+//! Strip chain:  boost -> low cut -> denoise -> gate -> EQ -> de-esser -> smart volume -> compressor
+//!               -> limiter -> fader/balance -> buses
 //! Bus chain:    sum -> fader -> limiter -> output
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use audiora_dsp::{
-    db_to_lin, Biquad, BiquadCoeffs, Compressor, Denoiser, FilterKind, Gate, Leveler, Limiter,
+    db_to_lin, Biquad, BiquadCoeffs, Compressor, DeEsser, Denoiser, FilterKind, Gate, Leveler, Limiter, LowCut,
     DENOISE_SAMPLE_RATE,
 };
 
@@ -30,9 +31,15 @@ struct StripState {
     gate: Gate,
     comp: Compressor,
     leveler: Leveler,
+    lowcut: LowCut,
+    deesser: DeEsser,
+    limiter: Box<Limiter>,
     gate_on: bool,
     comp_on: bool,
     smart_on: bool,
+    lowcut_on: bool,
+    deess_on: bool,
+    limiter_on: bool,
     eq: [[Biquad; 2]; EQ_BANDS],
     /// (freq, gain_db, q) the filters were last configured with.
     eq_cache: [(f32, f32, f32); EQ_BANDS],
@@ -53,7 +60,14 @@ pub struct Mixer {
     strips: Vec<StripState>,
     buses: Vec<BusState>,
     scratch: Vec<f32>,
+    /// Strip whose processed, post-fader signal is copied into `post` (the microphone check).
+    post_strip: Option<usize>,
+    post: Vec<f32>,
+    post_len: usize,
 }
+
+/// Longest call (in frames) whose post-fader tap is kept; longer calls are not tapped.
+const POST_TAP_FRAMES: usize = 16_384;
 
 impl Mixer {
     pub fn new(sample_rate: f32, strips: usize, buses: usize) -> (Self, Arc<MixerParams>) {
@@ -68,9 +82,15 @@ impl Mixer {
                     gate: Gate::new(sample_rate),
                     comp: Compressor::new(sample_rate),
                     leveler: Leveler::new(sample_rate),
+                    lowcut: LowCut::new(sample_rate),
+                    deesser: DeEsser::new(sample_rate),
+                    limiter: Box::new(Limiter::new(sample_rate)),
                     gate_on: false,
                     comp_on: false,
                     smart_on: false,
+                    lowcut_on: false,
+                    deess_on: false,
+                    limiter_on: false,
                     eq: [[Biquad::default(); 2]; EQ_BANDS],
                     eq_cache: [(f32::NAN, 0.0, 0.0); EQ_BANDS],
                     eq_active: false,
@@ -86,8 +106,23 @@ impl Mixer {
                 })
                 .collect(),
             scratch: vec![0.0; MAX_BLOCK_FRAMES * 2],
+            post_strip: None,
+            post: vec![0.0; POST_TAP_FRAMES * 2],
+            post_len: 0,
         };
         (mixer, params)
+    }
+
+    /// Copies strip `strip`'s finished signal (after its fader) into [`post_tap`](Self::post_tap)
+    /// on every call; `None` stops it.
+    pub fn set_post_tap(&mut self, strip: Option<usize>) {
+        self.post_strip = strip;
+        self.post_len = 0;
+    }
+
+    /// The tapped strip's signal from the last [`process`](Self::process) call.
+    pub fn post_tap(&self) -> &[f32] {
+        &self.post[..self.post_len]
     }
 
     /// `inputs[i]` is strip i, `outputs[b]` is bus b; all interleaved stereo
@@ -99,6 +134,10 @@ impl Mixer {
         let mut peaks_s = [[0f32; 2]; 64];
         let mut peaks_b = [[0f32; 2]; 32];
 
+        self.post_len = if self.post_strip.is_some() && total_frames <= POST_TAP_FRAMES { total_frames * 2 } else { 0 };
+        if self.post_len > 0 {
+            self.post[..self.post_len].fill(0.0);
+        }
         let mut offset = 0;
         while offset < total_frames {
             let frames = (total_frames - offset).min(MAX_BLOCK_FRAMES);
@@ -156,9 +195,17 @@ impl Mixer {
                 }
             }
 
+            if p.lowcut.enabled.load(Ordering::Relaxed) {
+                st.lowcut.process(buf, p.lowcut.freq.get());
+                st.lowcut_on = true;
+            } else if st.lowcut_on {
+                st.lowcut.reset();
+                st.lowcut_on = false;
+            }
+
             if p.denoise.load(Ordering::Relaxed) {
                 if let Some(d) = st.denoiser.as_mut() {
-                    d.process(buf);
+                    d.process_mix(buf, p.denoise_mix.get());
                 }
             }
 
@@ -182,6 +229,15 @@ impl Mixer {
                 }
             }
 
+            if p.deess.enabled.load(Ordering::Relaxed) {
+                p.deess.gr_db.set(st.deesser.process(buf, p.deess.threshold_db.get()));
+                st.deess_on = true;
+            } else if st.deess_on {
+                st.deesser.reset();
+                p.deess.gr_db.set(0.0);
+                st.deess_on = false;
+            }
+
             if p.smart.enabled.load(Ordering::Relaxed) {
                 p.smart.gain_db.set(st.leveler.process(buf, p.smart.target_db.get()));
                 st.smart_on = true;
@@ -200,6 +256,15 @@ impl Mixer {
                 st.comp_on = false;
             }
 
+            if p.limiter.enabled.load(Ordering::Relaxed) {
+                p.limiter.gr_db.set(st.limiter.process(buf, &p.limiter.settings()));
+                st.limiter_on = true;
+            } else if st.limiter_on {
+                st.limiter.reset();
+                p.limiter.gr_db.set(0.0);
+                st.limiter_on = false;
+            }
+
             let step_l = (target_l - st.gain_l) * inv;
             let step_r = (target_r - st.gain_r) * inv;
             let (mut gl, mut gr) = (st.gain_l, st.gain_r);
@@ -215,6 +280,9 @@ impl Mixer {
             peaks_s[i] = [pl, pr];
             st.gain_l = target_l;
             st.gain_r = target_r;
+            if self.post_strip == Some(i) && self.post_len > 0 {
+                self.post[range.clone()].copy_from_slice(buf);
+            }
 
             for (b, out) in outputs.iter_mut().enumerate() {
                 if mask & (1 << b) != 0 {
@@ -452,6 +520,39 @@ mod tests {
             run(&mut m, std::slice::from_ref(&loud), 1);
         }
         assert!(p.strips[0].smart.gain_db.get() < -4.0, "gain {}", p.strips[0].smart.gain_db.get());
+    }
+
+    #[test]
+    fn voice_chain_processors_switch_on_and_report() {
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        let s = &p.strips[0];
+        s.lowcut.enabled.store(true, Ordering::Relaxed);
+        s.deess.enabled.store(true, Ordering::Relaxed);
+        s.deess.threshold_db.set(-40.0);
+        s.limiter.enabled.store(true, Ordering::Relaxed);
+        s.limiter.ceiling_db.set(-6.0);
+        let hiss = sine(0.9, 7000.0);
+        let mut worst = 0f32;
+        for _ in 0..30 {
+            let out = run(&mut m, std::slice::from_ref(&hiss), 1);
+            worst = worst.max(out[0].iter().fold(0.0, |a, &b| a.max(b.abs())));
+        }
+        assert!(s.deess.gr_db.get() > 3.0, "de-esser {}", s.deess.gr_db.get());
+        assert!(worst <= db_to_lin(-6.0) + 1e-3, "limiter let {worst} through");
+    }
+
+    #[test]
+    fn post_tap_copies_the_finished_strip() {
+        let (mut m, p) = Mixer::new(48_000.0, 2, 1);
+        p.strips[1].gain_db.set(-6.0206);
+        m.set_post_tap(Some(1));
+        run(&mut m, &[dc(0.25), dc(0.5)], 1);
+        let tap = m.post_tap();
+        assert_eq!(tap.len(), FRAMES * 2);
+        assert!((tap[100] - 0.25).abs() < 1e-3);
+        m.set_post_tap(None);
+        run(&mut m, &[dc(0.25), dc(0.5)], 1);
+        assert!(m.post_tap().is_empty());
     }
 
     #[test]

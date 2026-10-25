@@ -6,6 +6,7 @@
   import { toast } from '../lib/toast.svelte.ts';
   import ChannelEq from './ChannelEq.svelte';
   import DynamicsPanel from './DynamicsPanel.svelte';
+  import MicCheck from './MicCheck.svelte';
   import Icon from './Icon.svelte';
   import Popover from './Popover.svelte';
   import PresetPicker from './PresetPicker.svelte';
@@ -49,6 +50,12 @@
     engine.set(p('comp/ratio'), Math.round((2 + a * 0.04) * 10) / 10);
     engine.set(p('comp/makeup_db'), Math.round(a * 0.08 * 10) / 10);
   }
+
+  // de-esser "amount" 0..100 maps to its threshold: more amount = acts on softer sibilance
+  const deessAmount = $derived(Math.round(Math.min(100, Math.max(0, (-15 - g('deess/threshold_db', -30)) / 0.35))));
+  const deessGr = $derived(on('deess/enabled') ? engine.gauge(p('deess/gr_db')) : 0);
+  const limitGr = $derived(on('limiter/enabled') ? engine.gauge(p('limiter/gr_db')) : 0);
+  const LOWCUTS = [60, 80, 100, 120];
 
   const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
   let saveName = $state('');
@@ -112,18 +119,44 @@
     </Popover>
   </div>
 
+  {#if isMic}<MicCheck />{/if}
+
   <ChannelEq strip={ch.strip} color={meta.color} />
 
   <section class="panel list" aria-label="Sound settings">
+    {#if isMic}
+      <SettingRow icon="wave" title="Low cut" description="Removes rumble, desk bumps and breath pops." on={on('lowcut/enabled')} ontoggle={(v) => engine.set(p('lowcut/enabled'), v)}>
+        <Segmented
+          size="sm"
+          label="Low cut frequency"
+          value={String(LOWCUTS.reduce((b, f) => (Math.abs(f - g('lowcut/freq', 80)) < Math.abs(b - g('lowcut/freq', 80)) ? f : b)))}
+          options={LOWCUTS.map((f) => ({ id: String(f), label: `${f} Hz` }))}
+          onchange={(id) => engine.set(p('lowcut/freq'), +id)}
+        />
+      </SettingRow>
+    {/if}
+
     {#if isMic || ch.key === 'chat'}
       <SettingRow
         icon="bolt"
         title="ClearCast noise cancellation"
-        description={clearCastOk ? (isMic ? 'Removes keyboard, fan and room noise from your voice.' : 'Cleans up noisy voices from the people you talk to.') : 'Needs the speakers to run at 48 kHz.'}
+        description={clearCastOk ? (isMic ? 'AI that removes keyboard, fan and room noise from your voice.' : 'Cleans up noisy voices from the people you talk to.') : 'Needs the speakers to run at 48 kHz.'}
         on={on('denoise')}
         disabled={!clearCastOk}
         ontoggle={(v) => engine.set(p('denoise'), v)}
-      />
+      >
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={g('denoise_mix', 1)}
+          style="--fill: {g('denoise_mix', 1) * 100}%"
+          aria-label="Noise cancellation strength"
+          oninput={(e) => engine.set(p('denoise_mix'), +e.currentTarget.value)}
+        />
+        <output class="num">{Math.round(g('denoise_mix', 1) * 100)}%</output>
+      </SettingRow>
     {/if}
 
     {#if isMic}
@@ -140,6 +173,22 @@
           oninput={(e) => engine.set(p('gate/threshold_db'), +e.currentTarget.value)}
         />
         <output class="num">{g('gate/threshold_db', -50).toFixed(0)} dB</output>
+      </SettingRow>
+    {/if}
+
+    {#if isMic}
+      <SettingRow icon="chat" title="De-esser" description="Softens harsh “s” and “sh” sounds." value={deessGr > 0.5 ? `−${deessGr.toFixed(1)} dB` : ''} on={on('deess/enabled')} ontoggle={(v) => engine.set(p('deess/enabled'), v)}>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={deessAmount}
+          style="--fill: {deessAmount}%"
+          aria-label="De-esser amount"
+          oninput={(e) => engine.set(p('deess/threshold_db'), Math.round((-15 - +e.currentTarget.value * 0.35) * 10) / 10)}
+        />
+        <output class="num">{deessAmount}%</output>
       </SettingRow>
     {/if}
 
@@ -177,6 +226,14 @@
     </SettingRow>
 
     {#if isMic}
+      <SettingRow
+        icon="alert"
+        title="Limiter"
+        description="Never lets your voice clip, however loud you get."
+        value={limitGr > 0.3 ? `−${limitGr.toFixed(1)} dB` : ''}
+        on={on('limiter/enabled')}
+        ontoggle={(v) => engine.set(p('limiter/enabled'), v)}
+      />
       <SettingRow
         icon="headphones"
         title="Hear yourself"

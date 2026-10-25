@@ -22,7 +22,7 @@ use audiora_device::{ControlKind, HardwareInterface};
 use serde_json::{json, Map, Value};
 
 use crate::analysis::{Analysis, SPECTRUM_OFF};
-use crate::engine::Stats;
+use crate::engine::{MicTest, Stats};
 use crate::channels::{channel_index, Channels};
 use crate::presets::{PresetStore, LAST, LAST_CHANNELS};
 use crate::rec::{self, RecController};
@@ -45,6 +45,8 @@ pub struct Api {
     pub info: Value,
     /// Channel model (Game/Chat/Media/Aux/Mic); `None` in the flat device-per-strip layout.
     pub channels: Option<Arc<Channels>>,
+    /// Record-and-listen-back check of the processed microphone.
+    pub mic_test: Option<Arc<MicTest>>,
 }
 
 impl Api {
@@ -71,6 +73,8 @@ impl Api {
             }
             "apps" => self.apps(),
             "channels" => self.channels_cmd(),
+            "mic_test" => self.mic_test_cmd(&req),
+            "mic_test_status" => self.mic_test.as_ref().map(|m| Self::mic_test_json(m)).ok_or_else(|| "no microphone check in this layout".to_string()),
             "config_set" => self.ch().and_then(|c| c.config_set(&req)),
             "routes" => self.ch().map(|c| c.routes_json()),
             "app_route" => self.app_route(&req),
@@ -220,6 +224,31 @@ impl Api {
             }),
             Err(e) => json!({ "state": "invalid", "edition": "play", "error": e.to_string() }),
         }
+    }
+
+    fn mic_test_json(m: &MicTest) -> Value {
+        let rate = m.rate.load(Relaxed).max(1) as f64;
+        let state = match m.state.load(Relaxed) {
+            1 => "recording",
+            2 => "playing",
+            _ => "idle",
+        };
+        json!({
+            "state": state,
+            "seconds": m.pos.load(Relaxed) as f64 / rate,
+            "length": m.len.load(Relaxed) as f64 / rate,
+        })
+    }
+
+    fn mic_test_cmd(&self, req: &Value) -> Result<Value, String> {
+        let m = self.mic_test.as_ref().ok_or("no microphone check in this layout")?;
+        match req.get("action").and_then(Value::as_str) {
+            Some("record") => m.record(req.get("seconds").and_then(Value::as_f64).unwrap_or(5.0)),
+            Some("play") => m.play(),
+            Some("stop") => m.stop(),
+            _ => return Err("\"action\" must be record, play or stop".into()),
+        }
+        Ok(Self::mic_test_json(m))
     }
 
     fn ch(&self) -> Result<&Arc<Channels>, String> {
@@ -411,7 +440,7 @@ mod tests {
         let analysis = Arc::new(Analysis::default());
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
         let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
-        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}), channels: None }
+        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}), channels: None, mic_test: None }
     }
 
     fn call(a: &Api, line: &str) -> Value {

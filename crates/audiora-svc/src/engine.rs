@@ -13,7 +13,7 @@
 
 use std::f32::consts::TAU;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
 
@@ -44,6 +44,8 @@ pub struct InputSpec {
     pub channel: Option<&'static str>,
     /// Why a silent strip is silent, shown to the user.
     pub note: Option<String>,
+    /// Capture the microphone without Windows/driver effects.
+    pub raw: bool,
 }
 
 impl InputSpec {
@@ -68,6 +70,8 @@ pub struct EngineConfig {
     pub rec_dir: Option<PathBuf>,
     /// How device streams are opened: shared, low-latency shared, or exclusive.
     pub mode: Mode,
+    /// Strip recorded by the microphone check.
+    pub mic_strip: Option<usize>,
     /// When the master device disappears for a few seconds, asks for another output to play on
     /// (for example the new system default). `None` waits for the same device to return.
     pub master_fallback: Option<MasterFallback>,
@@ -115,8 +119,49 @@ pub struct Engine {
     pub analysis: Arc<Analysis>,
     /// Adds and removes per-application captures while the engine runs.
     pub tapper: AppTapper,
+    pub mic_test: Arc<MicTest>,
     stop: Arc<AtomicBool>,
     threads: Vec<JoinHandle<()>>,
+}
+
+/// Longest microphone check, in seconds.
+pub const MIC_TEST_MAX_SECS: usize = 10;
+
+/// "Record yourself, then listen back": the processed microphone (exactly what others receive) is
+/// recorded into memory and can be played into the master. Driven from the control thread through
+/// these atomics; the audio thread owns the buffer.
+#[derive(Default)]
+pub struct MicTest {
+    /// 1 = record, 2 = play, 3 = stop; consumed by the audio thread.
+    cmd: AtomicU8,
+    /// 0 = idle, 1 = recording, 2 = playing.
+    pub state: AtomicU8,
+    /// Frames recorded or played so far.
+    pub pos: AtomicUsize,
+    /// Frames in the last recording.
+    pub len: AtomicUsize,
+    /// Frames to record before stopping by itself.
+    limit: AtomicUsize,
+    /// Strip that is recorded (the microphone).
+    pub strip: AtomicUsize,
+    pub rate: AtomicUsize,
+}
+
+impl MicTest {
+    pub fn record(&self, seconds: f64) {
+        let rate = self.rate.load(Ordering::Relaxed).max(1);
+        let secs = seconds.clamp(1.0, MIC_TEST_MAX_SECS as f64);
+        self.limit.store((secs * rate as f64) as usize, Ordering::Relaxed);
+        self.cmd.store(1, Ordering::Release);
+    }
+
+    pub fn play(&self) {
+        self.cmd.store(2, Ordering::Release);
+    }
+
+    pub fn stop(&self) {
+        self.cmd.store(3, Ordering::Release);
+    }
 }
 
 /// Most applications captured at once; more are refused rather than allocating on the audio thread.
@@ -277,8 +322,8 @@ impl Engine {
             }
             let (prod, cons) = ring::ring(RING_SAMPLES);
             let (tx, rx) = mpsc::channel::<Result<StreamFormat, String>>();
-            let (dev, lb, stop2, stats2, ll) = (spec.device.clone(), spec.loopback, stop.clone(), stats.clone(), cfg.mode);
-            threads.push(std::thread::spawn(move || capture_thread(dev, lb, ll, prod, stop2, stats2, tx)));
+            let (dev, lb, raw, stop2, stats2, ll) = (spec.device.clone(), spec.loopback, spec.raw, stop.clone(), stats.clone(), cfg.mode);
+            threads.push(std::thread::spawn(move || capture_thread(dev, lb, raw, ll, prod, stop2, stats2, tx)));
             let opened = match rx.recv() {
                 Ok(r) => r,
                 Err(_) => Err("thread died".to_string()),
@@ -301,6 +346,8 @@ impl Engine {
 
         // Application taps reach the audio thread through a bounded channel (no allocation there).
         let (tap_tx, tap_rx) = mpsc::sync_channel::<AppTap>(MAX_APP_TAPS);
+        let mic_test = Arc::new(MicTest::default());
+        mic_test.strip.store(cfg.mic_strip.unwrap_or(usize::MAX), Ordering::Relaxed);
 
         // Master render thread: opens the master device and runs the mixer.
         let (tx, rx) = mpsc::channel::<Result<(StreamFormat, Arc<MixerParams>), String>>();
@@ -318,6 +365,7 @@ impl Engine {
                 n_buses: n_out,
                 analysis: analysis.clone(),
                 taps: tap_rx,
+                mic_test: mic_test.clone(),
             };
             let (stop2, stats2, slot2) = (stop.clone(), stats.clone(), slot.clone());
             threads.push(std::thread::spawn(move || master_thread(args, stop2, stats2, slot2, tx)));
@@ -362,7 +410,7 @@ impl Engine {
         let rec = Arc::new(RecController::new(slot, master_fmt.sample_rate, rec_dir, layout));
 
         let tapper = AppTapper { tx: tap_tx, master: master_fmt, stats: stats.clone(), open: Arc::default() };
-        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, tapper, stop, threads })
+        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, tapper, mic_test, stop, threads })
     }
 
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
@@ -438,6 +486,7 @@ struct MasterArgs {
     n_buses: usize,
     analysis: Arc<Analysis>,
     taps: mpsc::Receiver<AppTap>,
+    mic_test: Arc<MicTest>,
 }
 
 fn master_thread(
@@ -488,6 +537,9 @@ fn master_thread(
     let (mut analysis_tap, analysis_thread) =
         analysis::spawn(a.analysis.clone(), fmt.sample_rate as f32, cap / 2, stop.clone());
     let mut taps: Vec<AppTap> = Vec::with_capacity(MAX_APP_TAPS);
+    let mt = a.mic_test.clone();
+    mt.rate.store(fmt.sample_rate as usize, Ordering::Relaxed);
+    let mut mic_buf = vec![0f32; MIC_TEST_MAX_SECS * fmt.sample_rate as usize * 2];
     let mut tap_buf = vec![0f32; cap];
     // finished taps are freed on this helper thread, never on the audio thread
     let (reaper_tx, reaper_rx) = mpsc::sync_channel::<AppTap>(MAX_APP_TAPS);
@@ -548,11 +600,65 @@ fn master_thread(
             None => in_bufs[tone_idx][..n].fill(0.0),
         }
 
+        // microphone check: commands first, so a new recording includes this block
+        match mt.cmd.swap(0, Ordering::Acquire) {
+            1 => {
+                let strip = mt.strip.load(Ordering::Relaxed);
+                if strip < n_strips {
+                    mixer.set_post_tap(Some(strip));
+                    mt.pos.store(0, Ordering::Relaxed);
+                    mt.state.store(1, Ordering::Relaxed);
+                }
+            }
+            2 if mt.len.load(Ordering::Relaxed) > 0 => {
+                mixer.set_post_tap(None);
+                mt.pos.store(0, Ordering::Relaxed);
+                mt.state.store(2, Ordering::Relaxed);
+            }
+            3 => {
+                if mt.state.load(Ordering::Relaxed) == 1 {
+                    mt.len.store(mt.pos.load(Ordering::Relaxed), Ordering::Relaxed);
+                }
+                mixer.set_post_tap(None);
+                mt.state.store(0, Ordering::Relaxed);
+            }
+            _ => {}
+        }
+
         {
             let inputs: ArrayVec<&[f32], MAX_STRIPS> = in_bufs.iter().map(|b| &b[..n]).collect();
             let mut outputs: ArrayVec<&mut [f32], MAX_BUSES> =
                 bus_bufs.iter_mut().map(|b| &mut b[..n]).collect();
             mixer.process(&inputs, &mut outputs);
+        }
+
+        match mt.state.load(Ordering::Relaxed) {
+            1 => {
+                let tap = mixer.post_tap();
+                let pos = mt.pos.load(Ordering::Relaxed);
+                let limit = mt.limit.load(Ordering::Relaxed).min(mic_buf.len() / 2);
+                let take = (tap.len() / 2).min(limit.saturating_sub(pos));
+                mic_buf[pos * 2..(pos + take) * 2].copy_from_slice(&tap[..take * 2]);
+                mt.pos.store(pos + take, Ordering::Relaxed);
+                if pos + take >= limit {
+                    mt.len.store(pos + take, Ordering::Relaxed);
+                    mixer.set_post_tap(None);
+                    mt.state.store(0, Ordering::Relaxed);
+                }
+            }
+            2 => {
+                let pos = mt.pos.load(Ordering::Relaxed);
+                let len = mt.len.load(Ordering::Relaxed);
+                let take = frames.min(len.saturating_sub(pos));
+                for (o, v) in bus_bufs[0][..take * 2].iter_mut().zip(&mic_buf[pos * 2..(pos + take) * 2]) {
+                    *o += *v;
+                }
+                mt.pos.store(pos + take, Ordering::Relaxed);
+                if pos + take >= len {
+                    mt.state.store(0, Ordering::Relaxed);
+                }
+            }
+            _ => {}
         }
 
         for (prod, bus) in a.extra_prods.iter_mut().zip(&bus_bufs[1..]) {
@@ -663,16 +769,26 @@ fn output_thread(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn capture_thread(
     device: Option<String>,
     loopback: bool,
+    raw: bool,
     mode: Mode,
     prod: ring::Producer,
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
     ready: mpsc::Sender<Result<StreamFormat, String>>,
 ) {
-    let open = || if loopback { CaptureStream::open_loopback(device.as_deref()) } else { CaptureStream::open(device.as_deref(), mode) };
+    let open = || {
+        if loopback {
+            CaptureStream::open_loopback(device.as_deref())
+        } else if raw {
+            CaptureStream::open_raw(device.as_deref(), mode)
+        } else {
+            CaptureStream::open(device.as_deref(), mode)
+        }
+    };
     let stream = match open() {
         Ok(s) => s,
         Err(e) => {

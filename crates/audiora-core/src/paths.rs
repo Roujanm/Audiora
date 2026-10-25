@@ -32,11 +32,13 @@ enum Target<'a> {
     Meter(&'a AtomicF32),
 }
 
-const STRIP_LEAVES: [&str; 9] =
-    ["gain_db", "balance", "mute", "solo", "bus_mask", "peak_l", "peak_r", "denoise", "boost_db"];
+const STRIP_LEAVES: [&str; 10] =
+    ["gain_db", "balance", "mute", "solo", "bus_mask", "peak_l", "peak_r", "denoise", "boost_db", "denoise_mix"];
+const LOWCUT_LEAVES: [&str; 2] = ["enabled", "freq"];
+const DEESS_LEAVES: [&str; 3] = ["enabled", "threshold_db", "gr_db"];
 const SMART_LEAVES: [&str; 3] = ["enabled", "target_db", "gain_db"];
-const GATE_LEAVES: [&str; 6] =
-    ["enabled", "threshold_db", "attack_ms", "release_ms", "range_db", "open"];
+const GATE_LEAVES: [&str; 7] =
+    ["enabled", "threshold_db", "attack_ms", "release_ms", "range_db", "hold_ms", "open"];
 const COMP_LEAVES: [&str; 8] =
     ["enabled", "threshold_db", "ratio", "attack_ms", "release_ms", "makeup_db", "knee_db", "gr_db"];
 const EQ_LEAVES: [&str; 3] = ["freq", "gain_db", "q"];
@@ -59,6 +61,25 @@ impl MixerParams {
                     ["bus_mask"] => Ok(Target::Mask(&s.bus_mask)),
                     ["denoise"] => Ok(Target::Flag(&s.denoise)),
                     ["boost_db"] => Ok(Target::Float(&s.boost_db, 0.0, 12.0)),
+                    ["denoise_mix"] => Ok(Target::Float(&s.denoise_mix, 0.0, 1.0)),
+                    ["lowcut", name] => match *name {
+                        "enabled" => Ok(Target::Flag(&s.lowcut.enabled)),
+                        "freq" => Ok(Target::Float(&s.lowcut.freq, 20.0, 300.0)),
+                        _ => Err(UnknownPath),
+                    },
+                    ["deess", name] => match *name {
+                        "enabled" => Ok(Target::Flag(&s.deess.enabled)),
+                        "threshold_db" => Ok(Target::Float(&s.deess.threshold_db, -60.0, 0.0)),
+                        "gr_db" => Ok(Target::Meter(&s.deess.gr_db)),
+                        _ => Err(UnknownPath),
+                    },
+                    ["limiter", name] => match *name {
+                        "enabled" => Ok(Target::Flag(&s.limiter.enabled)),
+                        "ceiling_db" => Ok(Target::Float(&s.limiter.ceiling_db, -30.0, 0.0)),
+                        "release_ms" => Ok(Target::Float(&s.limiter.release_ms, 1.0, 2000.0)),
+                        "gr_db" => Ok(Target::Meter(&s.limiter.gr_db)),
+                        _ => Err(UnknownPath),
+                    },
                     ["smart", name] => match *name {
                         "enabled" => Ok(Target::Flag(&s.smart.enabled)),
                         "target_db" => Ok(Target::Float(&s.smart.target_db, -40.0, -10.0)),
@@ -82,6 +103,7 @@ impl MixerParams {
                         "attack_ms" => Ok(Target::Float(&s.gate.attack_ms, 0.1, 500.0)),
                         "release_ms" => Ok(Target::Float(&s.gate.release_ms, 1.0, 5000.0)),
                         "range_db" => Ok(Target::Float(&s.gate.range_db, 0.0, 100.0)),
+                        "hold_ms" => Ok(Target::Float(&s.gate.hold_ms, 0.0, 1000.0)),
                         "open" => Ok(Target::Meter(&s.gate.open)),
                         _ => Err(UnknownPath),
                     },
@@ -168,6 +190,15 @@ impl MixerParams {
             for n in COMP_LEAVES {
                 paths.push(format!("strip/{i}/comp/{n}"));
             }
+            for n in LOWCUT_LEAVES {
+                paths.push(format!("strip/{i}/lowcut/{n}"));
+            }
+            for n in DEESS_LEAVES {
+                paths.push(format!("strip/{i}/deess/{n}"));
+            }
+            for n in LIMITER_LEAVES {
+                paths.push(format!("strip/{i}/limiter/{n}"));
+            }
         }
         for i in 0..self.buses.len() {
             for n in BUS_LEAVES {
@@ -221,7 +252,7 @@ mod tests {
     fn every_listed_path_resolves() {
         let p = MixerParams::new(3, 2);
         let paths = p.paths();
-        assert_eq!(paths.len(), 3 * (9 + 6 + 18 + 3 + 8) + 2 * (4 + 4));
+        assert_eq!(paths.len(), 3 * (10 + 7 + 18 + 3 + 8 + 2 + 3 + 4) + 2 * (4 + 4));
         for path in &paths {
             assert!(p.get(path).is_ok(), "{path}");
         }
