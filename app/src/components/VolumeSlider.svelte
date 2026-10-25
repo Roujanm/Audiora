@@ -85,8 +85,8 @@
       {onkeydown}
     >
       <div class="track" bind:this={track}>
-        <i class="fill" style:height="{pct}%"></i>
-        <i class="cap" style:bottom="{pct}%"><b></b></i>
+        <i class="ticks"></i>
+        <i class="fill" style:height="max({pct}%, {pct > 0 ? 30 : 0}px)"><b class="grip"></b></i>
       </div>
     </div>
     <div class="meter">
@@ -128,64 +128,75 @@
   }
 
   .hit {
-    width: 40px;
+    width: 44px;
     display: flex;
     justify-content: center;
     cursor: ns-resize;
     touch-action: none;
   }
 
+  /* a full-height capsule that fills with the channel colour up to the volume */
   .track {
     position: relative;
-    width: 4px;
+    width: 30px;
     height: 100%;
-    border-radius: 2px;
-    background: var(--bg-0);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.04);
+    border-radius: 15px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #0a0d12, #11151c);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .ticks {
+    position: absolute;
+    inset: 10px 9px;
+    background: repeating-linear-gradient(to top, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 10%);
+    pointer-events: none;
   }
 
   .fill {
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 2px;
-    background: var(--c);
-    opacity: 0.85;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    max-height: calc(100% - 6px);
+    border-radius: 12px;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 45%, rgba(0, 0, 0, 0.18)),
+      linear-gradient(0deg, color-mix(in oklab, var(--c) 45%, #000), var(--c));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: height 0.05s linear;
   }
 
-  /* a console-style fader cap: flat, machined, with a coloured index line */
-  .cap {
+  /* grip lines at the top of the fill: where you grab it */
+  .grip {
     position: absolute;
+    top: 7px;
     left: 50%;
-    width: 34px;
-    height: 20px;
-    transform: translate(-50%, 50%);
-    border-radius: 5px;
-    background: linear-gradient(180deg, #eef1f6 0%, #c3cad5 48%, #9aa3b1 52%, #c9d0da 100%);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
-    pointer-events: none;
-    transition: box-shadow 0.15s;
+    width: 12px;
+    height: 6px;
+    transform: translateX(-50%);
+    border-top: 2px solid rgba(255, 255, 255, 0.95);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.95);
+    border-radius: 1px;
+    opacity: 0.9;
   }
 
-  .cap b {
-    position: absolute;
-    left: 5px;
-    right: 5px;
-    top: 50%;
-    height: 2px;
-    margin-top: -1px;
-    border-radius: 1px;
-    background: var(--c);
+  .hit:hover .fill {
+    filter: brightness(1.1);
   }
 
   .hit:focus-visible {
     outline: none;
   }
 
-  .hit:focus-visible .cap,
-  .hit.dragging .cap {
-    box-shadow: 0 0 0 2px var(--c), 0 3px 10px rgba(0, 0, 0, 0.7);
+  .hit:focus-visible .track,
+  .hit.dragging .track {
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      0 0 0 2px color-mix(in oklab, var(--c) 70%, transparent);
   }
 
   .meter {
@@ -206,7 +217,7 @@
   }
 
   .muted .fill {
-    background: var(--faint);
+    background: linear-gradient(0deg, #2a313b, #4a525e);
   }
 
   .muted output {
