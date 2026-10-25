@@ -1,5 +1,6 @@
 <script lang="ts">
   import { APP_CHANNEL_KEYS, channelMeta } from '../lib/channels.ts';
+  import { desktop } from '../lib/desktop.svelte.ts';
   import { engine } from '../lib/engine.svelte.ts';
   import { shortName } from '../lib/theme.ts';
   import { toast } from '../lib/toast.svelte.ts';
@@ -132,6 +133,22 @@
           </div>
           <Switch checked={draft.mic_raw} label="Pure microphone signal" onchange={(v) => (draft!.mic_raw = v)} />
         </div>
+        {#if desktop.available}
+          <div class="toggle">
+            <div>
+              <strong>Start with Windows</strong>
+              <p class="muted tiny">Audiora opens minimized when you sign in, so your channels and microphone are ready.</p>
+            </div>
+            <Switch checked={desktop.autostart} label="Start with Windows" onchange={(v) => void desktop.setAutostart(v)} />
+          </div>
+          <div class="toggle">
+            <div>
+              <strong>Updates</strong>
+              <p class="muted tiny">Version {desktop.version}. New versions are announced in the app and install with one click.</p>
+            </div>
+            <button class="btn sm" disabled={desktop.phase !== 'idle'} onclick={() => void desktop.check(true)}>{desktop.phase === 'checking' ? 'Checking…' : 'Check now'}</button>
+          </div>
+        {/if}
         <div class="toggle">
           <div>
             <strong>R Interface simulator</strong>

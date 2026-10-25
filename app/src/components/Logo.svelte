@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { GLYPH } from '../lib/glyph.ts';
   import { MARK, WORDMARK } from '../lib/logo.ts';
 
   interface Props {
-    variant?: 'mark' | 'word';
+    /** `glyph`: the bold small-size version of the mark (menus, icons). */
+    variant?: 'mark' | 'word' | 'glyph';
     /** Height in CSS pixels; the width follows the logo's proportions. */
     size?: number;
     /** Optional class on each letter (the splash animates them one by one). */
@@ -13,6 +15,9 @@
   const art = $derived(variant === 'mark' ? MARK : WORDMARK);
 </script>
 
+{#if variant === 'glyph'}
+  <svg viewBox="16 16 68 68" width={size} height={size} aria-hidden="true" focusable="false">{@html GLYPH}</svg>
+{:else}
 <svg
   viewBox="0 0 {art.width} {art.height}"
   height={size}
@@ -26,3 +31,4 @@
     <path {d} class={letterClass} style:--i={i} />
   {/each}
 </svg>
+{/if}

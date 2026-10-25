@@ -17,9 +17,12 @@
   import Toasts from './components/Toasts.svelte';
   import Logo from './components/Logo.svelte';
   import Splash from './components/Splash.svelte';
+  import UpdateBanner from './components/UpdateBanner.svelte';
+  import { desktop } from './lib/desktop.svelte.ts';
   import { toast } from './lib/toast.svelte.ts';
 
   engine.start();
+  void desktop.start();
 
   type Tab = 'mixer' | ChannelKey | 'studio' | 'hardware' | 'system';
 
@@ -222,7 +225,7 @@
 <div class="app">
   <nav class="rail" aria-label="Sections">
     <div class="logo" aria-label="Audiora">
-      <Logo variant="mark" size={30} />
+      <Logo variant="glyph" size={30} />
     </div>
     <div class="items">
       {#each RAIL as n (n.id)}
@@ -343,6 +346,7 @@
 
     <CommandPalette open={paletteOpen} {commands} onclose={() => (paletteOpen = false)} />
     <Toasts />
+    <UpdateBanner />
 
     {#if dnd.drag}
       <div class="drag-ghost" style:left="{dnd.drag.x}px" style:top="{dnd.drag.y}px" style:--c={appColor(dnd.drag.name)} aria-hidden="true">
@@ -364,7 +368,7 @@
         <span class="chip bad">Offline</span>
       {/if}
       <span class="spacer"></span>
-      <span class="muted ver">Audiora 0.1 · {engine.license?.state === 'valid' ? `${engine.license.edition} licence` : 'Play edition'}</span>
+      <span class="muted ver">Audiora {desktop.version || '0.1'} · {engine.license?.state === 'valid' ? `${engine.license.edition} licence` : 'Play edition'}</span>
     </footer>
   </div>
 </div>

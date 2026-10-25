@@ -110,10 +110,35 @@ fn stop_engine(mut child: Child) {
     let _ = child.kill();
 }
 
+/// Stops the engine (and forgets it) before an update replaces its files.
+#[tauri::command]
+fn stop_engine_now(state: tauri::State<'_, OwnedEngine>) {
+    if let Some(child) = state.0.lock().unwrap().take() {
+        stop_engine(child);
+    } else if let Ok(mut s) = TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], TCP_PORT)), Duration::from_millis(500)) {
+        let _ = s.write_all(b"{\"cmd\":\"shutdown\"}
+");
+        std::thread::sleep(Duration::from_millis(800));
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        // single source of truth for "start with Windows": the HKCU Run entry the plugin manages;
+        // it launches the app with --autostart so it opens minimized
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            if std::env::args().any(|a| a == "--autostart") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.minimize();
+                }
+            }
+            Ok(())
+        })
         .manage(OwnedEngine::default())
-        .invoke_handler(tauri::generate_handler![ensure_engine, reveal_in_folder])
+        .invoke_handler(tauri::generate_handler![ensure_engine, reveal_in_folder, stop_engine_now])
         .build(tauri::generate_context!())
         .expect("error while building the Audiora app")
         .run(|app, event| {

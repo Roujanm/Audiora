@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Audiora",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "digital.roujan.audiora",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -27,14 +27,38 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "Roujan Digital Agency",
     "copyright": "© Roujan Digital Agency",
     "category": "Music",
     "shortDescription": "Professional audio mixer and recorder",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
     "windows": {
-      "nsis": { "installMode": "currentUser" }
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "createUpdaterArtifacts": true,
+    "externalBin": [
+      "binaries/audiora-svc"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg2QTc4NzQyQTgyMEMzM0YKUldRL3d5Q29Rb2VuaHVibEduV21vc2hmNDNyOStGR2ZTQkhrNGIyb0h3L0czSXNvQjJIUzF2eGIK",
+      "endpoints": [
+        "https://github.com/Roujanm/Audiora/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

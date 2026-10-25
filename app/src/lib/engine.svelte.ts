@@ -170,6 +170,20 @@ class EngineClient {
     void this.#connect();
   }
 
+  #suspended = false;
+
+  /** Disconnects and stops reconnecting (an update is about to replace the engine). */
+  suspend() {
+    this.#suspended = true;
+    this.#ws?.close();
+  }
+
+  resume() {
+    if (!this.#suspended) return;
+    this.#suspended = false;
+    void this.#connect();
+  }
+
   async #connect() {
     this.connecting = true;
     if (inTauri()) {
@@ -186,7 +200,7 @@ class EngineClient {
     ws.onmessage = (ev) => this.#onMessage(ev.data as string);
     ws.onclose = () => {
       this.#teardown();
-      setTimeout(() => void this.#connect(), 1000);
+      if (!this.#suspended) setTimeout(() => void this.#connect(), 1000);
     };
     ws.onerror = () => {
       /* onclose follows and handles the retry */
