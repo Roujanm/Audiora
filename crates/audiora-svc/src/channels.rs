@@ -87,6 +87,19 @@ pub fn is_virtual(name: &str) -> bool {
     VIRTUAL_HINTS.iter().any(|h| n.contains(h))
 }
 
+/// Lower is a better automatic choice for where the user listens: headphones and speakers before
+/// the analogue jack, before HDMI/digital outputs that usually have nothing attached.
+fn listening_rank(name: &str) -> u8 {
+    let n = name.to_lowercase();
+    if ["headphone", "headset", "speaker", "earphone", "earbud"].iter().any(|h| n.contains(h)) {
+        0
+    } else if ["hdmi", "digital", "spdif", "s/pdif", "monitor", "display", "high definition audio"].iter().any(|h| n.contains(h)) {
+        2
+    } else {
+        1
+    }
+}
+
 /// Another mixer that is running owns its own virtual devices; using them would play every
 /// sound twice (once through that mixer, once through Audiora).
 fn owned_by_running_mixer(name: &str, running: &[String]) -> bool {
@@ -115,20 +128,22 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
         mic_out: exists(&cfg.mic_out, Flow::Render),
         ..Default::default()
     };
-    // Master: the system default unless it is virtual (then it would be a loop), else the first real output.
+    // Master: the system default unless it is virtual (then it would be a loop), else the most
+    // plausible real output.
     if r.master_out.is_none() {
         r.master_out = devs
             .iter()
             .find(|d| d.flow == Flow::Render && d.is_default && !is_virtual(&d.name))
-            .or_else(|| devs.iter().find(|d| d.flow == Flow::Render && !is_virtual(&d.name)))
+            .or_else(|| {
+                devs.iter().filter(|d| d.flow == Flow::Render && !is_virtual(&d.name)).min_by_key(|d| listening_rank(&d.name))
+            })
             .map(|d| d.id.clone());
     }
+    // Microphone: never a Bluetooth hands-free microphone (8 kHz): opening it would drop the
+    // headset's playback quality to telephone grade.
     if r.mic_in.is_none() {
-        r.mic_in = devs
-            .iter()
-            .find(|d| d.flow == Flow::Capture && d.is_default && !is_virtual(&d.name))
-            .or_else(|| devs.iter().find(|d| d.flow == Flow::Capture && !is_virtual(&d.name)))
-            .map(|d| d.id.clone());
+        let usable = |d: &&DeviceInfo| d.flow == Flow::Capture && !is_virtual(&d.name) && d.sample_rate >= 16_000;
+        r.mic_in = devs.iter().filter(usable).find(|d| d.is_default).or_else(|| devs.iter().find(usable)).map(|d| d.id.clone());
     }
     let mut used: HashSet<String> = HashSet::new();
     used.extend(r.master_out.clone());
@@ -484,6 +499,24 @@ mod tests {
         let devs = [dev("Sonar - Gaming", Flow::Render, "v", true), dev("Headphones", Flow::Render, "h", false)];
         let r = resolve(&Config::default(), &devs, &[]);
         assert_eq!(r.master_out.as_deref(), Some("h"));
+    }
+
+    #[test]
+    fn automatic_choices_prefer_headphones_and_avoid_hands_free_mics() {
+        let mut headset = dev("Headset (JBL)", Flow::Capture, "hf", false);
+        headset.sample_rate = 8000;
+        let devs = [
+            dev("Sonar - Gaming", Flow::Render, "v", true),
+            dev("1 - PHL 243V7 (AMD High Definition Audio Device)", Flow::Render, "hdmi", false),
+            dev("Realtek Digital Output", Flow::Render, "spdif", false),
+            dev("Headphones (JBL Quantum 360)", Flow::Render, "jbl", false),
+            dev("Sonar - Microphone", Flow::Capture, "vmic", true),
+            headset,
+            dev("Microphone (Realtek)", Flow::Capture, "mic", false),
+        ];
+        let r = resolve(&Config::default(), &devs, &[]);
+        assert_eq!(r.master_out.as_deref(), Some("jbl"));
+        assert_eq!(r.mic_in.as_deref(), Some("mic"));
     }
 
     #[test]

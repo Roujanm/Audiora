@@ -368,6 +368,10 @@ class EngineClient {
     const v = typeof value === 'boolean' ? (value ? 1 : 0) : value;
     this.params[path] = v;
     this.#dirty.set(path, performance.now());
+    // a hand-made change means the channel no longer matches the preset it was loaded from
+    const sound = /^strip\/(\d+)\/(eq\/|boost_db|smart\/|denoise|gate\/|comp\/)/.exec(path);
+    const channel = sound ? this.channelOf(+sound[1]) : null;
+    if (channel && this.activePreset[channel]) this.#remember(channel, null);
     this.call('set', { path, value: v }).catch((e) => (this.lastError = String(e)));
   }
 

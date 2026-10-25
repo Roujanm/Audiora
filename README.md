@@ -8,14 +8,20 @@ Proprietary — all rights reserved.
 ## What works today
 
 * **Engine** (`audiora-svc`): any number of input and output devices, each on its own clock and
-  bridged without clicks; strip chain denoise → gate → EQ → compressor → fader; bus limiter; shared,
-  low-latency and **exclusive** WASAPI (3 ms periods); per-application volumes; survives devices
-  disappearing; presets and session restore; recorder to multichannel 32-bit float WAV (RF64, crash-safe).
+  bridged without clicks; per-channel chain boost → denoise → gate → 6-band EQ → Smart Volume →
+  compressor → fader; bus limiter; shared, low-latency and **exclusive** WASAPI (3 ms periods);
+  survives devices disappearing; presets and session restore; recorder to multichannel 32-bit float
+  WAV (RF64, crash-safe).
+* **Sonar-style channels**: Game, Chat, Media, Aux and Mic. Programs that make sound are detected
+  automatically; drag one onto a channel and Windows plays it into that channel's virtual output while
+  Audiora mixes it (per-app output routing + loopback, live, no driver of ours). Per-channel presets
+  with favourites, per-game profiles that load by themselves when the game starts, per-program
+  volumes, Smart Volume, ClearCast noise cancellation, gate, compressor. Needs virtual audio cables
+  until our own driver exists — see below.
 * **App** (`app/`): Svelte 5 + Tauri 2 with a hardware-style interface (knobs, machined faders, LED
-  meters, patchbay routing, five accent colours). Play skin: mixer and application volumes. Studio
-  skin adds the EQ curve editor, gate/compressor graphs, recorder with takes list, routing and the
-  interface panel. Live meters at 30 Hz, master LUFS (BS.1770), live spectrum behind the EQ, click-to-type
-  values, renamable channels and a Ctrl+K command palette.
+  meters, five accent colours): the channel mixer with Master and the app list at the left, one page
+  per channel, recorder with takes list, interface panel, Setup. Live meters at 30 Hz, master LUFS
+  (BS.1770), live spectrum behind the EQ, click-to-type values and a Ctrl+K command palette.
 * **Control API** over a loopback WebSocket / TCP — see [docs/CONTROL-API.md](docs/CONTROL-API.md).
 * **R Interface**: control layer plus a clearly-labelled **simulator**; licence system with a vendor
   tool.
@@ -24,7 +30,7 @@ Proprietary — all rights reserved.
 
 | Item | Blocked on |
 |---|---|
-| Virtual audio driver (Game/Chat/Media/Aux endpoints, per-app routing) | Windows Driver Kit + a spare test machine — [design](drivers/virtual-audio/DESIGN.md) |
+| Audiora's own virtual audio driver (replaces the third-party cables; adds a real virtual microphone) | Windows Driver Kit + a spare test machine — [design](drivers/virtual-audio/DESIGN.md) |
 | ASIO driver | Steinberg licence agreement — [design](drivers/asio/DESIGN.md) |
 | Real R Interface backend | Hardware/firmware documentation — [R-INTERFACE.md](docs/R-INTERFACE.md) |
 | Signed installer and drivers | Code-signing certificate, Hardware Dashboard account |
@@ -36,7 +42,8 @@ Full picture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md]
 ```powershell
 cargo test                                                  # engine and tools
 cargo run -p audiora-cli -- devices                         # list audio devices
-cargo run -p audiora-svc -- --no-input --tone 440 --sim-r   # engine + control API (quiet test tone)
+cargo run -p audiora-svc -- --tone 440 --sim-r              # engine + control API (channel layout)
+cargo run -p audiora-cli -- route PID default               # per-app output, e.g. undo a route by hand
 
 cd app
 npm install
@@ -60,6 +67,13 @@ npx tauri build    # NSIS per-user installer (unsigned until a certificate exist
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
+
+### Virtual cables (until the own driver exists)
+
+Each application channel needs its own virtual *output*: install a cable pack such as the free
+**VB-Audio Virtual Cable** (A, B, C, D give four) and pick one per channel in **Setup**. Audiora
+never uses outputs owned by a running SteelSeries Sonar or Voicemeeter. If you play a program that
+opens a fixed audio device instead of the Windows default, restart its audio once after routing it.
 
 ## Requirements
 

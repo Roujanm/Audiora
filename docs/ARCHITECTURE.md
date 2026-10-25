@@ -4,11 +4,12 @@ Owner: Roujan Digital Agency · Status: v0.1 · Platform: Windows 10 22H2 / Wind
 
 ## 1. Product scope
 
-One audio platform, three experiences on a single engine:
+One audio platform, three experiences on a single engine (the app is one professional interface;
+what each edition unlocks is a licensing decision, not a mode switch):
 
 | Edition | Audience | Core value |
 |---|---|---|
-| **Audiora Play** | Gamers, streamers, daily users | Per-app mixer (Game / Chat / Media / Aux / Mic), ChatMix, EQ, presets |
+| **Audiora Play** | Gamers, streamers, daily users | Per-app channels (Game / Chat / Media / Aux / Mic) with drag-and-drop routing, per-channel EQ and presets, per-game profiles |
 | **Audiora Studio** | Producers, podcasters, musicians | Low-latency I/O, multitrack recording, monitoring, routing matrix, processing |
 | **R Interface support** | Owners of the R audio interface | First-class driver, hardware control, zero-config recording |
 
@@ -55,7 +56,7 @@ Any third-party class-compliant device must also work (Tier 2); the R Interface 
                 │                                   WebSocket (Origin-checked) + TCP lines
           Audio hardware                                   │
                                           Audiora app: Tauri 2 + Svelte 5   [built]
-                                          Play skin · Studio skin · CLI · 3rd-party
+                                          Channel mixer · CLI · 3rd-party
 ```
 
 ### Why a per-user process and not a Windows service
@@ -70,7 +71,7 @@ for driver installation/update, where administrator rights are needed.
 ### 4.1 Drivers (`drivers/`)
 | Driver | Type | Purpose | Status |
 |---|---|---|---|
-| `virtual-audio` | Kernel WDM/PortCls, WaveRT, derived from Microsoft SysVAD | Virtual playback/capture endpoints visible to every app | Designed (`drivers/virtual-audio/DESIGN.md`); needs WDK + test machine |
+| `virtual-audio` | Kernel WDM/PortCls, WaveRT, derived from Microsoft SysVAD | Virtual playback/capture endpoints visible to every app | Designed (`drivers/virtual-audio/DESIGN.md`); needs WDK + test machine. Until then Audiora uses third-party virtual cables (section 4.2, *Channels*) |
 | `asio` | User-mode COM DLL (ASIO 2.x), Rust | Low-latency access for DAWs | Designed (`drivers/asio/DESIGN.md`); needs Steinberg licence decision |
 | `r-interface` | USB Audio Class 2.0 via inbox `usbaudio2.sys` first; custom KMDF/UMDF streaming driver only if latency/feature goals demand | Hardware | Depends on firmware (see R-INTERFACE.md) |
 
@@ -82,20 +83,27 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   low-latency shared (`IAudioClient3` minimum period) and **exclusive** (native float or
   16/24/32-bit integer format, device minimum period, converted to/from f32 at the edge). Audio
   threads join the MMCSS "Pro Audio" class. Also lists per-application audio sessions and sets their
-  volume/mute (what the Windows volume mixer does). Planned behind the same types: ASIO, R
+  volume/mute (what the Windows volume mixer does), **loopback capture of a render device**, and
+  **per-application default output** (`policy.rs`: the `AudioPolicyConfig` factory behind Settings >
+  Sound > Volume mixer, with both known interface ids and a read-back check). A *switchable* render
+  stream (class activation, automatic format conversion) is what routing-aware programs use; Windows
+  moves such a stream live when its output changes. Planned behind the same types: ASIO, R
   Interface native backend.
-- **Graph** (`audiora-svc/engine.rs`): any number of capture devices become strips; any number of
-  output devices become buses. The first output is the master that clocks the mixer. Every other
+- **Graph** (`audiora-svc/engine.rs`): any number of input devices — microphones, or loopback taps of
+  a render device — become strips; any number of output devices become buses. The first output is the master that clocks the mixer. Every other
   device is its own clock domain, bridged by a `DriftResampler`. A device that disappears (unplugged,
   taken exclusively by another application) does not stop the engine: that path goes silent, a
   `device_errors` counter ticks, and the device is reopened automatically when it returns with the
   same rate and channel count. Capture strips start unrouted so a microphone never feeds back by
-  default.
-- **Mixer** (`audiora-core`): strip chain *denoise → gate → 4-band EQ → compressor → fader/balance*,
+  default. A loopback tap delivers no packets while its device is idle, so the capture thread turns
+  wall-clock time into silence (after 30 ms of quiet) and the mixer never sees a ring run dry.
+- **Mixer** (`audiora-core`): strip chain *volume boost → denoise → gate → 6-band EQ → Smart Volume →
+  compressor → fader/balance*,
   bus chain *sum → fader → brick-wall limiter*. Parameters ramp per block (no zipper noise),
   every value is addressable by path, meters include gain reduction.
 - **DSP** (`audiora-dsp`): RBJ biquads, gate, compressor with soft knee, look-ahead limiter with a
-  provable ceiling, RNNoise-port denoiser (48 kHz), linear resampler, BS.1770 loudness meter,
+  provable ceiling, Smart Volume leveler (slow AGC with a noise-floor guard), RNNoise-port denoiser
+  (48 kHz), linear resampler, BS.1770 loudness meter,
   spectrum analyser. Not yet: de-esser, convolution/reverb, true-peak / LRA meters.
 - **Analysis** (`audiora-svc/analysis.rs`, off the audio thread): programme loudness of the master bus
   per ITU-R BS.1770-4 / EBU R128 — K-weighting (coefficients verified against the standard), momentary
@@ -106,12 +114,30 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   extensible format for 3+ channels, RF64 beyond 4 GB, header re-patched every second so a crash
   keeps everything but the last second. Not yet: punch-in/out, take management, input monitoring.
 - **Presets**: one JSON file per preset, atomic writes, name validation (no path traversal); the last
-  session is restored on start.
+  session is restored on start. **Channel presets** store only the sound-shaping settings of one
+  channel (EQ, boost, Smart Volume, noise suppression, gate, compressor — never fader, mute or
+  routing): built-in sets per channel plus the user's own, with favourites. **Game profiles** name a
+  preset per program and channel; the engine applies it the moment that program starts making sound.
+- **Channels** (`audiora-svc/channels.rs`): Game, Chat, Media and Aux are application mixes, Mic is the
+  microphone. Each application mix is a *virtual output device* (a third-party cable today, Audiora's
+  own driver later): Windows is told per application to play there, a loopback tap feeds the mix to
+  its strip, and nothing reaches the real speakers except through the master. A route watcher keeps
+  assigned programs on their channel as they start (the choice is stored by Windows per executable and
+  re-checked every 1.5 s), remembers what the user had set before so letting go restores it, and
+  releases every running program when the engine exits, so closing Audiora never leaves sound going to
+  a device nobody listens to. Devices are chosen automatically (a device named for the channel, then a
+  free virtual output; never one owned by a running Sonar/Voicemeeter; never the default output when it
+  is virtual; never a Bluetooth hands-free microphone) or explicitly in Setup. An optional output
+  receives the processed microphone for other programs to use through the cable's other end.
+  Limits: programs that open a fixed device instead of the default move only after their audio is
+  restarted; programs launched while Audiora is closed play to the virtual output (silent) until
+  it runs again, the same dependency Sonar has.
 - **Hardware control** (`audiora-device`): capability description + parameters + meters for any
   interface. Ships a labelled simulator; the real USB protocol is pending.
 - **Licence** (`audiora-license`): offline Ed25519-signed files, optional lock to an R Interface
   serial; vendor tool issues them. Edition gating is a product decision not yet made.
-- **Not built (needs the driver):** per-application routing.
+- **Not built (needs the driver):** virtual *input* devices, so the processed microphone appears as a
+  microphone by itself (today it leaves through a user-chosen cable).
 - **Not built (large):** VST3 / CLAP hosting in a sandbox process.
 
 ### 4.3 Control plane
@@ -121,7 +147,8 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   matches what Voicemeeter's remote API allows.
 - Schema: JSON, parameter paths like `strip/3/eq/1/gain_db` — see `CONTROL-API.md`.
 - Meters are pushed at up to 60 Hz after `subscribe`; everything else is request/response.
-- Persistence: `%APPDATA%\Roujan\Audiora\presets`, `license.json`.
+- Persistence: `%APPDATA%\Roujan\Audiora\` — `presets/`, `channel-presets/<channel>.json`,
+  `channels.json` (devices), `routes.json` (program → channel), `app-profiles.json`, `license.json`.
 
 ### 4.4 Application (`app/`)
 - **Tauri 2 + Svelte 5 (TypeScript)**. The shell (`app/src-tauri`) starts the engine if it is not
@@ -132,15 +159,23 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   for the job: rotary knobs (drag, wheel, keyboard, double-click reset, log scales), machined faders,
   canvas LED meters with peak hold, switches and segmented controls. Everything is keyboard
   operable and carries ARIA slider semantics.
-- **Play skin**: the mixer (inputs and a console-style master section), application volumes, system
-  health, presets. **Studio skin** adds the EQ editor (response curve, four draggable bands with
-  knobs), gate and compressor with transfer-curve graphs and live gain reduction, the recorder
-  (timecode, track meters, takes list, show-in-folder), a patchbay routing view with cables, and the
-  audio-interface panel. Layouts adapt down to the 980 x 620 minimum window.
+- **Channel mixer**: Master at the far left with the live list of programs that make sound beneath it
+  (found automatically); Game, Chat, Media, Aux and Mic columns to its right. Drag a program onto a
+  column — or use the link menu — and it is routed there at once. Each column has its own fader,
+  meter, mute/solo, preset chooser and active-processing tags. Pointer-driven drag and drop (not the
+  browser's) so it works inside the desktop shell and with touch.
+- **Channel pages** (one per channel, like Sonar's): preset bar with favourites and *Save as*,
+  per-program volumes, equalizer (basic Bass/Voice/Treble, six band sliders with a live spectrum
+  behind the response curve, or the full parametric editor), volume boost, Smart Volume
+  (Quiet/Balanced/Loud), ClearCast noise cancellation (Chat, Mic), gate and compressor with
+  transfer-curve graphs, per-game profiles, and for the microphone a "hear yourself" monitor.
+  **Setup** assigns the virtual outputs, speakers, microphone and processed-microphone output, and
+  shows audio health. The recorder and the audio-interface panel complete the rail.
+  Layouts adapt down to the 980 x 620 minimum window.
 - **Workflow**: click any read-out to type an exact value ("-6", "2.5k", "L30"); double-click a channel
-  name to rename it (remembered per device); Ctrl+K opens a command palette (navigate, load presets,
-  record, mute master, accent, mode); Alt+1..9 switch views; toasts confirm actions and report errors.
-  The EQ view draws the live input spectrum behind the curve; the master section shows LUFS.
+  name to rename it (remembered per device); Ctrl+K opens a command palette (navigate, channel presets,
+  mute channels, record, mute master, accent); Alt+1..9 switch views; toasts confirm actions and report errors.
+  The EQ draws the live spectrum of its channel behind the curve; the master section shows LUFS.
 - All state comes from the engine; the UI keeps no audio logic except display maths that mirrors the
   engine (EQ curve, meter ballistics), covered by tests against the same expectations as the Rust.
 
@@ -221,7 +256,7 @@ Audiora/
 | R Interface | Simulator only — real protocol unknown |
 | Virtual audio driver | Designed — blocked: WDK missing, no safe test machine |
 | ASIO driver | Designed — blocked: Steinberg licence decision |
-| Per-app routing | Blocked on the virtual driver |
+| Per-app routing | Built on virtual cables (loopback + per-app output); verified live, including streams moving while they play. Own driver pending |
 | VST3 / CLAP hosting, convolution, true-peak / LRA meters | Not started |
 | Installer signing, updater, telemetry | Not started (needs certificates and hosting) |
 
@@ -232,4 +267,6 @@ Audiora/
 3. Long-run clock behaviour → soak tests (1 h+) still to run.
 4. Conflicts with existing virtual audio software (Voicemeeter, Sonar) → detection and guidance in
    the installer.
-5. Undocumented Windows per-app routing API → isolate behind one module with a version guard.
+5. Undocumented Windows per-app routing API → isolated in `audiora-hal/policy.rs` with both known
+   interface ids and a read-back check; if a future Windows changes it the Setup page says routing is
+   unavailable instead of failing silently.
