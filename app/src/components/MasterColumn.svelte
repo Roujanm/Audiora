@@ -3,7 +3,7 @@
   import { shortName } from '../lib/theme.ts';
   import AppsDock from './AppsDock.svelte';
   import Icon from './Icon.svelte';
-  import VolumeSlider from './VolumeSlider.svelte';
+  import VolumeKnob from './VolumeKnob.svelte';
 
   const p = (leaf: string) => `bus/0/${leaf}`;
   const muted = $derived(engine.get(p('mute')) > 0.5);
@@ -25,7 +25,7 @@
     </header>
 
     <div class="body">
-      <VolumeSlider db={engine.get(p('gain_db'))} {levels} {holds} {muted} label="Master volume" onchange={(db) => engine.set(p('gain_db'), db)} />
+      <VolumeKnob db={engine.get(p('gain_db'))} {levels} {holds} {muted} size={132} label="Master volume" onchange={(db) => engine.set(p('gain_db'), db)} />
       <div class="info">
         <button class="round" class:on={muted} aria-pressed={muted} title={muted ? 'Unmute everything' : 'Mute everything'} aria-label="Mute master" onclick={() => engine.toggle(p('mute'))}>
           <Icon name={muted ? 'mute' : 'volume'} size={17} />
@@ -110,16 +110,17 @@
     flex: 1;
     min-height: 0;
     display: flex;
-    gap: 8px;
-  }
-
-  .info {
-    flex: 1;
-    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 12px;
+  }
+
+  .info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
   }
 
   .round {
@@ -147,12 +148,12 @@
 
   .stat {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    align-items: baseline;
+    gap: 5px;
   }
 
   .stat .num {
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 600;
   }
 

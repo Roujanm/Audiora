@@ -6,7 +6,7 @@
   import { shortName } from '../lib/theme.ts';
   import AppChip from './AppChip.svelte';
   import Icon from './Icon.svelte';
-  import VolumeSlider from './VolumeSlider.svelte';
+  import VolumeKnob from './VolumeKnob.svelte';
 
   interface Props {
     ch: ChannelEntry;
@@ -47,16 +47,18 @@
     <span class="go"><Icon name="arrow" size={15} /></span>
   </button>
 
-  <VolumeSlider
-    db={engine.get(p('gain_db'))}
-    {levels}
-    {holds}
-    color={meta.color}
-    {muted}
-    disabled={!ch.online}
-    label="{meta.name} volume"
-    onchange={(db) => engine.set(p('gain_db'), db)}
-  />
+  <div class="ctl">
+    <VolumeKnob
+      db={engine.get(p('gain_db'))}
+      {levels}
+      {holds}
+      color={meta.color}
+      {muted}
+      disabled={!ch.online}
+      label="{meta.name} volume"
+      onchange={(db) => engine.set(p('gain_db'), db)}
+    />
+  </div>
 
   <div class="actions">
     <button class="round" class:on={muted} aria-pressed={muted} title={muted ? 'Unmute' : 'Mute'} aria-label="Mute {meta.name}" onclick={() => engine.toggle(p('mute'))}>
@@ -183,6 +185,14 @@
   .head:hover .go {
     color: var(--c);
     transform: translateX(2px);
+  }
+
+  .ctl {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .actions {
