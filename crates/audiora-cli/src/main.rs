@@ -160,7 +160,8 @@ fn route(args: &[String]) -> Res {
     Ok(())
 }
 
-/// `loopcap DEVICE-NAME-PART [--secs S]` — peak of what a render device is playing.
+/// `loopcap DEVICE-NAME-PART [--secs S] [--raw FILE]` — peak of what a render device is playing;
+/// `--raw` also writes it as interleaved stereo f32 (silence included) for offline analysis.
 fn loopcap(args: &[String]) -> Res {
     use std::cell::Cell;
     let id = find_render(args.first().map(String::as_str).unwrap_or(""))?;
@@ -171,6 +172,17 @@ fn loopcap(args: &[String]) -> Res {
     let stop = std::sync::atomic::AtomicBool::new(false);
     let start = std::time::Instant::now();
     let (peak, audio, idle, last) = (Cell::new(0f32), Cell::new(0usize), Cell::new(0usize), Cell::new(0u64));
+    let raw_path: String = flag(args, "--raw", String::new());
+    let raw = std::cell::RefCell::new((!raw_path.is_empty()).then(|| std::io::BufWriter::new(std::fs::File::create(&raw_path).expect("raw file"))));
+    let write = |frames: &mut dyn Iterator<Item = (f32, f32)>| {
+        use std::io::Write;
+        if let Some(w) = raw.borrow_mut().as_mut() {
+            for (l, r) in frames {
+                let _ = w.write_all(&l.to_le_bytes());
+                let _ = w.write_all(&r.to_le_bytes());
+            }
+        }
+    };
     let tick = || {
         let t = start.elapsed().as_secs();
         if t != last.get() {
@@ -187,10 +199,12 @@ fn loopcap(args: &[String]) -> Res {
         |buf, n| {
             audio.set(audio.get() + n);
             peak.set(buf.chunks_exact(ch).fold(peak.get(), |m, f| m.max(f[0].abs())));
+            write(&mut buf.chunks_exact(ch).take(n).map(|f| (f[0], if ch > 1 { f[1] } else { f[0] })));
             tick();
         },
         Some(|n: usize| {
             idle.set(idle.get() + n);
+            write(&mut std::iter::repeat_n((0.0, 0.0), n));
             tick();
         }),
     )?;

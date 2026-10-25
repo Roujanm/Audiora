@@ -53,6 +53,7 @@ fn config_from_args(args: &[String]) -> EngineConfig {
         tone_hz: arg(args, "--tone"),
         rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
         tolerant_inputs: false,
+        master_fallback: None,
         mode: if args.iter().any(|a| a == "--exclusive") {
             audiora_hal::Mode::Exclusive
         } else if args.iter().any(|a| a == "--low-latency") {
@@ -68,8 +69,10 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
     let devs = audiora_hal::list_devices().unwrap_or_default();
     let running = audiora_hal::running_process_names();
     let mut resolved = channels::resolve(&channels::Config::load(data_dir), &devs, &running);
-    if let Some(out) = args_all(args, "--out").into_iter().next() {
-        resolved.master_out = Some(out);
+    let forced_out = args_all(args, "--out").into_iter().next();
+    if let Some(out) = &forced_out {
+        resolved.master_out = Some(out.clone());
+        resolved.enforce_master();
     }
     let mut inputs: Vec<InputSpec> = (0..APP_CHANNELS)
         .map(|i| InputSpec {
@@ -78,6 +81,7 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
             silent: resolved.devices[i].is_none(),
             name: Some(CHANNELS[i].1.to_string()),
             channel: Some(CHANNELS[i].0),
+            note: resolved.blocked[i].clone(),
         })
         .collect();
     inputs.push(InputSpec {
@@ -86,6 +90,7 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
         silent: resolved.mic_in.is_none() || args.iter().any(|a| a == "--no-mic"),
         name: Some("Mic".into()),
         channel: Some("mic"),
+        note: None,
     });
     let mut outputs = vec![resolved.master_out.clone()];
     if let Some(m) = &resolved.mic_out {
@@ -97,6 +102,14 @@ fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig,
         tone_hz: arg(args, "--tone"),
         rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
         tolerant_inputs: true,
+        // if the speakers vanish, play on whatever the automatic choice is now (never a channel's device)
+        master_fallback: forced_out.is_none().then(|| {
+            let dir = data_dir.to_owned();
+            std::sync::Arc::new(move || {
+                let devs = audiora_hal::list_devices().unwrap_or_default();
+                channels::resolve(&channels::Config::load(&dir), &devs, &audiora_hal::running_process_names()).master_out
+            }) as engine::MasterFallback
+        }),
         mode: if args.iter().any(|a| a == "--exclusive") {
             audiora_hal::Mode::Exclusive
         } else if args.iter().any(|a| a == "--low-latency") {

@@ -40,8 +40,13 @@
   });
 
   const crowded = (name: string) => /sonar|steelseries|voicemeeter/i.test(name);
+  // Same list as the engine: only virtual outputs can be channels. A real speaker as a channel
+  // would record what it plays and send it back into itself (endless echo).
+  const isVirtual = (name: string) => /sonar|voicemeeter|vb-audio|cable|virtual|audiora|steelseries|hi-fi/i.test(name);
+  const virtuals = $derived(renders.filter((d) => isVirtual(d.name)));
+  const listening = $derived(draft?.master_out || engine.channels?.master_out.device_id || '');
   const picked = $derived(draft ? APP_CHANNEL_KEYS.map((k) => draft!.devices[k]).filter(Boolean) : []);
-  const duplicate = $derived(new Set(picked).size !== picked.length || (!!draft?.master_out && picked.includes(draft.master_out)));
+  const duplicate = $derived(new Set(picked).size !== picked.length || (!!listening && picked.includes(listening)));
 
   async function apply() {
     if (!draft) return;
@@ -121,16 +126,18 @@
             <span class="who"><i><Icon name={m.icon} size={13} /></i>{m.name}</span>
             <select bind:value={draft.devices[k]}>
               <option value="">Automatic{st?.auto && st.device_name ? ` — ${shortName(st.device_name)}` : ''}</option>
-              {#each renders as d (d.id)}<option value={d.id}>{label(d)}</option>{/each}
+              {#each virtuals as d (d.id)}<option value={d.id} disabled={d.id === listening}>{label(d)}</option>{/each}
             </select>
             <span class="chip" class:ok={st?.online} class:warn={!st?.online}>{st?.online ? 'ready' : 'no device'}</span>
           </label>
+          {#if st?.error}<p class="warn-line"><Icon name="alert" size={12} /> {st.error}</p>{/if}
           {@const chosen = renders.find((d) => d.id === draft!.devices[k])}
           {#if chosen && crowded(chosen.name)}
             <p class="warn-line"><Icon name="alert" size={12} /> {label(chosen)} belongs to another mixer — close it first or you may hear sound twice.</p>
           {/if}
         {/each}
         {#if duplicate}<p class="warn-line"><Icon name="alert" size={12} /> Two channels (or the speakers) share a device. Each needs its own.</p>{/if}
+        <p class="muted tiny">Only virtual outputs are listed: a real speaker here would echo its own sound back forever.</p>
       </div>
     </div>
 

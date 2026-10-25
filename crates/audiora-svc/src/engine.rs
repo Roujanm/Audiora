@@ -42,6 +42,8 @@ pub struct InputSpec {
     pub name: Option<String>,
     /// Fixed channel this strip belongs to ("game", "chat", "media", "aux", "mic").
     pub channel: Option<&'static str>,
+    /// Why a silent strip is silent, shown to the user.
+    pub note: Option<String>,
 }
 
 impl InputSpec {
@@ -50,7 +52,7 @@ impl InputSpec {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct EngineConfig {
     /// One entry per input strip. Empty = no inputs.
     pub inputs: Vec<InputSpec>,
@@ -66,7 +68,12 @@ pub struct EngineConfig {
     pub rec_dir: Option<PathBuf>,
     /// How device streams are opened: shared, low-latency shared, or exclusive.
     pub mode: Mode,
+    /// When the master device disappears for a few seconds, asks for another output to play on
+    /// (for example the new system default). `None` waits for the same device to return.
+    pub master_fallback: Option<MasterFallback>,
 }
+
+pub type MasterFallback = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
 #[derive(Default)]
 pub struct Stats {
@@ -175,7 +182,7 @@ impl Engine {
             if spec.silent {
                 in_cons.push(None);
                 in_formats.push(None);
-                in_errors.push(None);
+                in_errors.push(spec.note.clone());
                 continue;
             }
             let (prod, cons) = ring::ring(RING_SAMPLES);
@@ -207,6 +214,7 @@ impl Engine {
         {
             let args = MasterArgs {
                 device: cfg.outputs[0].clone(),
+                fallback: cfg.master_fallback.clone(),
                 mode: cfg.mode,
                 tone_hz: cfg.tone_hz,
                 in_cons,
@@ -322,6 +330,7 @@ fn target_frames(prod: &StreamFormat, cons: &StreamFormat) -> usize {
 
 struct MasterArgs {
     device: Option<String>,
+    fallback: Option<MasterFallback>,
     mode: Mode,
     tone_hz: Option<f32>,
     in_cons: Vec<Option<ring::Consumer>>,
@@ -446,7 +455,24 @@ fn master_thread(
         }
         stats.device_errors.fetch_add(1, Ordering::Relaxed);
         eprintln!("master output lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
-        match reopen(&stop, fmt, || RenderStream::open(a.device.as_deref(), a.mode), |s| s.format()) {
+        // Give the device three tries to come back (a Bluetooth hiccup), then follow the fallback.
+        let attempts = std::cell::Cell::new(0u32);
+        let open = || {
+            attempts.set(attempts.get() + 1);
+            match (RenderStream::open(a.device.as_deref(), a.mode), &a.fallback) {
+                (Ok(s), _) => Ok(s),
+                (Err(e), Some(pick)) if attempts.get() >= 3 => match pick().filter(|id| Some(id) != a.device.as_ref()) {
+                    Some(id) => {
+                        let s = RenderStream::open(Some(&id), a.mode)?;
+                        eprintln!("master moved to {id}");
+                        Ok(s)
+                    }
+                    None => Err(e),
+                },
+                (Err(e), _) => Err(e),
+            }
+        };
+        match reopen(&stop, fmt, open, |s| s.format()) {
             Some(s) => stream = s,
             None => break,
         }

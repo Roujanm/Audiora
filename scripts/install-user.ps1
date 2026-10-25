@@ -17,10 +17,13 @@ param(
     [switch]$Shortcuts,
     [switch]$Uninstall,
     # Folder holding audiora-svc.exe, audiora.exe and audiora-app.exe (default: next to this script).
-    [string]$Source = $PSScriptRoot
+    [string]$Source = $PSScriptRoot,
+    # Where to install (default %LOCALAPPDATA%\Roujan\Audiora). Use a folder outside AppData when
+    # installing from a sandboxed (packaged) terminal, whose AppData writes are redirected.
+    [string]$Target = (Join-Path $env:LOCALAPPDATA "Roujan\Audiora")
 )
 $ErrorActionPreference = "Stop"
-$target = Join-Path $env:LOCALAPPDATA "Roujan\Audiora"
+$target = $Target
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $valueName = "Audiora Engine"
 $links = @(

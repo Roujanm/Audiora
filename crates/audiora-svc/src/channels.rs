@@ -118,7 +118,30 @@ pub struct Resolved {
     pub devices: [Option<String>; APP_CHANNELS],
     /// True where a channel device was picked automatically.
     pub auto: [bool; APP_CHANNELS],
+    /// Why a configured channel device is not used.
+    pub blocked: [Option<String>; APP_CHANNELS],
 }
+
+impl Resolved {
+    /// A channel listening to the device the master plays into would hear its own output and feed
+    /// it back forever. Such a channel stays silent and says why; the same goes for the
+    /// microphone output. Call again whenever the master changes.
+    pub fn enforce_master(&mut self) {
+        let Some(master) = self.master_out.clone() else { return };
+        for i in 0..APP_CHANNELS {
+            if self.devices[i].as_deref() == Some(master.as_str()) {
+                self.devices[i] = None;
+                self.auto[i] = false;
+                self.blocked[i] = Some(LOOP_MSG.into());
+            }
+        }
+        if self.mic_out.as_deref() == Some(master.as_str()) {
+            self.mic_out = None;
+        }
+    }
+}
+
+const LOOP_MSG: &str = "Same device as your speakers: Audiora would play the sound back into itself. Pick a virtual cable.";
 
 pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolved {
     let exists = |id: &Option<String>, flow: Flow| id.as_ref().filter(|i| devs.iter().any(|d| &d.id == *i && d.flow == flow)).cloned();
@@ -128,15 +151,16 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
         mic_out: exists(&cfg.mic_out, Flow::Render),
         ..Default::default()
     };
-    // Master: the system default unless it is virtual (then it would be a loop), else the most
-    // plausible real output.
+    let chosen: Vec<String> = cfg.devices.iter().filter_map(|d| exists(d, Flow::Render)).collect();
+    // Master: the system default unless it is virtual (then it would be a loop) or taken by a
+    // channel, else the most plausible real output.
     if r.master_out.is_none() {
+        let free = |d: &&DeviceInfo| d.flow == Flow::Render && !is_virtual(&d.name) && !chosen.contains(&d.id);
         r.master_out = devs
             .iter()
-            .find(|d| d.flow == Flow::Render && d.is_default && !is_virtual(&d.name))
-            .or_else(|| {
-                devs.iter().filter(|d| d.flow == Flow::Render && !is_virtual(&d.name)).min_by_key(|d| listening_rank(&d.name))
-            })
+            .filter(free)
+            .find(|d| d.is_default)
+            .or_else(|| devs.iter().filter(free).min_by_key(|d| listening_rank(&d.name)))
             .map(|d| d.id.clone());
     }
     // Microphone: never a Bluetooth hands-free microphone (8 kHz): opening it would drop the
@@ -187,6 +211,7 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
             used.insert(d.id.clone());
         }
     }
+    r.enforce_master();
     r
 }
 
@@ -298,8 +323,10 @@ impl Channels {
             return Err("two channels cannot share one device".into());
         }
         let clash = |id: &Option<String>| id.as_ref().is_some_and(|i| used.contains(&i));
-        if clash(&next.master_out) {
-            return Err("the speakers cannot also be a channel device".into());
+        // the master that will actually play, whether chosen or automatic
+        let master = next.master_out.clone().or_else(|| self.resolved.master_out.clone());
+        if clash(&master) {
+            return Err("a channel cannot use the device you listen on: the sound would loop back into itself".into());
         }
         next.save(&self.dir)?;
         *cfg = next;
@@ -545,6 +572,25 @@ mod tests {
         assert!(r.devices.iter().all(Option::is_none));
         let r = resolve(&Config::default(), &devs, &[]);
         assert!(r.devices.iter().any(Option::is_some));
+    }
+
+    #[test]
+    fn a_channel_on_the_speakers_is_blocked_instead_of_looping() {
+        let devs = [dev("Speakers (Sonos)", Flow::Render, "sonos", true), dev("Headphones", Flow::Render, "hp", false)];
+        // the user picked the speaker for Media and the master is automatic: master moves elsewhere
+        let mut cfg = Config::default();
+        cfg.devices[2] = Some("sonos".into());
+        let r = resolve(&cfg, &devs, &[]);
+        assert_eq!(r.master_out.as_deref(), Some("hp"));
+        assert_eq!(r.devices[2].as_deref(), Some("sonos"));
+        // the speaker is the only output: the channel is switched off and says why
+        let devs = [dev("Speakers (Sonos)", Flow::Render, "sonos", true)];
+        let r = resolve(&cfg, &devs, &[]);
+        assert!(r.master_out.is_none() || r.devices[2].is_none());
+        let mut r = Resolved { master_out: Some("sonos".into()), ..Default::default() };
+        r.devices[2] = Some("sonos".into());
+        r.enforce_master();
+        assert!(r.devices[2].is_none() && r.blocked[2].is_some());
     }
 
     #[test]
