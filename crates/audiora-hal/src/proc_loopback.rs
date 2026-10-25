@@ -7,7 +7,7 @@ use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
-use windows::core::{implement, Interface, Ref, PCWSTR};
+use windows::core::{implement, w, Interface, Ref, PCWSTR};
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
     ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation, IActivateAudioInterfaceCompletionHandler,
@@ -57,6 +57,33 @@ impl IActivateAudioInterfaceCompletionHandler_Impl for Handler_Impl {
     }
 }
 
+/// Runs `ActivateAudioInterfaceAsync` and waits for the client it hands back.
+pub(crate) fn activate(path: PCWSTR, params: Option<*const PROPVARIANT>) -> Result<IAudioClient> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let done: Done = Arc::new((Mutex::new(None), Condvar::new()));
+        let handler: IActivateAudioInterfaceCompletionHandler = Handler { done: done.clone() }.into();
+        let _op = ActivateAudioInterfaceAsync(path, &IAudioClient::IID, params, &handler)?;
+        let (slot, cv) = &*done;
+        let mut guard = slot.lock().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while guard.is_none() {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                return Err(HalError("audio interface activation timed out".into()));
+            }
+            guard = cv.wait_timeout(guard, left).unwrap().0;
+        }
+        Ok(guard.take().unwrap().0?)
+    }
+}
+
+/// The default render device activated the way Windows expects of an application that wants to
+/// follow per-app output routing live: through its device-interface class instead of a fixed id.
+pub(crate) fn activate_default_render() -> Result<IAudioClient> {
+    activate(w!("{E6327CAD-DCEC-4949-AE8A-991E976A79D2}"), None)
+}
+
 /// Loopback capture of one process tree. Create and run on the same thread.
 pub struct ProcessCapture {
     client: IAudioClient,
@@ -102,29 +129,10 @@ impl ProcessCapture {
                     }),
                 },
             };
-            let done: Done = Arc::new((Mutex::new(None), Condvar::new()));
-            let handler: IActivateAudioInterfaceCompletionHandler = Handler { done: done.clone() }.into();
-            let _op = ActivateAudioInterfaceAsync(
-                VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
-                &IAudioClient::IID,
-                Some(&prop),
-                &handler,
-            )?;
+            let client = activate(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, Some(&prop));
             // The blob points at `params` on this stack; the prop must not free it.
             std::mem::forget(prop);
-
-            let (slot, cv) = &*done;
-            let mut guard = slot.lock().unwrap();
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-            while guard.is_none() {
-                let left = deadline.saturating_duration_since(std::time::Instant::now());
-                if left.is_zero() {
-                    return Err(HalError("process loopback activation timed out".into()));
-                }
-                guard = cv.wait_timeout(guard, left).unwrap().0;
-            }
-            let client = guard.take().unwrap().0?;
-            drop(guard);
+            let client = client?;
 
             let fmt = WAVEFORMATEX {
                 wFormatTag: 3, // IEEE float

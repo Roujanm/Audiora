@@ -59,7 +59,11 @@ fn tone(args: &[String]) -> Res {
     let device: String = flag(args, "--device", String::new());
     let mode = if args.iter().any(|a| a == "--exclusive") { Mode::Exclusive } else if args.iter().any(|a| a == "--low-latency") { Mode::LowLatency } else { Mode::Shared };
 
-    let stream = RenderStream::open((!device.is_empty()).then_some(device.as_str()), mode)?;
+    let stream = if args.iter().any(|a| a == "--switchable") {
+        RenderStream::open_switchable()?
+    } else {
+        RenderStream::open((!device.is_empty()).then_some(device.as_str()), mode)?
+    };
     let fmt = stream.format();
     println!("{} Hz, {} ch, {}-bit{}, buffer {} frames (period {}); {freq} Hz at {gain_db} dB for {secs} s", fmt.sample_rate, fmt.channels, fmt.bit_depth, if fmt.exclusive { " EXCLUSIVE" } else { "" }, fmt.buffer_frames, fmt.period_frames);
 

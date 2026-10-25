@@ -6,6 +6,9 @@ import { shortName } from './theme.ts';
 import { toast } from './toast.svelte.ts';
 import type {
   AppSessionEntry,
+  ChannelKey,
+  ChannelPresets,
+  ChannelsInfo,
   DeviceEntry,
   EngineInfo,
   HwControl,
@@ -33,6 +36,33 @@ function loadAliases(): Record<string, string> {
   }
 }
 
+function loadActivePresets(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem('audiora.activePreset') ?? '{}');
+    return raw && typeof raw === 'object' ? (raw as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Applications that are not worth routing: Audiora's own processes. */
+const IGNORED_APPS = new Set(['audiora', 'audiora-app', 'audiora-svc', 'msedgewebview2', 'audiodg']);
+
+export interface AppGroup {
+  /** Executable name as Windows reports it ("chrome"). */
+  name: string;
+  sessions: AppSessionEntry[];
+  /** Strongest live level among its sessions, 0..1. */
+  peak: number;
+  active: boolean;
+  /** Channel the user assigned it to. */
+  route: ChannelKey | null;
+  /** Channel whose device it is actually playing into. */
+  playingIn: ChannelKey | null;
+  volume: number;
+  muted: boolean;
+}
+
 function inTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -56,6 +86,17 @@ class EngineClient {
   license = $state<LicenseStatus | null>(null);
   apps = $state<AppSessionEntry[]>([]);
 
+  /** Channel layout (Game, Chat, Media, Aux, Mic) with the device behind each. */
+  channels = $state<ChannelsInfo | null>(null);
+  /** Application name -> channel key. */
+  routes = $state<Record<string, ChannelKey>>({});
+  /** Presets per channel: built-in, user-made and favourites. */
+  chPresets = $state<Record<string, ChannelPresets>>({});
+  /** Application name -> channel -> preset applied automatically when the app starts. */
+  profiles = $state<Record<string, Record<string, string>>>({});
+  /** Last preset applied to each channel (remembered in this window only). */
+  activePreset = $state<Record<string, string>>(loadActivePresets());
+
   /** Programme loudness of the master bus in LUFS (momentary, short-term, integrated). */
   loudness = $state({ m: -120, s: -120, i: -120 });
   /** Smoothed spectrum in dBFS while an analyser source is selected, else null. */
@@ -77,6 +118,51 @@ class EngineClient {
   #timers: number[] = [];
   #started = false;
   #lastAnalysisAt = 0;
+
+  /** True when the engine runs the Game/Chat/Media/Aux/Mic layout. */
+  get channelMode(): boolean {
+    return !!this.info?.channel_mode;
+  }
+
+  /** Detected applications, one entry per program however many audio sessions it has. */
+  appGroups = $derived.by<AppGroup[]>(() => {
+    const byName = new Map<string, AppGroup>();
+    for (const a of this.apps) {
+      if (a.system_sounds || a.pid === 0) continue;
+      const key = a.name.toLowerCase();
+      if (IGNORED_APPS.has(key)) continue;
+      let g = byName.get(key);
+      if (!g) {
+        g = {
+          name: a.name,
+          sessions: [],
+          peak: 0,
+          active: false,
+          route: this.routes[key] ?? null,
+          playingIn: null,
+          volume: a.volume,
+          muted: a.muted,
+        };
+        byName.set(key, g);
+      }
+      g.sessions.push(a);
+      g.peak = Math.max(g.peak, a.peak);
+      g.active ||= a.active;
+      g.playingIn ||= a.playing_in ?? null;
+      // the session on the channel device carries the app's volume
+      if (a.playing_in) {
+        g.volume = a.volume;
+        g.muted = a.muted;
+      }
+    }
+    // remembered routes of applications that are not running right now
+    for (const [key, route] of Object.entries(this.routes)) {
+      if (!byName.has(key)) {
+        byName.set(key, { name: key, sessions: [], peak: 0, active: false, route, playingIn: null, volume: 1, muted: false });
+      }
+    }
+    return [...byName.values()].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
+  });
 
   start() {
     if (this.#started) return;
@@ -135,6 +221,11 @@ class EngineClient {
         this.refreshTakes().catch(() => {}),
       ]);
       if (this.info?.hardware) await this.refreshHardware();
+      if (this.channelMode) {
+        await Promise.all([this.refreshChannels(), this.refreshRoutes(), this.refreshProfiles(), this.refreshApps().catch(() => {})]);
+        for (const c of ['game', 'chat', 'media', 'aux', 'mic']) await this.refreshChannelPresets(c);
+        this.#timers.push(window.setInterval(() => void this.refreshApps().catch(() => {}), 1500));
+      }
       this.connected = true;
       this.connecting = false;
       this.lastError = '';
@@ -229,6 +320,7 @@ class EngineClient {
     const n = kind === 'strip' ? this.info?.strips[index] : this.info?.buses[index];
     if (!n) return '—';
     const key = this.#aliasKey(kind, index);
+    if (kind === 'strip' && 'channel' in n && n.channel) return n.name;
     return (key && this.aliases[key]) || (n.kind === 'tone' ? 'Tone generator' : shortName(n.name));
   }
 
@@ -376,6 +468,104 @@ class EngineClient {
     this.call('app_set', { device: app.device_id, instance_id: app.instance_id, ...change }).catch(
       (e) => (this.lastError = String(e)),
     );
+  }
+
+  // ---- channels, routing, channel presets, game profiles -------------------
+
+  async refreshChannels() {
+    this.channels = (await this.call('channels')) as unknown as ChannelsInfo;
+  }
+
+  async refreshRoutes() {
+    this.routes = (await this.call('routes')).routes as Record<string, ChannelKey>;
+  }
+
+  async refreshProfiles() {
+    this.profiles = (await this.call('app_profiles')).profiles as Record<string, Record<string, string>>;
+  }
+
+  /** Sends an application to a channel (or `null` to give it back to Windows' own routing). */
+  async routeApp(name: string, channel: ChannelKey | null) {
+    const key = name.toLowerCase();
+    const before = this.routes;
+    // move the chip at once; the reply and the next poll confirm it
+    const next = { ...this.routes };
+    if (channel) next[key] = channel;
+    else delete next[key];
+    this.routes = next;
+    try {
+      const r = await this.call('app_route', { app: name, channel });
+      await Promise.all([this.refreshRoutes(), this.refreshApps()]);
+      return { live: !!r.live };
+    } catch (e) {
+      this.routes = before;
+      throw e;
+    }
+  }
+
+  async refreshChannelPresets(channel: string) {
+    const r = await this.call('cpreset_list', { channel });
+    this.chPresets = {
+      ...this.chPresets,
+      [channel]: { factory: r.factory as string[], user: r.user as string[], favorites: r.favorites as string[] },
+    };
+  }
+
+  #remember(channel: string, name: string | null) {
+    const next = { ...this.activePreset };
+    if (name) next[channel] = name;
+    else delete next[channel];
+    this.activePreset = next;
+    try {
+      localStorage.setItem('audiora.activePreset', JSON.stringify(next));
+    } catch {
+      /* the choice is just not remembered */
+    }
+  }
+
+  async loadChannelPreset(channel: string, name: string) {
+    await this.call('cpreset_load', { channel, name });
+    this.#remember(channel, name);
+    await this.refreshState();
+  }
+
+  async saveChannelPreset(channel: string, name: string) {
+    await this.call('cpreset_save', { channel, name });
+    this.#remember(channel, name);
+    await this.refreshChannelPresets(channel);
+  }
+
+  async deleteChannelPreset(channel: string, name: string) {
+    await this.call('cpreset_delete', { channel, name });
+    if (this.activePreset[channel] === name) this.#remember(channel, null);
+    await this.refreshChannelPresets(channel);
+  }
+
+  async favoriteChannelPreset(channel: string, name: string, on: boolean) {
+    await this.call('cpreset_favorite', { channel, name, on });
+    await this.refreshChannelPresets(channel);
+  }
+
+  /** Makes `preset` load by itself whenever `app` starts (null removes the rule). */
+  async setProfile(app: string, channel: string, preset: string | null) {
+    await this.call('app_profile_set', { app, channel, preset });
+    await this.refreshProfiles();
+  }
+
+  /** Saves device choices; they apply when the engine restarts. */
+  async configSet(fields: Record<string, unknown>) {
+    await this.call('config_set', fields);
+    await this.refreshChannels();
+  }
+
+  /** Stops the engine; the desktop app starts a fresh one a moment later. */
+  async restartEngine() {
+    await this.call('shutdown').catch(() => {});
+  }
+
+  /** Channel key -> display name, colour index = strip index. */
+  channelOf(strip: number): ChannelKey | null {
+    return (this.info?.strips[strip]?.channel as ChannelKey | undefined) ?? null;
   }
 
   // ---- devices, license, hardware ---------------------------------------

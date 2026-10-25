@@ -21,8 +21,8 @@ test('shelves reach their gain far from the corner', () => {
 
 test('combined response sums bands and skips flat ones', () => {
   const flat = { freq: 1000, gainDb: 0, q: 1 };
-  assert.equal(eqResponseDb([flat, flat, flat, flat], FS, 1000), 0);
-  const bands = [flat, { freq: 1000, gainDb: 6, q: 1 }, { freq: 1000, gainDb: 3, q: 1 }, flat];
+  assert.equal(eqResponseDb([flat, flat, flat, flat, flat, flat], FS, 1000), 0);
+  const bands = [flat, { freq: 1000, gainDb: 6, q: 1 }, { freq: 1000, gainDb: 3, q: 1 }, flat, flat, flat];
   assert.ok(Math.abs(eqResponseDb(bands, FS, 1000) - 9) < 0.05);
 });
 

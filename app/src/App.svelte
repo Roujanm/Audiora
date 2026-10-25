@@ -1,27 +1,26 @@
 <script lang="ts">
+  import { appColor, appLabel, CHANNELS, channelMeta } from './lib/channels.ts';
+  import { dnd } from './lib/dnd.svelte.ts';
   import { engine } from './lib/engine.svelte.ts';
   import { ACCENTS, periodLabel, rateLabel, type AccentId } from './lib/theme.ts';
-  import Strip from './components/Strip.svelte';
-  import BusStrip from './components/BusStrip.svelte';
-  import EqEditor from './components/EqEditor.svelte';
-  import DynamicsPanel from './components/DynamicsPanel.svelte';
-  import Routing from './components/Routing.svelte';
+  import type { ChannelKey } from './lib/protocol.ts';
+  import ChannelColumn from './components/ChannelColumn.svelte';
+  import ChannelPage from './components/ChannelPage.svelte';
+  import MasterColumn from './components/MasterColumn.svelte';
   import Recorder from './components/Recorder.svelte';
   import Hardware from './components/Hardware.svelte';
+  import Setup from './components/Setup.svelte';
   import System from './components/System.svelte';
-  import Apps from './components/Apps.svelte';
   import Presets from './components/Presets.svelte';
   import Icon, { type IconName } from './components/Icon.svelte';
   import Popover from './components/Popover.svelte';
-  import Segmented from './components/Segmented.svelte';
   import CommandPalette, { type Command } from './components/CommandPalette.svelte';
   import Toasts from './components/Toasts.svelte';
   import { toast } from './lib/toast.svelte.ts';
 
   engine.start();
 
-  type Skin = 'play' | 'studio';
-  type Tab = 'mixer' | 'apps' | 'processing' | 'record' | 'routing' | 'hardware' | 'system';
+  type Tab = 'mixer' | ChannelKey | 'record' | 'hardware' | 'system';
 
   function remembered<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
     try {
@@ -33,47 +32,45 @@
   }
 
   const accentIds = ACCENTS.map((a) => a.id);
-  let skin = $state<Skin>(remembered('audiora.skin', ['play', 'studio'], 'play'));
   let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'azure'));
   let tab = $state<Tab>('mixer');
-  let selected = $state(0);
 
   $effect(() => {
     document.documentElement.dataset.accent = accent;
     try {
-      localStorage.setItem('audiora.skin', skin);
       localStorage.setItem('audiora.accent', accent);
     } catch {
       /* private mode: preferences just are not remembered */
     }
   });
 
-  const NAV: { id: Tab; label: string; icon: IconName; studio: boolean; title: string }[] = [
-    { id: 'mixer', label: 'Mixer', icon: 'mixer', studio: false, title: 'Mixer' },
-    { id: 'apps', label: 'Apps', icon: 'apps', studio: false, title: 'Applications' },
-    { id: 'processing', label: 'EQ · FX', icon: 'eq', studio: true, title: 'EQ & Dynamics' },
-    { id: 'record', label: 'Record', icon: 'record', studio: true, title: 'Recorder' },
-    { id: 'routing', label: 'Routing', icon: 'routing', studio: true, title: 'Routing' },
-    { id: 'hardware', label: 'Interface', icon: 'interface', studio: true, title: 'Audio interface' },
-    { id: 'system', label: 'System', icon: 'system', studio: false, title: 'System' },
+  interface NavItem {
+    id: Tab;
+    label: string;
+    icon: IconName;
+    title: string;
+    color?: string;
+    /** Starts the second group of the rail. */
+    divider?: boolean;
+  }
+
+  const NAV: NavItem[] = [
+    { id: 'mixer', label: 'Mixer', icon: 'mixer', title: 'Mixer' },
+    ...CHANNELS.map((c) => ({ id: c.key as Tab, label: c.name, icon: c.icon, title: c.name, color: c.color })),
+    { id: 'record', label: 'Record', icon: 'record', title: 'Recorder', divider: true },
+    { id: 'hardware', label: 'Interface', icon: 'interface', title: 'Audio interface' },
+    { id: 'system', label: 'Setup', icon: 'system', title: 'Setup & health' },
   ];
 
-  const visibleNav = $derived(NAV.filter((n) => skin === 'studio' || !n.studio));
-  $effect(() => {
-    if (!visibleNav.some((n) => n.id === tab)) tab = 'mixer';
-  });
-
-  const strips = $derived(engine.info?.strips ?? []);
+  const channelList = $derived(engine.channels?.channels ?? []);
   const buses = $derived(engine.info?.buses ?? []);
-  $effect(() => {
-    if (selected >= strips.length) selected = 0;
-  });
+  const currentChannel = $derived(channelList.find((c) => c.key === tab));
 
   // ---- command palette, shortcuts, error toasts -----------------------------------------
   let paletteOpen = $state(false);
 
   const commands = $derived.by<Command[]>(() => {
-    const list: Command[] = visibleNav.map((n, i) => ({
+    const list: Command[] = NAV.map((n, i) => ({
       id: `go-${n.id}`,
       title: `Go to ${n.title}`,
       group: 'Navigate',
@@ -82,11 +79,31 @@
       run: () => (tab = n.id),
     }));
     if (engine.connected) {
+      for (const c of CHANNELS) {
+        const lists = engine.chPresets[c.key];
+        for (const name of [...(lists?.favorites ?? [])]) {
+          list.push({
+            id: `cp-${c.key}-${name}`,
+            title: `${c.name}: ${name}`,
+            group: 'Channel presets',
+            icon: 'star',
+            run: () => void engine.loadChannelPreset(c.key, name).then(() => toast(`${c.name} → ${name}`, 'ok')).catch((e) => toast(String(e), 'error')),
+          });
+        }
+        const mute = `strip/${CHANNELS.indexOf(c)}/mute`;
+        list.push({
+          id: `mute-${c.key}`,
+          title: `${engine.get(mute) > 0.5 ? 'Unmute' : 'Mute'} ${c.name}`,
+          group: 'Actions',
+          icon: c.icon,
+          run: () => engine.toggle(mute),
+        });
+      }
       for (const name of engine.presets) {
         list.push({
           id: `preset-${name}`,
-          title: `Load preset “${name}”`,
-          group: 'Presets',
+          title: `Load scene “${name}”`,
+          group: 'Scenes',
           icon: 'save',
           run: () => void engine.loadPreset(name).then(() => toast(`Loaded “${name}”`, 'ok')).catch((e) => toast(String(e), 'error')),
         });
@@ -123,13 +140,6 @@
         },
       );
     }
-    list.push({
-      id: 'skin',
-      title: skin === 'play' ? 'Switch to Studio mode' : 'Switch to Play mode',
-      group: 'Appearance',
-      icon: 'interface',
-      run: () => (skin = skin === 'play' ? 'studio' : 'play'),
-    });
     for (const a of ACCENTS) {
       list.push({ id: `accent-${a.id}`, title: `Accent colour: ${a.label}`, group: 'Appearance', icon: 'palette', run: () => (accent = a.id) });
     }
@@ -143,7 +153,7 @@
       return;
     }
     if (e.altKey && /^[1-9]$/.test(e.key)) {
-      const target = visibleNav[Number(e.key) - 1];
+      const target = NAV[Number(e.key) - 1];
       if (target) {
         e.preventDefault();
         tab = target.id;
@@ -162,20 +172,20 @@
   const master = $derived(buses[0]);
   const s = $derived(engine.stats);
   const glitches = $derived(s.underruns + s.drift_drops + s.capture_drops + s.device_errors);
+  const routedCount = $derived(engine.appGroups.filter((a) => a.route).length);
+  const ready = $derived(channelList.filter((c) => c.kind === 'apps' && c.online).length);
   const subtitle = $derived(
     tab === 'mixer'
-      ? `${strips.filter((x) => x.kind === 'input').length} inputs · ${buses.length} output${buses.length === 1 ? '' : 's'}`
-      : tab === 'apps'
-        ? 'Volume per application, like the Windows mixer'
-        : tab === 'processing'
-          ? 'Per-channel equalizer, gate and compressor'
-          : tab === 'record'
-            ? '32-bit float WAV, multitrack'
-            : tab === 'routing'
-              ? 'Which input goes to which output'
-              : tab === 'hardware'
-                ? 'Preamps, phantom power, monitoring'
-                : 'Devices, audio health and licence',
+      ? `${ready} of 4 app channels ready · ${routedCount} app${routedCount === 1 ? '' : 's'} routed`
+      : channelMeta(tab)
+        ? currentChannel?.kind === 'mic'
+          ? 'Microphone channel'
+          : 'Application channel'
+        : tab === 'record'
+          ? '32-bit float WAV, multitrack'
+          : tab === 'hardware'
+            ? 'Preamps, phantom power, monitoring'
+            : 'Devices, channels and audio health',
   );
 </script>
 
@@ -187,9 +197,10 @@
       <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 14v-4M7 18V6M11 21V3M15 17V7M19 14v-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none" /></svg>
     </div>
     <div class="items">
-      {#each visibleNav as n (n.id)}
-        <button class="item" class:active={tab === n.id} aria-current={tab === n.id ? 'page' : undefined} onclick={() => (tab = n.id)}>
-          <span class="ico"><Icon name={n.icon} size={20} />{#if n.id === 'record' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}</span>
+      {#each NAV as n (n.id)}
+        {#if n.divider}<hr />{/if}
+        <button class="item" class:active={tab === n.id} style:--c={n.color ?? 'var(--accent)'} aria-current={tab === n.id ? 'page' : undefined} onclick={() => (tab = n.id)}>
+          <span class="ico"><Icon name={n.icon} size={19} />{#if n.id === 'record' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}</span>
           <span class="lbl">{n.label}</span>
         </button>
       {/each}
@@ -249,16 +260,6 @@
           </div>
         {/snippet}
       </Popover>
-
-      <Segmented
-        label="Interface mode"
-        value={skin}
-        options={[
-          { id: 'play', label: 'Play' },
-          { id: 'studio', label: 'Studio' },
-        ]}
-        onchange={(id) => (skin = id as Skin)}
-      />
     </header>
 
     <main>
@@ -273,51 +274,50 @@
             {#if engine.lastError}<p class="chip bad err">{engine.lastError}</p>{/if}
           </div>
         </div>
+      {:else if !engine.channelMode && tab !== 'record' && tab !== 'hardware' && tab !== 'system'}
+        <div class="connect panel pad" role="status">
+          <span class="warn-ico"><Icon name="alert" size={26} /></span>
+          <div>
+            <h2>This engine runs without channels</h2>
+            <p class="muted">It was started with explicit <code>--in</code> / <code>--no-input</code> device flags. Restart <code>audiora-svc</code> without them to get Game, Chat, Media, Aux and Mic.</p>
+          </div>
+        </div>
       {:else if tab === 'mixer'}
         <div class="mixer">
-          <section class="group inputs" aria-label="Inputs">
-            <h2 class="eyebrow">Inputs</h2>
-            <div class="row">
-              {#each strips as _s, i (i)}
-                <Strip index={i} advanced={skin === 'studio'} selected={selected === i && skin === 'studio'} onselect={() => { selected = i; tab = 'processing'; }} />
-              {/each}
-            </div>
-          </section>
+          <MasterColumn />
           <div class="divider"></div>
-          <section class="group outputs" aria-label="Outputs">
-            <h2 class="eyebrow">Outputs</h2>
-            <div class="row">
-              {#each buses as _b, i (i)}
-                <BusStrip index={i} />
-              {/each}
-            </div>
-          </section>
+          <div class="channels">
+            {#each channelList as c (c.key)}
+              <ChannelColumn ch={c} onopen={() => (tab = c.key)} onsetup={() => (tab = 'system')} />
+            {/each}
+          </div>
         </div>
-      {:else if tab === 'apps'}
-        <div class="scroll"><Apps /></div>
-      {:else if tab === 'processing'}
-        <div class="scroll"><div class="proc"><nav class="picker" aria-label="Channel">
-          {#each strips as s2, i (i)}
-            <button class:active={selected === i} aria-pressed={selected === i} onclick={() => (selected = i)}>
-              <span class="n">{s2.kind === 'input' ? i + 1 : 'T'}</span>
-              <span class="t">{s2.kind === 'input' ? s2.name.replace(/\s*\(.*\)\s*$/, '') : 'Tone generator'}</span>
-            </button>
-          {/each}
-        </nav>
-        <div class="stack"><EqEditor strip={selected} /><DynamicsPanel strip={selected} /></div></div></div>
+      {:else if currentChannel}
+        {#key currentChannel.key}
+          <div class="scroll"><ChannelPage ch={currentChannel} onsetup={() => (tab = 'system')} /></div>
+        {/key}
       {:else if tab === 'record'}
         <div class="scroll"><Recorder /></div>
-      {:else if tab === 'routing'}
-        <div class="scroll"><Routing /></div>
       {:else if tab === 'hardware'}
         <div class="scroll"><Hardware /></div>
       {:else}
-        <div class="scroll"><System /></div>
+        <div class="scroll stack">
+          {#if engine.channelMode}<Setup />{/if}
+          <System />
+        </div>
       {/if}
     </main>
 
     <CommandPalette open={paletteOpen} {commands} onclose={() => (paletteOpen = false)} />
     <Toasts />
+
+    {#if dnd.drag}
+      <div class="drag-ghost" style:left="{dnd.drag.x}px" style:top="{dnd.drag.y}px" style:--c={appColor(dnd.drag.name)} aria-hidden="true">
+        <span class="av">{appLabel(dnd.drag.name).charAt(0)}</span>
+        <span>{appLabel(dnd.drag.name)}</span>
+        {#if dnd.over && dnd.over !== 'none'}<b>→ {channelMeta(dnd.over)?.name}</b>{/if}
+      </div>
+    {/if}
 
     <footer class="foot">
       {#if engine.connected}
@@ -367,18 +367,29 @@
   .items {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 3px;
     width: 100%;
     padding: 0 10px;
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .items hr {
+    width: 28px;
+    margin: 6px auto;
+    border: 0;
+    border-top: 1px solid var(--line-2);
   }
 
   .item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 9px 0 7px;
+    flex: none;
+    gap: 3px;
+    padding: 7px 0 6px;
     border: 0;
     border-radius: 12px;
     background: none;
@@ -393,8 +404,8 @@
   }
 
   .item.active {
-    color: var(--accent-hi);
-    background: var(--accent-soft);
+    color: var(--c);
+    background: color-mix(in oklab, var(--c) 15%, transparent);
   }
 
   .item.active::before {
@@ -405,8 +416,8 @@
     bottom: 14px;
     width: 3px;
     border-radius: 0 3px 3px 0;
-    background: var(--accent);
-    box-shadow: 0 0 12px var(--accent-glow);
+    background: var(--c);
+    box-shadow: 0 0 12px var(--c);
   }
 
   .ico {
@@ -415,7 +426,7 @@
   }
 
   .lbl {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 600;
   }
 
@@ -592,44 +603,24 @@
 
   .mixer {
     display: flex;
-    gap: 18px;
+    gap: 16px;
     height: 100%;
     min-height: 0;
   }
 
-  .group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-height: 0;
-    flex: none;
-  }
-
-  /* inputs take the free width and scroll on their own; the outputs stay pinned right, like a console */
-  .group.inputs {
+  .channels {
     flex: 1;
     min-width: 0;
-  }
-
-  .group.inputs .row {
+    display: flex;
+    gap: 12px;
+    min-height: 0;
     overflow-x: auto;
     padding: 2px 4px 8px 2px;
     margin: 0 -4px 0 -2px;
   }
 
-  .group h2 {
-    padding-left: 4px;
-  }
-
-  .group .row {
-    display: flex;
-    gap: 12px;
-    flex: 1;
-    min-height: 0;
-  }
-
-  .group .row > :global(*) {
-    max-height: 640px;
+  .channels > :global(.col) {
+    max-height: 760px;
   }
 
   .divider {
@@ -644,69 +635,10 @@
     padding-right: 6px;
   }
 
-  .proc {
-    display: grid;
-    grid-template-columns: 210px minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
-  }
-
-  .picker {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    position: sticky;
-    top: 0;
-  }
-
-  .picker button {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    border-radius: var(--r-md);
-    border: 1px solid var(--line);
-    background: var(--bg-2);
-    color: var(--text-2);
-    text-align: left;
-    font-weight: 550;
-    transition: all 0.12s;
-  }
-
-  .picker button:hover {
-    border-color: var(--line-3);
-    color: var(--text);
-  }
-
-  .picker button.active {
-    color: var(--text);
-    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
-    background: var(--accent-soft);
-  }
-
-  .picker .n {
-    flex: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    display: grid;
-    place-items: center;
-    font: 700 11px var(--mono);
-    background: var(--bg-0);
-    color: var(--accent-hi);
-  }
-
-  .picker .t {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .stack {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    min-width: 0;
   }
 
   .connect {
@@ -774,6 +706,55 @@
       transform: scale(1);
       opacity: 0;
     }
+  }
+
+  .warn-ico {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    color: var(--warn);
+    background: color-mix(in oklab, var(--warn) 12%, transparent);
+  }
+
+  /* the app being dragged follows the pointer */
+  .drag-ghost {
+    position: fixed;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 14px 7px 8px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--bg-4), var(--bg-3));
+    border: 1px solid color-mix(in oklab, var(--c) 55%, transparent);
+    box-shadow: var(--shadow-pop), 0 0 28px -6px var(--c);
+    font-weight: 650;
+    pointer-events: none;
+    transform: translate(14px, 10px) rotate(-2deg);
+  }
+
+  .drag-ghost .av {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #0b0e13;
+    font-weight: 800;
+    background: var(--c);
+  }
+
+  .drag-ghost b {
+    color: var(--accent-hi);
+    font-weight: 650;
+  }
+
+  :global(body.dragging-app),
+  :global(body.dragging-app *) {
+    cursor: grabbing !important;
   }
 
   .foot {

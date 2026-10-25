@@ -1,6 +1,6 @@
 <script lang="ts">
   import { engine } from '../lib/engine.svelte.ts';
-  import { eqResponseDb, formatDb, freqToX, xToFreq, type Band } from '../lib/dsp.ts';
+  import { EQ_BANDS, eqResponseDb, formatDb, freqToX, xToFreq, type Band } from '../lib/dsp.ts';
   import Knob from './Knob.svelte';
 
   interface Props {
@@ -9,12 +9,13 @@
   let { strip }: Props = $props();
 
   const RANGE_DB = 18;
-  const NAMES = ['Low shelf', 'Low-mid', 'High-mid', 'High shelf'];
-  const COLORS = ['#ff8a65', '#ffd54f', '#5eead4', '#7aa7ff'];
+  const NAMES = ['Sub bass', 'Bass', 'Low mids', 'Mid range', 'Upper mids', 'Highs'];
+  const COLORS = ['#ff8a65', '#ffb74d', '#ffd54f', '#5eead4', '#7aa7ff', '#b39dff'];
+  const DEFAULT_FREQ = [60, 160, 500, 1800, 5000, 10000];
 
   const fs = $derived(engine.info?.buses[0]?.sample_rate ?? 48000);
   const bands = $derived<Band[]>(
-    [0, 1, 2, 3].map((b) => ({
+    Array.from({ length: EQ_BANDS }, (_, b) => b).map((b) => ({
       freq: engine.get(`strip/${strip}/eq/${b}/freq`, 1000),
       gainDb: engine.get(`strip/${strip}/eq/${b}/gain_db`),
       q: engine.get(`strip/${strip}/eq/${b}/q`, 1),
@@ -244,7 +245,7 @@
       <h2 class="eyebrow">Equalizer</h2>
       <p class="hint muted">Drag a point to set frequency and gain · scroll over it to change Q · double-click to reset · grey: live input spectrum</p>
     </div>
-    <button class="btn sm" disabled={flat} onclick={() => [0, 1, 2, 3].forEach((b) => engine.set(`strip/${strip}/eq/${b}/gain_db`, 0))}>
+    <button class="btn sm" disabled={flat} onclick={() => Array.from({ length: EQ_BANDS }, (_, b) => b).forEach((b) => engine.set(`strip/${strip}/eq/${b}/gain_db`, 0))}>
       Flatten
     </button>
   </header>
@@ -287,9 +288,9 @@
       <div class="band" style:--c={COLORS[i]} class:flat={Math.abs(b.gainDb) < 0.01} class:focus={hover === i || active === i}>
         <div class="bh"><span class="dot">{i + 1}</span><strong>{NAMES[i]}</strong></div>
         <div class="knobs">
-          <Knob label="Freq" size={46} min={20} max={20000} scale="log" step={1} reset={[100, 400, 2500, 8000][i]} color={COLORS[i]} value={b.freq} format={fmtFreq} onchange={set(i, 'freq')} />
+          <Knob label="Freq" size={46} min={20} max={20000} scale="log" step={1} reset={DEFAULT_FREQ[i]} color={COLORS[i]} value={b.freq} format={fmtFreq} onchange={set(i, 'freq')} />
           <Knob label="Gain" size={46} min={-24} max={24} step={0.5} bipolar reset={0} color={COLORS[i]} value={b.gainDb} format={(v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`} onchange={set(i, 'gain_db')} />
-          <Knob label="Q" size={46} min={0.1} max={18} scale="log" step={0.05} digits={2} reset={i === 0 || i === 3 ? 0.707 : 1} color={COLORS[i]} value={b.q} onchange={set(i, 'q')} />
+          <Knob label="Q" size={46} min={0.1} max={18} scale="log" step={0.05} digits={2} reset={i === 0 || i === EQ_BANDS - 1 ? 0.707 : 1} color={COLORS[i]} value={b.q} onchange={set(i, 'q')} />
         </div>
       </div>
     {/each}
@@ -330,7 +331,7 @@
 
   .bands {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;
   }
 

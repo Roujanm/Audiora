@@ -8,8 +8,10 @@
 
   interface Props {
     strip: number;
+    /** Show the noise-suppression card (pages with their own ClearCast card hide it). */
+    showNoise?: boolean;
   }
-  let { strip }: Props = $props();
+  let { strip, showNoise = true }: Props = $props();
 
   const p = (leaf: string) => `strip/${strip}/${leaf}`;
   const g = (leaf: string, d = 0) => engine.get(p(leaf), d);
@@ -34,7 +36,7 @@
 </script>
 
 <div class="dyn">
-  {#if isInput}
+  {#if isInput && showNoise}
     <section class="card panel" class:off={!denoise}>
       <header>
         <span class="ico"><Icon name="bolt" size={16} /></span>

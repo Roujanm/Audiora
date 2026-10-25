@@ -9,7 +9,8 @@ use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOU
 use windows::Win32::Media::Audio::{
     eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IAudioClient3, IAudioRenderClient, IMMDevice,
     IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_EXCLUSIVE,
-    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, WAVEFORMATEX,
+    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, AUDCLNT_STREAMFLAGS_LOOPBACK,
+    AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, DEVICE_STATE_ACTIVE, WAVEFORMATEX,
     WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
@@ -165,11 +166,15 @@ fn open_device(flow: Flow, id: Option<&str>) -> Result<IMMDevice> {
 }
 
 fn open_stream(flow: Flow, id: Option<&str>, mode: Mode) -> Result<Shared> {
-    open_stream_inner(flow, id, mode, false)
+    open_stream_inner(flow, id, mode, false, false)
 }
 
 /// `loopback` taps what a render device is playing; it needs shared mode and the default period.
-fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool) -> Result<Shared> {
+///
+/// `switchable` opens the default output the way routing-aware applications do (class activation,
+/// automatic format conversion) so Windows can move the running stream to another device when the
+/// user — or Audiora — sends this program somewhere else.
+fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool, switchable: bool) -> Result<Shared> {
     let dev = open_device(flow, id)?;
     if mode == Mode::Exclusive && !loopback {
         return open_exclusive(&dev);
@@ -177,11 +182,16 @@ fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool) -
     let low_latency = mode == Mode::LowLatency && !loopback;
     let flags = if loopback {
         AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_LOOPBACK
+    } else if switchable {
+        AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
     } else {
         AUDCLNT_STREAMFLAGS_EVENTCALLBACK
     };
-    let client: IAudioClient = unsafe { dev.Activate(CLSCTX_ALL, None) }
-        .map_err(|e| HalError(format!("activate: {e}")))?;
+    let client: IAudioClient = if switchable {
+        crate::proc_loopback::activate_default_render()?
+    } else {
+        unsafe { dev.Activate(CLSCTX_ALL, None) }.map_err(|e| HalError(format!("activate: {e}")))?
+    };
     let (fmt, is_float) = mix_format(&client).map_err(|e| HalError(format!("mix format: {e}")))?;
     if !is_float || fmt.wBitsPerSample != 32 {
         return Err(HalError(format!(
@@ -394,6 +404,14 @@ impl RenderStream {
         Ok(Self { s, render })
     }
 
+    /// The default output, opened so that Windows' per-app output routing moves the running
+    /// stream live. Used by test tones and any client that should behave like a well-made app.
+    pub fn open_switchable() -> Result<Self> {
+        let s = open_stream_inner(Flow::Render, None, Mode::Shared, false, true)?;
+        let render: IAudioRenderClient = unsafe { s.client.GetService()? };
+        Ok(Self { s, render })
+    }
+
     pub fn format(&self) -> StreamFormat {
         self.s.format
     }
@@ -477,7 +495,7 @@ impl CaptureStream {
 
     /// Taps what the render device `device_id` is playing (`None` = default output).
     pub fn open_loopback(device_id: Option<&str>) -> Result<Self> {
-        let s = open_stream_inner(Flow::Render, device_id, Mode::Shared, true)?;
+        let s = open_stream_inner(Flow::Render, device_id, Mode::Shared, true, false)?;
         let capture: IAudioCaptureClient = unsafe { s.client.GetService()? };
         Ok(Self { s, capture })
     }
@@ -507,7 +525,11 @@ impl CaptureStream {
     ) -> Result<()> {
         let rate = self.s.format.sample_rate as f64;
         let wait_ms = if on_idle.is_some() { 10 } else { 100 };
-        let mut last = std::time::Instant::now();
+        // `last_audio`: the last real packet; `last_fill`: how far silence has been accounted for.
+        let mut last_audio = std::time::Instant::now();
+        let mut last_fill = last_audio;
+        // Packets arrive every device period; only a gap clearly longer than that is silence.
+        let quiet_after = std::time::Duration::from_millis(30);
         let ch = self.s.format.channels as usize;
         let sample = self.s.sample;
         let exclusive = self.s.format.exclusive;
@@ -521,15 +543,18 @@ impl CaptureStream {
                     if !wait_event_ms(self.s.event, wait_ms)? {
                         if let Some(idle) = on_idle.as_mut() {
                             let now = std::time::Instant::now();
-                            let frames = (now.duration_since(last).as_secs_f64() * rate) as usize;
-                            if frames > 0 {
-                                last = now;
-                                idle(frames.min(4800));
+                            if now.duration_since(last_audio) >= quiet_after {
+                                let frames = (now.duration_since(last_fill).as_secs_f64() * rate) as usize;
+                                if frames > 0 {
+                                    last_fill = now;
+                                    idle(frames.min(4800));
+                                }
                             }
                         }
                         continue;
                     }
-                    last = std::time::Instant::now();
+                    last_audio = std::time::Instant::now();
+                    last_fill = last_audio;
                     loop {
                         // Exclusive event-driven capture hands over exactly one buffer per
                         // event, and GetNextPacketSize is not meaningful there: reading until

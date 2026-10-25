@@ -1,10 +1,12 @@
 // Mirrors crates/audiora-dsp/src/biquad.rs (RBJ cookbook) so the EQ curve the
 // user sees is the curve the engine applies.
 
-export type FilterKind = 'lowshelf' | 'peak' | 'peak2' | 'highshelf';
+export type FilterKind = 'lowshelf' | 'peak' | 'highshelf';
 
-/** Band layout is fixed by the engine: 0 low shelf, 1 peak, 2 peak, 3 high shelf. */
-export const BAND_KINDS: FilterKind[] = ['lowshelf', 'peak', 'peak2', 'highshelf'];
+/** Band layout is fixed by the engine: 0 low shelf, 1-4 peaks, 5 high shelf. */
+export const BAND_KINDS: FilterKind[] = ['lowshelf', 'peak', 'peak', 'peak', 'peak', 'highshelf'];
+
+export const EQ_BANDS = BAND_KINDS.length;
 
 export interface Band {
   freq: number;

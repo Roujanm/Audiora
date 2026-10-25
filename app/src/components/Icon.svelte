@@ -21,7 +21,19 @@
     | 'folder'
     | 'bolt'
     | 'palette'
-    | 'alert';
+    | 'alert'
+    | 'gamepad'
+    | 'chat'
+    | 'music'
+    | 'aux'
+    | 'star'
+    | 'x'
+    | 'grip'
+    | 'play'
+    | 'refresh'
+    | 'sliders'
+    | 'link'
+    | 'volume';
 
   interface Props {
     name: IconName;
@@ -52,6 +64,18 @@
     bolt: 'M13 3L5 13h6l-1 8 8-10h-6z',
     palette: 'M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01',
     alert: 'M12 4l9 16H3zM12 10v4M12 17h.01',
+    gamepad: 'M6 8h12a4 4 0 0 1 4 4v3a3 3 0 0 1-5.2 2L15 15H9l-1.8 2A3 3 0 0 1 2 15v-3a4 4 0 0 1 4-4zM7 10.5v3M5.5 12h3M16 11h.01M18 13h.01',
+    chat: 'M4 5h16v11H10l-5 4v-4H4z',
+    music: 'M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+    aux: 'M8 3v5M16 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4',
+    star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
+    x: 'M6 6l12 12M18 6L6 18',
+    grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+    play: 'M8 5v14l11-7z',
+    refresh: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5',
+    sliders: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
+    link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+    volume: 'M4 10v4h4l5 4V6l-5 4z',
   };
 </script>
 

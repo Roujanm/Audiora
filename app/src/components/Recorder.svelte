@@ -82,8 +82,8 @@
     return kind === 'bus'
       ? { title: +i === 0 ? 'Master mix' : `Output ${+i + 1}`, sub: engine.labelOf('bus', +i), color: 'var(--accent)' }
       : {
-          title: strips[+i]?.kind === 'input' ? `Input ${+i + 1}` : 'Tone',
-          sub: engine.labelOf('strip', +i),
+          title: strips[+i]?.channel ? engine.labelOf('strip', +i) : strips[+i]?.kind === 'input' ? `Input ${+i + 1}` : 'Tone',
+          sub: strips[+i]?.channel ? 'Before processing' : engine.labelOf('strip', +i),
           color: stripColor(strips[+i], +i),
         };
   };

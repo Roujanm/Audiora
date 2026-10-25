@@ -9,7 +9,7 @@
   const lic = $derived(engine.license);
 
   const nodes = $derived([
-    ...(engine.info?.strips.filter((n) => n.kind === 'input') ?? []).map((n) => ({ ...n, role: 'Input' })),
+    ...(engine.info?.strips.filter((n) => n.kind === 'input' && n.sample_rate) ?? []).map((n) => ({ ...n, role: n.channel ? 'Channel' : 'Input' })),
     ...(engine.info?.buses ?? []).map((n, i) => ({ ...n, role: i === 0 ? 'Master output' : `Output ${i + 1}` })),
   ]);
 

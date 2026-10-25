@@ -211,6 +211,7 @@ impl Engine {
                 tone_hz: cfg.tone_hz,
                 in_cons,
                 in_formats: in_formats.clone(),
+                in_loopback: cfg.inputs.iter().map(|i| i.loopback).collect(),
                 extra_prods,
                 rate_txs,
                 n_buses: n_out,
@@ -325,6 +326,8 @@ struct MasterArgs {
     tone_hz: Option<f32>,
     in_cons: Vec<Option<ring::Consumer>>,
     in_formats: Vec<Option<StreamFormat>>,
+    /// Loopback inputs deliver nothing while their device is idle: running dry is silence, not a glitch.
+    in_loopback: Vec<bool>,
     extra_prods: Vec<ring::Producer>,
     rate_txs: Vec<mpsc::Sender<StreamFormat>>,
     n_buses: usize,
@@ -390,7 +393,7 @@ fn master_thread(
                 continue;
             };
             let r = rs.fill(cons, &mut in_bufs[i][..n]);
-            if r.underrun {
+            if r.underrun && !a.in_loopback[i] {
                 stats.underruns.fetch_add(1, Ordering::Relaxed);
             }
             if r.dropped {

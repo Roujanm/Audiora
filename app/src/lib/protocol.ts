@@ -11,6 +11,10 @@ export interface NodeInfo {
   low_latency: boolean | null;
   exclusive: boolean | null;
   bit_depth: number | null;
+  /** Channel key for strips in the channel layout ("game", "chat", "media", "aux", "mic"). */
+  channel?: string | null;
+  /** Why a configured strip is silent. */
+  error?: string | null;
 }
 
 export interface EngineInfo {
@@ -20,6 +24,40 @@ export interface EngineInfo {
   strips: NodeInfo[];
   buses: NodeInfo[];
   hardware: boolean;
+  channel_mode?: boolean;
+}
+
+export type ChannelKey = 'game' | 'chat' | 'media' | 'aux' | 'mic';
+
+export interface ChannelEntry {
+  key: ChannelKey;
+  name: string;
+  strip: number;
+  kind: 'apps' | 'mic';
+  device_id: string | null;
+  device_name: string | null;
+  /** The device was picked automatically rather than by the user. */
+  auto: boolean;
+  online: boolean;
+  error: string | null;
+}
+
+export interface ChannelsInfo {
+  channels: ChannelEntry[];
+  master_out: { device_id: string | null; device_name: string | null; auto: boolean };
+  mic_out: { device_id: string | null; device_name: string | null };
+  config: {
+    master_out: string | null;
+    mic_in: string | null;
+    mic_out: string | null;
+    devices: Record<string, string | null>;
+  };
+}
+
+export interface ChannelPresets {
+  factory: string[];
+  user: string[];
+  favorites: string[];
 }
 
 export interface Stats {
@@ -99,6 +137,10 @@ export interface AppSessionEntry {
   peak: number;
   active: boolean;
   system_sounds: boolean;
+  /** Channel this application is assigned to (survives restarts of the app). */
+  route?: ChannelKey | null;
+  /** Channel whose device the application is playing into right now. */
+  playing_in?: ChannelKey | null;
 }
 
 export interface Reply {
