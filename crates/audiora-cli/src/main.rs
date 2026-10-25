@@ -7,13 +7,14 @@ use std::f32::consts::TAU;
 use std::process::ExitCode;
 
 use audiora_core::{Mixer, MAX_BLOCK_FRAMES};
-use audiora_hal::{list_devices, Flow, Mode, RenderStream};
+use audiora_hal::{list_devices, list_sessions, set_session, Flow, Mode, ProcessCapture, RenderStream};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("devices") => devices(),
         Some("tone") => tone(&args[1..]),
+        Some("proccap") => proccap(&args[1..]),
         _ => {
             eprintln!("usage: audiora devices | tone [--device ID] [--freq HZ] [--secs S] [--gain DB] [--bass DB]");
             return ExitCode::from(2);
@@ -86,5 +87,41 @@ fn tone(args: &[String]) -> Res {
         }
     })?;
     println!("peak L/R: {:.3} / {:.3}", params.buses[0].peak_l.get(), params.buses[0].peak_r.get());
+    Ok(())
+}
+
+/// Captures one process tree's audio and prints its peak once a second; `--mute` also mutes the
+/// process's own sessions meanwhile (restored afterwards) to prove capture ignores the mute.
+fn proccap(args: &[String]) -> Res {
+    let pid: u32 = args.first().and_then(|a| a.parse().ok()).ok_or("usage: proccap PID [--secs S] [--mute]")?;
+    let secs: u64 = flag(args, "--secs", 5);
+    let mute_vol = args.iter().any(|a| a == "--vol0");
+    let mute = mute_vol || args.iter().any(|a| a == "--mute");
+    let cap = ProcessCapture::open(pid)?;
+    let muted: Vec<_> = if mute { list_sessions()?.into_iter().filter(|s| s.pid == pid).collect() } else { Vec::new() };
+    for s in &muted {
+        set_session(&s.device_id, &s.instance_id, mute_vol.then_some(0.0), (!mute_vol).then_some(true))?;
+    }
+    println!("capturing pid {pid}; muted {} session(s)", muted.len());
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let start = std::time::Instant::now();
+    let (mut peak, mut frames, mut last) = (0f32, 0usize, 0u64);
+    let result = cap.run_until(&stop, |buf, n| {
+        frames += n;
+        peak = buf.iter().fold(peak, |m, v| m.max(v.abs()));
+        let t = start.elapsed().as_secs();
+        if t != last {
+            println!("t={t}s frames={frames} peak={peak:.4}");
+            peak = 0.0;
+            last = t;
+            if t >= secs {
+                stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    });
+    for s in &muted {
+        let _ = set_session(&s.device_id, &s.instance_id, Some(s.volume), Some(false));
+    }
+    result?;
     Ok(())
 }

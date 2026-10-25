@@ -4,10 +4,14 @@
 
 mod format;
 #[cfg(windows)]
+mod proc_loopback;
+#[cfg(windows)]
 mod sessions;
 #[cfg(windows)]
 mod wasapi;
 
+#[cfg(windows)]
+pub use proc_loopback::ProcessCapture;
 #[cfg(windows)]
 pub use sessions::{list_sessions, set_session, AppSession};
 #[cfg(windows)]
