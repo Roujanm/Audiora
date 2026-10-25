@@ -2,10 +2,8 @@
   import { BASIC_EQ } from '../lib/channels.ts';
   import { EQ_BANDS, eqResponseDb, freqToX, xToFreq, type Band } from '../lib/dsp.ts';
   import { engine } from '../lib/engine.svelte.ts';
-  import Card from './Card.svelte';
-  import EqEditor from './EqEditor.svelte';
+  import Icon from './Icon.svelte';
   import Segmented from './Segmented.svelte';
-  import Slider from './Slider.svelte';
   import VSlider from './VSlider.svelte';
 
   interface Props {
@@ -14,7 +12,7 @@
   }
   let { strip, color }: Props = $props();
 
-  type Tab = 'basic' | 'bands' | 'param';
+  type Tab = 'basic' | 'advanced';
   let tab = $state<Tab>('basic');
 
   const NAMES = ['Sub bass', 'Bass', 'Low mids', 'Mid range', 'Upper mids', 'Highs'];
@@ -40,14 +38,13 @@
     group.bands.forEach((b, i) => setGain(b)(Math.round(v * group.weights[i] * 10) / 10));
   }
 
-  // ---- live curve ---------------------------------------------------------
+  // ---- response curve with the channel's live spectrum behind it --------------------
   let canvas = $state<HTMLCanvasElement>();
   let box = $state<HTMLDivElement>();
   let width = $state(600);
-  const height = 150;
+  const height = 130;
 
   $effect(() => {
-    if (tab === 'param') return;
     engine.setSpectrumSource(`strip/${strip}`);
     return () => engine.setSpectrumSource(null);
   });
@@ -60,7 +57,7 @@
   });
 
   $effect(() => {
-    if (!canvas || tab === 'param') return;
+    if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
@@ -72,17 +69,17 @@
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim();
 
     ctx.font = `500 9.5px ${mono}`;
-    for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) {
+    for (const f of [100, 1000, 10000]) {
       const gx = Math.round(x(f)) + 0.5;
       ctx.strokeStyle = 'rgba(255,255,255,0.05)';
       ctx.beginPath();
       ctx.moveTo(gx, 0);
       ctx.lineTo(gx, height);
       ctx.stroke();
-      ctx.fillStyle = 'rgba(133,145,163,0.75)';
-      ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, gx + 3, height - 5);
+      ctx.fillStyle = 'rgba(133,145,163,0.6)';
+      ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, gx + 4, height - 6);
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
     ctx.moveTo(0, y(0) + 0.5);
     ctx.lineTo(width, y(0) + 0.5);
@@ -94,15 +91,11 @@
       const sy = (db: number) => height - Math.min(Math.max((db + 90) / 90, 0), 1) * height * 0.85;
       const sp = new Path2D();
       spec.forEach((db, i) => (i ? sp.lineTo(x(hz[i]), sy(db)) : sp.moveTo(x(hz[i]), sy(db))));
-      const sa = new Path2D(sp);
-      sa.lineTo(x(hz[hz.length - 1]), height);
-      sa.lineTo(x(hz[0]), height);
-      sa.closePath();
-      const g = ctx.createLinearGradient(0, height * 0.15, 0, height);
-      g.addColorStop(0, 'rgba(160,180,210,0.28)');
-      g.addColorStop(1, 'rgba(160,180,210,0.02)');
-      ctx.fillStyle = g;
-      ctx.fill(sa);
+      sp.lineTo(x(hz[hz.length - 1]), height);
+      sp.lineTo(x(hz[0]), height);
+      sp.closePath();
+      ctx.fillStyle = 'rgba(160,180,210,0.14)';
+      ctx.fill(sp);
     }
 
     const path = new Path2D();
@@ -115,91 +108,114 @@
     area.lineTo(width, y(0));
     area.lineTo(0, y(0));
     area.closePath();
-    ctx.fillStyle = color + '2a';
+    ctx.fillStyle = color + '26';
     ctx.fill(area);
     ctx.lineJoin = 'round';
     ctx.shadowColor = color;
     ctx.shadowBlur = 12;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = 2.5;
     ctx.stroke(path);
     ctx.shadowBlur = 0;
-
-    bands.forEach((b, i) => {
-      const dim = Math.abs(b.gainDb) < 0.01;
-      ctx.beginPath();
-      ctx.arc(x(b.freq), y(Math.max(-RANGE_DB, Math.min(RANGE_DB, b.gainDb))), 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = dim ? 'rgba(180,190,205,0.55)' : '#fff';
-      ctx.fill();
-      void i;
-    });
   });
 </script>
 
-<Card title="Equalizer" icon="eq" {color} description="Shape the sound of this channel. Grey: live spectrum of the channel.">
-  {#snippet actions()}
+<section class="eq panel" style:--c={color}>
+  <header>
+    <span class="ico"><Icon name="eq" size={17} /></span>
+    <h3>Equalizer</h3>
     <Segmented
-      label="Equalizer view"
+      label="Equalizer mode"
       size="sm"
       value={tab}
       options={[
         { id: 'basic', label: 'Basic' },
-        { id: 'bands', label: 'Bands' },
-        { id: 'param', label: 'Parametric' },
+        { id: 'advanced', label: 'Advanced' },
       ]}
       onchange={(id) => (tab = id as Tab)}
     />
-    <button class="btn sm" disabled={flat} onclick={() => Array.from({ length: EQ_BANDS }, (_, b) => b).forEach((b) => setGain(b)(0))}>Flatten</button>
-  {/snippet}
+    <span class="grow"></span>
+    <button class="btn sm ghost" disabled={flat} onclick={() => Array.from({ length: EQ_BANDS }, (_, b) => b).forEach((b) => setGain(b)(0))}>
+      <Icon name="refresh" size={13} /> Flat
+    </button>
+  </header>
 
-  {#if tab === 'param'}
-    <EqEditor {strip} />
-  {:else}
-    <div class="curve inset" bind:this={box}>
-      <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px" aria-label="Equalizer response of this channel"></canvas>
+  <div class="curve" bind:this={box}>
+    <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px" aria-label="Equalizer response"></canvas>
+  </div>
+
+  {#if tab === 'basic'}
+    <div class="sliders three">
+      {#each BASIC_EQ as g (g.id)}
+        <VSlider label={g.label} value={basicValue(g)} {color} height={130} onchange={(v) => setBasic(g, v)} />
+      {/each}
     </div>
-
-    {#if tab === 'basic'}
-      <div class="basic">
-        {#each BASIC_EQ as g (g.id)}
-          <Slider label={g.label} value={basicValue(g)} min={-12} max={12} step={0.5} unit=" dB" reset={0} onchange={(v) => setBasic(g, v)} />
-        {/each}
-      </div>
-    {:else}
-      <div class="bands">
-        {#each bands as b, i (i)}
-          <VSlider label={NAMES[i]} sub={fmtFreq(b.freq)} value={b.gainDb} {color} onchange={setGain(i)} />
-        {/each}
-      </div>
-    {/if}
+  {:else}
+    <div class="sliders six">
+      {#each bands as b, i (i)}
+        <VSlider label={NAMES[i]} sub={fmtFreq(b.freq)} value={b.gainDb} {color} height={130} onchange={setGain(i)} />
+      {/each}
+    </div>
   {/if}
-</Card>
+</section>
 
 <style>
+  .eq {
+    padding: 14px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .ico {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: var(--accent-hi);
+    background: var(--accent-soft);
+  }
+
+  h3 {
+    font-size: 13.5px;
+    font-weight: 650;
+  }
+
+  .grow {
+    flex: 1;
+  }
+
   .curve {
-    height: 150px;
+    height: 130px;
+    border-radius: 12px;
+    background: var(--bg-0);
     overflow: hidden;
-    margin-bottom: 14px;
   }
 
   canvas {
     display: block;
   }
 
-  .basic {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 640px;
-  }
-
-  .basic :global(.slider) {
-    grid-template-columns: 70px 1fr 70px;
-  }
-
-  .bands {
+  .sliders {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 4px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 420px;
+  }
+
+  .six {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 </style>

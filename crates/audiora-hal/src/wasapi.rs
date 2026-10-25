@@ -76,6 +76,27 @@ fn mix_format(client: &IAudioClient) -> Result<(WAVEFORMATEX, bool)> {
     }
 }
 
+/// The format the Windows audio engine runs this endpoint at, read from the property store.
+/// Deliberately not via `IAudioClient`: activating a client on a Bluetooth hands-free microphone
+/// can switch the headset into telephone mode, which ruins its playback quality for everyone.
+fn stored_format(dev: &IMMDevice) -> Option<(u32, u16)> {
+    use windows::Win32::Media::Audio::PKEY_AudioEngine_DeviceFormat;
+    use windows::Win32::System::Variant::VT_BLOB;
+    unsafe {
+        let v = dev.OpenPropertyStore(STGM_READ).ok()?.GetValue(&PKEY_AudioEngine_DeviceFormat).ok()?;
+        let inner = &v.Anonymous.Anonymous;
+        if inner.vt != VT_BLOB {
+            return None;
+        }
+        let blob = inner.Anonymous.blob;
+        if blob.pBlobData.is_null() || (blob.cbSize as usize) < size_of::<WAVEFORMATEX>() {
+            return None;
+        }
+        let f = std::ptr::read_unaligned(blob.pBlobData as *const WAVEFORMATEX);
+        Some((f.nSamplesPerSec, f.nChannels))
+    }
+}
+
 pub fn default_device_id(flow: Flow) -> Result<String> {
     let e = enumerator()?;
     let dev = unsafe {
@@ -94,11 +115,7 @@ pub fn list_devices() -> Result<Vec<DeviceInfo>> {
         for i in 0..unsafe { coll.GetCount()? } {
             let dev = unsafe { coll.Item(i)? };
             let id = device_id(&dev)?;
-            let (rate, ch) = unsafe { dev.Activate::<IAudioClient>(CLSCTX_ALL, None) }
-                .map_err(HalError::from)
-                .and_then(|c| mix_format(&c))
-                .map(|(f, _)| (f.nSamplesPerSec, f.nChannels))
-                .unwrap_or((0, 0));
+            let (rate, ch) = stored_format(&dev).unwrap_or((0, 0));
             out.push(DeviceInfo {
                 is_default: default.as_deref() == Some(id.as_str()),
                 name: device_name(&dev),

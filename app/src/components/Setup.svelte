@@ -62,7 +62,9 @@
     }
   }
 
-  const label = (d: { name: string }) => shortName(d.name);
+  // Bluetooth hands-free microphones run at 8-16 kHz and switch the headset to telephone quality
+  const label = (d: { name: string; flow: string; sample_rate: number }) =>
+    shortName(d.name) + (d.flow === 'capture' && d.sample_rate > 0 && d.sample_rate < 16000 ? ' — hands-free (makes the headset sound robotic)' : '');
   const chState = (k: string) => engine.channels?.channels.find((c) => c.key === k);
 </script>
 

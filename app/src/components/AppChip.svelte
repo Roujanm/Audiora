@@ -93,11 +93,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 8px 8px 9px;
-    border-radius: var(--r-md);
-    background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
-    border: 1px solid var(--line-2);
-    box-shadow: var(--shadow-1);
+    padding: 7px 7px 7px 8px;
+    border-radius: 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
     cursor: grab;
     touch-action: none;
     transition: border-color 0.15s, opacity 0.15s, transform 0.12s var(--ease);
@@ -177,6 +176,18 @@
   .icon.open {
     color: var(--text);
     background: var(--bg-4);
+  }
+
+  /* actions stay out of the way until the row is pointed at */
+  .icon {
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  .chip-app:hover .icon,
+  .icon.open,
+  .icon:focus-visible {
+    opacity: 1;
   }
 
   .wait {

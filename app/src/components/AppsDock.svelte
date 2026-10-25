@@ -10,7 +10,10 @@
 
 <section class="dock panel" class:over data-drop="none" aria-label="Detected applications">
   <header>
-    <h2 class="eyebrow">Apps</h2>
+    <div>
+      <h2>Apps</h2>
+      <p class="muted">Drag one onto a channel</p>
+    </div>
     <span class="count num">{unrouted.length}</span>
   </header>
 
@@ -26,9 +29,6 @@
     {/each}
   </div>
 
-  <footer class="muted">
-    <Icon name="grip" size={13} /> Drag an app onto a channel — or use <Icon name="link" size={12} />
-  </footer>
 </section>
 
 <style>
@@ -99,11 +99,12 @@
     margin-bottom: 6px;
   }
 
-  footer {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  h2 {
+    font-size: 14.5px;
+    font-weight: 700;
+  }
+
+  header p {
     font-size: 11px;
-    padding-top: 2px;
   }
 </style>

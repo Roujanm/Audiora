@@ -161,14 +161,16 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   operable and carries ARIA slider semantics.
 - **Channel mixer**: Master at the far left with the live list of programs that make sound beneath it
   (found automatically); Game, Chat, Media, Aux and Mic columns to its right. Drag a program onto a
-  column — or use the link menu — and it is routed there at once. Each column has its own fader,
-  meter, mute/solo, preset chooser and active-processing tags. Pointer-driven drag and drop (not the
+  column — or use the link menu — and it is routed there at once. Each column is deliberately plain:
+  one volume slider in per cent (with the live level glowing inside its track), mute, and the apps
+  it holds; everything else lives on the channel's page. Pointer-driven drag and drop (not the
   browser's) so it works inside the desktop shell and with touch.
-- **Channel pages** (one per channel, like Sonar's): preset bar with favourites and *Save as*,
-  per-program volumes, equalizer (basic Bass/Voice/Treble, six band sliders with a live spectrum
-  behind the response curve, or the full parametric editor), volume boost, Smart Volume
-  (Quiet/Balanced/Loud), ClearCast noise cancellation (Chat, Mic), gate and compressor with
-  transfer-curve graphs, per-game profiles, and for the microphone a "hear yourself" monitor.
+- **Channel pages** (one per channel, like Sonar's): preset chooser with favourites and *Save as*,
+  equalizer (Basic: Bass/Voice/Treble; Advanced: six bands) over a live spectrum, then one list of
+  on/off rows — ClearCast noise cancellation (Chat, Mic), noise gate (Mic), volume boost, Smart Volume
+  (Quiet/Balanced/Loud), compressor as a single *amount*, "hear yourself" (Mic) — followed by the
+  apps in the channel with their own volumes and per-game profiles. Expert gate/compressor controls
+  with transfer-curve graphs sit behind an *Advanced* disclosure.
   **Setup** assigns the virtual outputs, speakers, microphone and processed-microphone output, and
   shows audio health. The recorder and the audio-interface panel complete the rail.
   Layouts adapt down to the 980 x 620 minimum window.

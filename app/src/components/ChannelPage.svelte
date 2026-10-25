@@ -4,15 +4,13 @@
   import type { ChannelEntry } from '../lib/protocol.ts';
   import { shortName } from '../lib/theme.ts';
   import { toast } from '../lib/toast.svelte.ts';
-  import Card from './Card.svelte';
   import ChannelEq from './ChannelEq.svelte';
   import DynamicsPanel from './DynamicsPanel.svelte';
   import Icon from './Icon.svelte';
-  import LedMeter from './LedMeter.svelte';
-  import PresetBar from './PresetBar.svelte';
+  import Popover from './Popover.svelte';
+  import PresetPicker from './PresetPicker.svelte';
   import Segmented from './Segmented.svelte';
-  import Slider from './Slider.svelte';
-  import Switch from './Switch.svelte';
+  import SettingRow from './SettingRow.svelte';
 
   interface Props {
     ch: ChannelEntry;
@@ -26,156 +24,204 @@
   const g = (leaf: string, d = 0) => engine.get(p(leaf), d);
   const on = (leaf: string) => g(leaf) > 0.5;
 
-  const masterRate = $derived(engine.info?.buses[0]?.sample_rate ?? 48000);
-  const clearCastOk = $derived(masterRate === 48000);
-  const smartOn = $derived(on('smart/enabled'));
-  const smartGain = $derived(smartOn ? engine.gauge(p('smart/gain_db')) : 0);
+  const clearCastOk = $derived((engine.info?.buses[0]?.sample_rate ?? 48000) === 48000);
   const boost = $derived(g('boost_db'));
+  const smartGain = $derived(on('smart/enabled') ? engine.gauge(p('smart/gain_db')) : 0);
+  const gr = $derived(on('comp/enabled') ? engine.gauge(p('comp/gr_db')) : 0);
+  const gateOpen = $derived(engine.gauge(p('gate/open')) > 0.5);
+  const monitoring = $derived((g('bus_mask') & 1) === 1);
+  const micOut = $derived(engine.channels?.mic_out);
+  const lists = $derived(engine.chPresets[ch.key] ?? { factory: [], user: [], favorites: [] });
+  const current = $derived(engine.activePreset[ch.key] ?? '');
   const apps = $derived(engine.appGroups.filter((a) => a.route === ch.key));
   const profiles = $derived(
     Object.entries(engine.profiles)
       .filter(([, per]) => per[ch.key])
       .map(([app, per]) => ({ app, preset: per[ch.key] })),
   );
-  const presetNames = $derived.by(() => {
-    const l = engine.chPresets[ch.key];
-    return l ? [...l.factory, ...l.user] : [];
-  });
-  const unprofiled = $derived(
-    engine.appGroups.filter((a) => !profiles.some((p2) => p2.app === a.name.toLowerCase())),
-  );
-  const micMonitor = $derived((g('bus_mask') & 1) === 1);
-  const micOut = $derived(engine.channels?.mic_out);
-  const dbSigned = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
+  const presetNames = $derived([...lists.factory, ...lists.user]);
+  const unprofiled = $derived(engine.appGroups.filter((a) => !profiles.some((x) => x.app === a.name.toLowerCase())));
 
+  // compressor "amount" 0..100 drives threshold, ratio and make-up together
+  const amount = $derived(Math.round(Math.min(100, Math.max(0, (-6 - g('comp/threshold_db', -18)) / 0.3))));
+  function setAmount(a: number) {
+    engine.set(p('comp/threshold_db'), Math.round((-6 - a * 0.3) * 10) / 10);
+    engine.set(p('comp/ratio'), Math.round((2 + a * 0.04) * 10) / 10);
+    engine.set(p('comp/makeup_db'), Math.round(a * 0.08 * 10) / 10);
+  }
+
+  const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
+  let saveName = $state('');
   let addApp = $state('');
+  let advanced = $state(false);
 
-  async function guard(fn: () => Promise<unknown>) {
+  async function guard(fn: () => Promise<unknown>, ok?: string) {
     try {
       await fn();
+      if (ok) toast(ok, 'ok');
     } catch (e) {
       toast(String(e instanceof Error ? e.message : e), 'error');
     }
   }
 
-  function setAppVolume(a: AppGroup, volume: number) {
-    const onChannel = a.sessions.filter((s) => s.playing_in === ch.key);
-    for (const s of onChannel.length ? onChannel : a.sessions) engine.setApp(s, { volume });
-  }
-
-  function setAppMute(a: AppGroup, mute: boolean) {
-    const onChannel = a.sessions.filter((s) => s.playing_in === ch.key);
-    for (const s of onChannel.length ? onChannel : a.sessions) engine.setApp(s, { mute });
+  function sessionsOf(a: AppGroup) {
+    const here = a.sessions.filter((s) => s.playing_in === ch.key);
+    return here.length ? here : a.sessions;
   }
 </script>
 
 <div class="page" style:--c={meta.color}>
-  <header class="hero">
-    <span class="big"><Icon name={meta.icon} size={26} /></span>
-    <div class="txt">
-      <h2>{meta.name}</h2>
-      <p class="muted">{meta.blurb}</p>
-    </div>
-    <div class="chips">
-      {#if isMic}
-        <span class="chip" class:ok={ch.online} class:bad={!ch.online}>{ch.online ? shortName(ch.device_name ?? 'Microphone') : 'No microphone'}</span>
-      {:else if ch.online}
-        <span class="chip ok" title={ch.device_name ?? ''}>{shortName(ch.device_name ?? 'Virtual device')}{ch.auto ? ' · auto' : ''}</span>
+  <div class="bar">
+    <div class="favs" role="group" aria-label="Favorite presets">
+      {#if !ch.online && !isMic}
+        <span class="warn">This channel has no virtual output yet — <button class="link" onclick={onsetup}>set it up</button>.</span>
       {:else}
-        <button class="chip warn setup" onclick={onsetup}><Icon name="alert" size={12} /> No virtual device — set up</button>
+        {#each lists.favorites as f (f)}
+          <button class="fav" class:on={f === current} aria-pressed={f === current} onclick={() => guard(() => engine.loadChannelPreset(ch.key, f))}>
+            <Icon name="star" size={11} />{f}
+          </button>
+        {:else}
+          <span class="muted hint">Star presets to keep them one click away.</span>
+        {/each}
       {/if}
     </div>
-  </header>
-
-  <PresetBar channel={ch.key} color={meta.color} />
-
-  {#if !isMic}
-    <Card title="Apps in {meta.name}" icon="apps" color={meta.color} status={apps.length ? `${apps.length}` : ''} description="Drag apps here from the mixer. Volume here is per app, before the channel fader.">
-      {#if apps.length}
-        <ul class="apps">
-          {#each apps as a (a.name)}
-            <li class:idle={a.sessions.length === 0}>
-              <span class="av" style:--a={appColor(a.name)}>{appLabel(a.name).charAt(0)}</span>
-              <span class="nm">{appLabel(a.name)}{#if a.sessions.length === 0}<small>not running</small>{/if}</span>
-              {#if a.sessions.length}
-                <div class="vol">
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={a.volume}
-                    style="--fill: {a.volume * 100}%"
-                    aria-label="{appLabel(a.name)} volume"
-                    oninput={(e) => setAppVolume(a, +e.currentTarget.value)}
-                  />
-                  <output class="num">{Math.round(a.volume * 100)}</output>
-                </div>
-                <button class="mini" class:on={a.muted} aria-pressed={a.muted} title={a.muted ? 'Unmute' : 'Mute'} aria-label="Mute {appLabel(a.name)}" onclick={() => setAppMute(a, !a.muted)}>
-                  <Icon name={a.muted ? 'x' : 'volume'} size={14} />
-                </button>
-              {:else}
-                <span class="grow"></span>
-              {/if}
-              <button class="mini" title="Remove from {meta.name}" aria-label="Remove {appLabel(a.name)} from {meta.name}" onclick={() => guard(() => engine.routeApp(a.name, null))}>
-                <Icon name="trash" size={14} />
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p class="empty muted">Nothing is routed to {meta.name} yet. Drag an app from the mixer onto the {meta.name} column.</p>
-      {/if}
-    </Card>
-  {/if}
-
-  {#if isMic}
-    <div class="two">
-      <Card title="ClearCast noise cancellation" icon="bolt" color={meta.color} enabled={on('denoise')} onenabled={(v) => engine.set(p('denoise'), v)} description={clearCastOk ? 'AI that removes keyboards, fans and room noise from your voice (adds 10 ms).' : `Needs a 48 kHz master output; it runs at ${masterRate / 1000} kHz now.`}>
-        <p class="note muted">{on('denoise') ? 'Active — your voice is cleaned in real time.' : 'Off — your microphone passes through untouched.'}</p>
-      </Card>
-
-      <Card title="Hear yourself" icon="headphones" color={meta.color} enabled={micMonitor} onenabled={(v) => engine.set(p('bus_mask'), (g('bus_mask') & ~1) | (v ? 1 : 0))} description="Sends your voice to the headphones so you can check the sound. Use headphones — speakers will feed back.">
-        <div class="testmeter">
-          <LedMeter orientation="horizontal" thickness={10} levels={[engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))]} holds={[engine.holdDb(p('peak_l')), engine.holdDb(p('peak_r'))]} />
-        </div>
-        <p class="note muted">
-          {#if micOut?.device_name}Processed voice goes to <strong>{shortName(micOut.device_name)}</strong> for other programs to use as a microphone.{:else}Other programs hear your microphone only through a virtual cable — choose a <button class="link" onclick={onsetup}>microphone output</button> in Setup.{/if}
-        </p>
-      </Card>
-    </div>
-  {:else if ch.key === 'chat'}
-    <Card title="ClearCast noise cancellation" icon="bolt" color={meta.color} enabled={on('denoise')} onenabled={(v) => engine.set(p('denoise'), v)} description={clearCastOk ? 'Cleans up noisy voices from other people in the call.' : `Needs a 48 kHz master output; it runs at ${masterRate / 1000} kHz now.`}>
-      <p class="note muted">{on('denoise') ? 'Active on everything played in Chat.' : 'Off.'}</p>
-    </Card>
-  {/if}
+    <PresetPicker channel={ch.key} color={meta.color} />
+    <Popover width={260}>
+      {#snippet trigger({ open, toggle })}
+        <button class="btn icon-btn" class:open title="Save as a new preset" aria-label="Save as a new preset" onclick={toggle}><Icon name="save" size={16} /></button>
+      {/snippet}
+      {#snippet children({ close })}
+        <form
+          class="save"
+          onsubmit={(e) => {
+            e.preventDefault();
+            const n = saveName.trim();
+            if (!n) return;
+            void guard(async () => {
+              await engine.saveChannelPreset(ch.key, n);
+              saveName = '';
+              close();
+            }, `Saved “${n}”`);
+          }}
+        >
+          <p class="eyebrow">Save as preset</p>
+          <input type="text" bind:value={saveName} placeholder="Name" maxlength="40" aria-label="Preset name" />
+          <button class="btn sm primary" type="submit" disabled={!saveName.trim()}>Save</button>
+        </form>
+      {/snippet}
+    </Popover>
+  </div>
 
   <ChannelEq strip={ch.strip} color={meta.color} />
 
-  <div class="two">
-    <Card title="Volume boost" icon="volume" color={meta.color} status={boost > 0.05 ? dbSigned(boost) : 'Off'} description="Adds up to 12 dB ahead of the processing for sources that are too quiet.">
-      <Slider label="Boost" value={boost} min={0} max={12} step={0.5} unit=" dB" reset={0} onchange={(v) => engine.set(p('boost_db'), v)} />
-    </Card>
+  <section class="panel list" aria-label="Sound settings">
+    {#if isMic || ch.key === 'chat'}
+      <SettingRow
+        icon="bolt"
+        title="ClearCast noise cancellation"
+        description={clearCastOk ? (isMic ? 'Removes keyboard, fan and room noise from your voice.' : 'Cleans up noisy voices from the people you talk to.') : 'Needs the speakers to run at 48 kHz.'}
+        on={on('denoise')}
+        disabled={!clearCastOk}
+        ontoggle={(v) => engine.set(p('denoise'), v)}
+      />
+    {/if}
 
-    <Card title="Smart Volume" icon="wave" color={meta.color} enabled={smartOn} onenabled={(v) => engine.set(p('smart/enabled'), v)} status={smartOn ? dbSigned(smartGain) : ''} description="Keeps loud moments from jumping out and quiet ones from disappearing.">
+    {#if isMic}
+      <SettingRow icon="mic" title="Noise gate" description="Silences the microphone between words." on={on('gate/enabled')} ontoggle={(v) => engine.set(p('gate/enabled'), v)}>
+        <span class="led" class:open={gateOpen && on('gate/enabled')} title={gateOpen ? 'Open' : 'Closed'}></span>
+        <input
+          type="range"
+          min="-80"
+          max="-20"
+          step="1"
+          value={g('gate/threshold_db', -50)}
+          style="--fill: {((g('gate/threshold_db', -50) + 80) / 60) * 100}%"
+          aria-label="Gate threshold"
+          oninput={(e) => engine.set(p('gate/threshold_db'), +e.currentTarget.value)}
+        />
+        <output class="num">{g('gate/threshold_db', -50).toFixed(0)} dB</output>
+      </SettingRow>
+    {/if}
+
+    <SettingRow icon="volume" title="Volume boost" description="For sources that are too quiet." value={boost > 0.05 ? signed(boost) : ''}>
+      <input type="range" min="0" max="12" step="0.5" value={boost} style="--fill: {(boost / 12) * 100}%" aria-label="Volume boost" oninput={(e) => engine.set(p('boost_db'), +e.currentTarget.value)} />
+    </SettingRow>
+
+    <SettingRow
+      icon="wave"
+      title="Smart Volume"
+      description="Evens out loud and quiet moments."
+      value={on('smart/enabled') && Math.abs(smartGain) > 0.4 ? signed(smartGain) : ''}
+      on={on('smart/enabled')}
+      ontoggle={(v) => engine.set(p('smart/enabled'), v)}
+    >
       <Segmented
+        size="sm"
         label="Smart Volume loudness"
         value={smartLevelOf(g('smart/target_db', -24))}
         options={SMART_LEVELS.map((l) => ({ id: l.id, label: l.label }))}
         onchange={(id) => engine.set(p('smart/target_db'), SMART_LEVELS.find((l) => l.id === id)!.db)}
       />
-    </Card>
-  </div>
+    </SettingRow>
 
-  <section class="dyn" aria-label="Gate and compressor">
-    <h3 class="eyebrow">Dynamics</h3>
-    <DynamicsPanel strip={ch.strip} showNoise={false} />
+    <SettingRow
+      icon="sliders"
+      title="Compressor"
+      description={isMic ? 'Keeps your voice at a steady level.' : 'Tames sudden peaks.'}
+      value={gr > 0.3 ? `−${gr.toFixed(1)} dB` : ''}
+      on={on('comp/enabled')}
+      ontoggle={(v) => engine.set(p('comp/enabled'), v)}
+    >
+      <input type="range" min="0" max="100" step="1" value={amount} style="--fill: {amount}%" aria-label="Compression amount" oninput={(e) => setAmount(+e.currentTarget.value)} />
+      <output class="num">{amount}%</output>
+    </SettingRow>
+
+    {#if isMic}
+      <SettingRow
+        icon="headphones"
+        title="Hear yourself"
+        description={micOut?.device_name ? `Your processed voice also goes to ${shortName(micOut.device_name)}.` : 'Use headphones — speakers will feed back.'}
+        on={monitoring}
+        ontoggle={(v) => engine.set(p('bus_mask'), (g('bus_mask') & ~1) | (v ? 1 : 0))}
+      />
+    {/if}
   </section>
 
   {#if !isMic}
-    <Card title="Game profiles" icon="star" color={meta.color} description="Pick a preset for a program and it is applied by itself whenever that program starts.">
+    <section class="panel block" aria-label="Apps in {meta.name}">
+      <h3>Apps in {meta.name}</h3>
+      {#if apps.length}
+        <ul class="rows">
+          {#each apps as a (a.name)}
+            <li class:idle={a.sessions.length === 0}>
+              <span class="av" style:--a={appColor(a.name)}>{appLabel(a.name).charAt(0)}</span>
+              <span class="nm">{appLabel(a.name)}</span>
+              {#if a.sessions.length}
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={a.volume}
+                  style="--fill: {a.volume * 100}%"
+                  aria-label="{appLabel(a.name)} volume"
+                  oninput={(e) => sessionsOf(a).forEach((s) => engine.setApp(s, { volume: +e.currentTarget.value }))}
+                />
+                <output class="num">{Math.round(a.volume * 100)}%</output>
+              {:else}
+                <span class="muted grow">Not running</span>
+              {/if}
+              <button class="mini" title="Remove from {meta.name}" aria-label="Remove {appLabel(a.name)}" onclick={() => guard(() => engine.routeApp(a.name, null))}><Icon name="x" size={14} /></button>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="muted">Drag apps onto the {meta.name} column in the mixer.</p>
+      {/if}
+
+      <h3 class="sub">Game profiles <small>— load a preset by itself when a program starts</small></h3>
       {#if profiles.length}
-        <ul class="prof">
+        <ul class="rows">
           {#each profiles as pr (pr.app)}
             <li>
               <span class="av" style:--a={appColor(pr.app)}>{appLabel(pr.app).charAt(0)}</span>
@@ -183,7 +229,7 @@
               <select aria-label="Preset for {pr.app}" value={pr.preset} onchange={(e) => guard(() => engine.setProfile(pr.app, ch.key, e.currentTarget.value))}>
                 {#each presetNames as n (n)}<option value={n}>{n}</option>{/each}
               </select>
-              <button class="mini" title="Remove" aria-label="Remove profile for {pr.app}" onclick={() => guard(() => engine.setProfile(pr.app, ch.key, null))}><Icon name="trash" size={14} /></button>
+              <button class="mini" title="Remove" aria-label="Remove profile for {pr.app}" onclick={() => guard(() => engine.setProfile(pr.app, ch.key, null))}><Icon name="x" size={14} /></button>
             </li>
           {/each}
         </ul>
@@ -193,116 +239,158 @@
           <option value="">Choose a program…</option>
           {#each unprofiled as a (a.name)}<option value={a.name.toLowerCase()}>{appLabel(a.name)}</option>{/each}
         </select>
-        <button
-          class="btn sm"
-          disabled={!addApp}
-          onclick={() =>
-            guard(async () => {
-              await engine.setProfile(addApp, ch.key, engine.activePreset[ch.key] ?? 'Flat');
-              addApp = '';
-            })}
-        ><Icon name="plus" size={13} /> Add profile</button>
+        <button class="btn sm" disabled={!addApp} onclick={() => guard(async () => { await engine.setProfile(addApp, ch.key, current || 'Flat'); addApp = ''; })}>
+          <Icon name="plus" size={13} /> Add
+        </button>
       </div>
-      {#if !profiles.length}
-        <p class="note muted">Example: give “Call of Duty” the Footsteps preset on Game and it turns itself on when the game opens.</p>
-      {/if}
-    </Card>
+    </section>
   {/if}
+
+  <section class="adv">
+    <button class="disclose" aria-expanded={advanced} onclick={() => (advanced = !advanced)}>
+      <span class="chev" class:open={advanced}><Icon name="arrow" size={14} /></span> Advanced: gate and compressor details
+    </button>
+    {#if advanced}<DynamicsPanel strip={ch.strip} showNoise={false} />{/if}
+  </section>
 </div>
 
 <style>
   .page {
+    max-width: 980px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding-bottom: 8px;
-    /* switches, sliders and primary buttons on this page wear the channel's colour */
+    padding-bottom: 12px;
+    /* controls on this page wear the channel's colour */
     --accent: var(--c);
     --accent-hi: color-mix(in oklab, var(--c) 70%, white);
     --accent-lo: color-mix(in oklab, var(--c) 60%, black);
     --on-accent: #06101c;
-    --accent-soft: color-mix(in oklab, var(--c) 16%, transparent);
+    --accent-soft: color-mix(in oklab, var(--c) 15%, transparent);
     --accent-glow: color-mix(in oklab, var(--c) 50%, transparent);
   }
 
-  .hero {
+  .bar {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
   }
 
-  .big {
-    flex: none;
-    width: 52px;
-    height: 52px;
-    border-radius: 16px;
-    display: grid;
-    place-items: center;
-    color: var(--c);
-    background: color-mix(in oklab, var(--c) 14%, transparent);
-    border: 1px solid color-mix(in oklab, var(--c) 32%, transparent);
-    box-shadow: 0 10px 30px -12px var(--c);
+  .warn {
+    color: var(--warn);
+    font-size: 12.5px;
   }
 
-  .txt {
-    flex: 1;
-    min-width: 0;
-  }
-
-  h2 {
-    font-size: 22px;
-    font-weight: 750;
-    letter-spacing: -0.02em;
-  }
-
-  .chips {
-    flex: none;
-  }
-
-  .setup {
-    cursor: pointer;
-  }
-
-  .two {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    align-items: start;
-  }
-
-  .note {
+  .hint {
     font-size: 12px;
-  }
-
-  .note strong {
-    color: var(--text-2);
-    font-weight: 600;
   }
 
   .link {
     border: 0;
     background: none;
     padding: 0;
-    color: var(--accent-hi);
+    color: inherit;
     text-decoration: underline;
+    font: inherit;
   }
 
-  .testmeter {
-    margin-bottom: 10px;
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
   }
 
-  .dyn {
+  .save {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding: 4px;
   }
 
-  .dyn h3 {
-    padding-left: 4px;
+  .favs {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
   }
 
-  .apps,
-  .prof {
+  .fav {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-2);
+    background: var(--bg-2);
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .fav :global(svg) {
+    color: #ffd24d;
+  }
+
+  .fav.on {
+    color: var(--text);
+    border-color: color-mix(in oklab, var(--c) 60%, transparent);
+    background: color-mix(in oklab, var(--c) 15%, transparent);
+  }
+
+  .list {
+    padding: 4px 0;
+  }
+
+  .list input[type='range'] {
+    max-width: 260px;
+  }
+
+  .list output {
+    width: 52px;
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .led {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--bg-4);
+  }
+
+  .led.open {
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+  }
+
+  .block {
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  h3 {
+    font-size: 13.5px;
+    font-weight: 650;
+  }
+
+  h3.sub {
+    margin-top: 8px;
+  }
+
+  h3 small {
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .rows {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -311,67 +399,52 @@
     gap: 6px;
   }
 
-  .apps li,
-  .prof li {
+  .rows li {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 6px 8px 6px 6px;
-    border-radius: var(--r-md);
+    border-radius: 12px;
     background: var(--bg-2);
-    border: 1px solid var(--line);
   }
 
-  .apps li.idle {
+  .rows li.idle {
     opacity: 0.6;
   }
 
   .av {
     flex: none;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     border-radius: 9px;
     display: grid;
     place-items: center;
     font-weight: 750;
     color: #0b0e13;
-    background: linear-gradient(135deg, var(--a), color-mix(in oklab, var(--a) 60%, #000));
+    background: var(--a);
   }
 
   .nm {
     width: 150px;
     flex: none;
     font-weight: 600;
-    display: flex;
-    flex-direction: column;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .nm small {
-    font-weight: 500;
-    font-size: 10.5px;
-    color: var(--faint);
-  }
-
-  .vol {
+  .rows input[type='range'],
+  .rows select,
+  .grow {
     flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 10px;
     min-width: 0;
   }
 
-  .vol output {
-    width: 28px;
+  .rows output {
+    width: 40px;
     text-align: right;
     font-size: 12px;
     color: var(--muted);
-  }
-
-  .grow {
-    flex: 1;
   }
 
   .mini {
@@ -382,7 +455,7 @@
     display: grid;
     place-items: center;
     padding: 0;
-    border: 1px solid transparent;
+    border: 0;
     background: none;
     color: var(--faint);
   }
@@ -392,23 +465,9 @@
     background: var(--bg-4);
   }
 
-  .mini.on {
-    color: var(--bad);
-  }
-
-  .empty {
-    font-size: 12.5px;
-  }
-
-  .prof select {
-    flex: 1;
-    min-width: 0;
-  }
-
   .add {
     display: flex;
     gap: 8px;
-    margin-top: 10px;
   }
 
   .add select {
@@ -416,13 +475,33 @@
     max-width: 320px;
   }
 
-  .prof + .add {
-    margin-top: 12px;
+  .disclose {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 6px 4px;
   }
 
-  @media (max-width: 1100px) {
-    .two {
-      grid-template-columns: 1fr;
-    }
+  .disclose:hover {
+    color: var(--text);
+  }
+
+  .chev {
+    display: grid;
+    transition: transform 0.15s;
+  }
+
+  .chev.open {
+    transform: rotate(90deg);
+  }
+
+  .adv {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 </style>

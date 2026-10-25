@@ -33,7 +33,9 @@
     | 'refresh'
     | 'sliders'
     | 'link'
-    | 'volume';
+    | 'volume'
+    | 'mute'
+    | 'arrow';
 
   interface Props {
     name: IconName;
@@ -75,7 +77,9 @@
     refresh: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5',
     sliders: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
     link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
-    volume: 'M4 10v4h4l5 4V6l-5 4z',
+    volume: 'M4 10v4h4l5 4V6l-5 4zM16.5 9a4.5 4.5 0 0 1 0 6',
+    mute: 'M4 10v4h4l5 4V6l-5 4zM16 9.5l5 5M21 9.5l-5 5',
+    arrow: 'M9 6l6 6-6 6',
   };
 </script>
 

@@ -2,7 +2,7 @@
   import { appColor, appLabel, CHANNELS, channelMeta } from './lib/channels.ts';
   import { dnd } from './lib/dnd.svelte.ts';
   import { engine } from './lib/engine.svelte.ts';
-  import { ACCENTS, periodLabel, rateLabel, type AccentId } from './lib/theme.ts';
+  import { ACCENTS, periodLabel, rateLabel, shortName, type AccentId } from './lib/theme.ts';
   import type { ChannelKey } from './lib/protocol.ts';
   import ChannelColumn from './components/ChannelColumn.svelte';
   import ChannelPage from './components/ChannelPage.svelte';
@@ -11,7 +11,6 @@
   import Hardware from './components/Hardware.svelte';
   import Setup from './components/Setup.svelte';
   import System from './components/System.svelte';
-  import Presets from './components/Presets.svelte';
   import Icon, { type IconName } from './components/Icon.svelte';
   import Popover from './components/Popover.svelte';
   import CommandPalette, { type Command } from './components/CommandPalette.svelte';
@@ -177,10 +176,14 @@
   const subtitle = $derived(
     tab === 'mixer'
       ? `${ready} of 4 app channels ready · ${routedCount} app${routedCount === 1 ? '' : 's'} routed`
-      : channelMeta(tab)
-        ? currentChannel?.kind === 'mic'
-          ? 'Microphone channel'
-          : 'Application channel'
+      : currentChannel
+        ? currentChannel.kind === 'mic'
+          ? currentChannel.online
+            ? shortName(currentChannel.device_name ?? 'Microphone')
+            : 'No microphone found'
+          : currentChannel.online
+            ? `${engine.appGroups.filter((a) => a.route === currentChannel.key).length} apps · ${shortName(currentChannel.device_name ?? '')}`
+            : 'Not set up'
         : tab === 'record'
           ? '32-bit float WAV, multitrack'
           : tab === 'hardware'
@@ -220,19 +223,13 @@
       {#if engine.connected && master}
         <div class="status-pill" title="Master output">
           <span class="dot"></span>
-          <span class="state">Engine running</span>
+          <span class="state">Running</span>
           <span class="sep"></span>
           <span class="num">{rateLabel(master.sample_rate)} · {periodLabel(master.sample_rate, master.period_frames)}</span>
           {#if master.exclusive}<span class="chip accent">EXCLUSIVE</span>{:else if master.low_latency}<span class="chip accent">LOW LATENCY</span>{/if}
         </div>
       {/if}
 
-      {#if engine.connected}
-        <button class="btn ghost search" onclick={() => (paletteOpen = true)} aria-label="Open command palette" title="Command palette (Ctrl+K)">
-          <Icon name="bolt" size={15} /> <kbd>Ctrl K</kbd>
-        </button>
-        <Presets />
-      {/if}
 
       <Popover width={196}>
         {#snippet trigger({ open, toggle })}
@@ -503,14 +500,6 @@
     flex: 1;
   }
 
-  .search kbd {
-    font: 600 10.5px var(--mono);
-    padding: 2px 6px;
-    border-radius: 5px;
-    background: var(--bg-0);
-    border: 1px solid var(--line-2);
-    color: var(--muted);
-  }
 
   /* every view fades and rises in when it is opened */
   .mixer,
