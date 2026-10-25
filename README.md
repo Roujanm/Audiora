@@ -62,6 +62,16 @@ npx tauri dev      # opens the window and starts the engine for you
 npx tauri build    # NSIS per-user installer (unsigned until a certificate exists)
 ```
 
+### Install for this user (desktop shortcut)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1          # builds dist\Audiora-<version>-win-x64
+powershell -ExecutionPolicy Bypass -File dist\Audiora-0.1.0-win-x64\install-user.ps1 -Shortcuts
+```
+
+Installs to `%LOCALAPPDATA%\Roujan\Audiora` (no administrator rights) and puts an **Audiora**
+shortcut on the desktop and in the Start menu. `-Uninstall` removes both.
+
 ### Package a portable build
 
 ```powershell
