@@ -182,7 +182,7 @@
             ? shortName(currentChannel.device_name ?? 'Microphone')
             : 'No microphone found'
           : currentChannel.online
-            ? `${engine.appGroups.filter((a) => a.route === currentChannel.key).length} apps · ${shortName(currentChannel.device_name ?? '')}`
+            ? `${engine.appGroups.filter((a) => a.route === currentChannel.key).length} apps · ${currentChannel.mode === 'direct' ? 'direct capture' : shortName(currentChannel.device_name ?? '')}`
             : 'Not set up'
         : tab === 'record'
           ? '32-bit float WAV, multitrack'

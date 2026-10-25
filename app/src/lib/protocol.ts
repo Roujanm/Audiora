@@ -34,6 +34,8 @@ export interface ChannelEntry {
   name: string;
   strip: number;
   kind: 'apps' | 'mic';
+  /** Application channels: `device` = its own virtual output, `direct` = apps captured one by one, `none` = unusable. */
+  mode?: 'device' | 'direct' | 'none';
   device_id: string | null;
   device_name: string | null;
   /** The device was picked automatically rather than by the user. */
@@ -46,10 +48,13 @@ export interface ChannelsInfo {
   channels: ChannelEntry[];
   master_out: { device_id: string | null; device_name: string | null; auto: boolean };
   mic_out: { device_id: string | null; device_name: string | null };
+  /** Unused output where directly captured apps play, unheard. */
+  parking?: { device_id: string | null; device_name: string | null; auto: boolean };
   config: {
     master_out: string | null;
     mic_in: string | null;
     mic_out: string | null;
+    parking?: string | null;
     devices: Record<string, string | null>;
   };
 }

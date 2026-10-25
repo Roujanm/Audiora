@@ -119,9 +119,14 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   routing): built-in sets per channel plus the user's own, with favourites. **Game profiles** name a
   preset per program and channel; the engine applies it the moment that program starts making sound.
 - **Channels** (`audiora-svc/channels.rs`): Game, Chat, Media and Aux are application mixes, Mic is the
-  microphone. Each application mix is a *virtual output device* (a third-party cable today, Audiora's
-  own driver later): Windows is told per application to play there, a loopback tap feeds the mix to
-  its strip, and nothing reaches the real speakers except through the master. A route watcher keeps
+  microphone. By default a channel needs no device at all (*direct capture*): Windows is told per
+  application to play into a *parking output* nobody listens to (an unused S/PDIF port or monitor HDMI
+  audio, chosen automatically or in Setup), and the engine captures each program's own process tree
+  (`ProcessCapture`, process loopback) into the channel strip through live, lock-free *app taps*
+  (`engine.rs` `AppTapper`, up to 64, retired off the audio thread). A channel may instead own a
+  *virtual output device* (a cable, later Audiora's own driver); then a loopback tap of that device
+  feeds the strip. Either way nothing reaches the real speakers except through the master, and a
+  channel can never listen to the master's device (that would loop forever). A route watcher keeps
   assigned programs on their channel as they start (the choice is stored by Windows per executable and
   re-checked every 1.5 s), remembers what the user had set before so letting go restores it, and
   releases every running program when the engine exits, so closing Audiora never leaves sound going to

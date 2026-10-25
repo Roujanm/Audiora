@@ -14,12 +14,12 @@
 use std::f32::consts::TAU;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
 
 use arrayvec::ArrayVec;
 use audiora_core::{ring, DriftResampler, Mixer, MixerParams, MAX_BLOCK_FRAMES};
-use audiora_hal::{list_devices, CaptureStream, Flow, Mode, RenderStream, StreamFormat};
+use audiora_hal::{list_devices, CaptureStream, Flow, Mode, ProcessCapture, RenderStream, StreamFormat};
 
 use crate::analysis::{self, Analysis};
 use crate::rec::{self, AudioTap, RecController, TapSlot};
@@ -113,8 +113,98 @@ pub struct Engine {
     pub info: EngineInfo,
     pub rec: Arc<RecController>,
     pub analysis: Arc<Analysis>,
+    /// Adds and removes per-application captures while the engine runs.
+    pub tapper: AppTapper,
     stop: Arc<AtomicBool>,
     threads: Vec<JoinHandle<()>>,
+}
+
+/// Most applications captured at once; more are refused rather than allocating on the audio thread.
+pub const MAX_APP_TAPS: usize = 64;
+
+/// One application's own audio (process loopback, children included), summed into a channel strip.
+/// This is how a channel works without any virtual device: the application plays into an output
+/// nobody listens to, and Audiora takes its sound straight from Windows.
+pub struct AppTap {
+    strip: usize,
+    cons: ring::Consumer,
+    rs: DriftResampler,
+    stop: Arc<AtomicBool>,
+}
+
+/// Starts application captures; cheap to clone and safe to use from any thread.
+#[derive(Clone)]
+pub struct AppTapper {
+    tx: mpsc::SyncSender<AppTap>,
+    master: StreamFormat,
+    stats: Arc<Stats>,
+    open: Arc<Mutex<Vec<Arc<AtomicBool>>>>,
+}
+
+impl AppTapper {
+    /// Captures `pid` and its child processes into strip `strip` until the returned flag is set
+    /// (or the process goes away, which sets it too).
+    pub fn attach(&self, pid: u32, strip: usize) -> Result<Arc<AtomicBool>, String> {
+        let (mut prod, cons) = ring::ring(RING_SAMPLES);
+        let stop = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
+        let (stop2, stats) = (stop.clone(), self.stats.clone());
+        std::thread::spawn(move || {
+            let cap = match ProcessCapture::open(pid) {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = ready_tx.send(Err(e.to_string()));
+                    return;
+                }
+            };
+            let _ = ready_tx.send(Ok(()));
+            let _ = cap.run_until(&stop2, |data, frames| {
+                let block = &data[..frames * 2];
+                if prod.free() < block.len() {
+                    stats.capture_drops.fetch_add(1, Ordering::Relaxed);
+                } else {
+                    prod.push_slice(block);
+                }
+            });
+            // the process ended or the capture failed: let the mixer drop this tap
+            stop2.store(true, Ordering::Relaxed);
+        });
+        match ready_rx.recv_timeout(std::time::Duration::from_secs(5)) {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => return Err(e),
+            Err(_) => {
+                stop.store(true, Ordering::Relaxed);
+                return Err("application capture did not start".into());
+            }
+        }
+        let rate = audiora_hal::proc_loopback_rate();
+        let prod_fmt = StreamFormat {
+            sample_rate: rate,
+            channels: 2,
+            buffer_frames: rate / 50,
+            period_frames: rate / 100,
+            low_latency: false,
+            exclusive: false,
+            bit_depth: 32,
+        };
+        let rs = DriftResampler::new(rate, self.master.sample_rate, target_frames(&prod_fmt, &self.master));
+        if self.tx.try_send(AppTap { strip, cons, rs, stop: stop.clone() }).is_err() {
+            stop.store(true, Ordering::Relaxed);
+            return Err(format!("at most {MAX_APP_TAPS} applications can be captured at once"));
+        }
+        let mut open = self.open.lock().map_err(|_| "tap list poisoned")?;
+        open.retain(|f| !f.load(Ordering::Relaxed));
+        open.push(stop.clone());
+        Ok(stop)
+    }
+
+    fn stop_all(&self) {
+        if let Ok(open) = self.open.lock() {
+            for f in open.iter() {
+                f.store(true, Ordering::Relaxed);
+            }
+        }
+    }
 }
 
 /// Maps a configured device (or the default) to its friendly name and id.
@@ -209,6 +299,9 @@ impl Engine {
             }
         }
 
+        // Application taps reach the audio thread through a bounded channel (no allocation there).
+        let (tap_tx, tap_rx) = mpsc::sync_channel::<AppTap>(MAX_APP_TAPS);
+
         // Master render thread: opens the master device and runs the mixer.
         let (tx, rx) = mpsc::channel::<Result<(StreamFormat, Arc<MixerParams>), String>>();
         {
@@ -224,6 +317,7 @@ impl Engine {
                 rate_txs,
                 n_buses: n_out,
                 analysis: analysis.clone(),
+                taps: tap_rx,
             };
             let (stop2, stats2, slot2) = (stop.clone(), stats.clone(), slot.clone());
             threads.push(std::thread::spawn(move || master_thread(args, stop2, stats2, slot2, tx)));
@@ -267,7 +361,8 @@ impl Engine {
         let layout = rec::Layout::new(strips.len(), buses.len(), n_in);
         let rec = Arc::new(RecController::new(slot, master_fmt.sample_rate, rec_dir, layout));
 
-        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, stop, threads })
+        let tapper = AppTapper { tx: tap_tx, master: master_fmt, stats: stats.clone(), open: Arc::default() };
+        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, tapper, stop, threads })
     }
 
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
@@ -279,6 +374,7 @@ impl Engine {
         if let Ok(s) = self.rec.stop() {
             println!("recording saved: {} ({:.1} s, {} dropped frames)", s.path.display(), s.seconds, s.dropped_frames);
         }
+        self.tapper.stop_all();
         self.stop.store(true, Ordering::Relaxed);
         for t in self.threads {
             let _ = t.join();
@@ -341,6 +437,7 @@ struct MasterArgs {
     rate_txs: Vec<mpsc::Sender<StreamFormat>>,
     n_buses: usize,
     analysis: Arc<Analysis>,
+    taps: mpsc::Receiver<AppTap>,
 }
 
 fn master_thread(
@@ -390,6 +487,11 @@ fn master_thread(
     let mut tap = AudioTap::new(slot, cap / 2, n_strips + a.n_buses);
     let (mut analysis_tap, analysis_thread) =
         analysis::spawn(a.analysis.clone(), fmt.sample_rate as f32, cap / 2, stop.clone());
+    let mut taps: Vec<AppTap> = Vec::with_capacity(MAX_APP_TAPS);
+    let mut tap_buf = vec![0f32; cap];
+    // finished taps are freed on this helper thread, never on the audio thread
+    let (reaper_tx, reaper_rx) = mpsc::sync_channel::<AppTap>(MAX_APP_TAPS);
+    std::thread::spawn(move || for dead in reaper_rx { drop(dead) });
 
     let mut render = |out: &mut [f32], frames: usize| {
         let n = frames * 2;
@@ -408,6 +510,31 @@ fn master_thread(
             if r.dropped {
                 stats.drift_drops.fetch_add(1, Ordering::Relaxed);
             }
+        }
+        while taps.len() < MAX_APP_TAPS {
+            match a.taps.try_recv() {
+                Ok(t) => taps.push(t),
+                Err(_) => break,
+            }
+        }
+        let mut k = 0;
+        while k < taps.len() {
+            if taps[k].stop.load(Ordering::Relaxed) {
+                let _ = reaper_tx.try_send(taps.swap_remove(k));
+                continue;
+            }
+            let t = &mut taps[k];
+            if t.strip < n_in {
+                // running dry is the application being quiet, not a glitch
+                let r = t.rs.fill(&mut t.cons, &mut tap_buf[..n]);
+                if r.dropped {
+                    stats.drift_drops.fetch_add(1, Ordering::Relaxed);
+                }
+                for (o, v) in in_bufs[t.strip][..n].iter_mut().zip(&tap_buf[..n]) {
+                    *o += *v;
+                }
+            }
+            k += 1;
         }
         match tone_step {
             Some(step) => {

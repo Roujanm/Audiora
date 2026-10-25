@@ -16,8 +16,7 @@ Proprietary — all rights reserved.
   automatically; drag one onto a channel and Windows plays it into that channel's virtual output while
   Audiora mixes it (per-app output routing + loopback, live, no driver of ours). Per-channel presets
   with favourites, per-game profiles that load by themselves when the game starts, per-program
-  volumes, Smart Volume, ClearCast noise cancellation, gate, compressor. Needs virtual audio cables
-  until our own driver exists — see below.
+  volumes, Smart Volume, ClearCast noise cancellation, gate, compressor. Works without any driver or cable — see below.
 * **App** (`app/`): Svelte 5 + Tauri 2 with a hardware-style interface (knobs, machined faders, LED
   meters, five accent colours): the channel mixer with Master and the app list at the left, one page
   per channel, recorder with takes list, interface panel, Setup. Live meters at 30 Hz, master LUFS
@@ -78,12 +77,15 @@ shortcut on the desktop and in the Start menu. `-Uninstall` removes both.
 powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
 
-### Virtual cables (until the own driver exists)
+### How apps reach the channels (no driver needed)
 
-Each application channel needs its own virtual *output*: install a cable pack such as the free
-**VB-Audio Virtual Cable** (A, B, C, D give four) and pick one per channel in **Setup**. Audiora
-never uses outputs owned by a running SteelSeries Sonar or Voicemeeter. If you play a program that
-opens a fixed audio device instead of the Windows default, restart its audio once after routing it.
+When you drag a program onto a channel, Windows is told to play that program into an output you do
+not listen to — automatically an unused digital/optical port or a monitor's HDMI audio — and Audiora
+captures the program's sound directly (per-process loopback) into the channel. Nothing is installed.
+Pick the output in **Setup** if the automatic one has speakers attached. A channel can instead use a
+virtual output (a cable, later Audiora's own driver); channels never accept your real speakers, which
+would echo forever. Programs that open a fixed audio device instead of the Windows default need their
+audio restarted once after routing.
 
 ## Requirements
 

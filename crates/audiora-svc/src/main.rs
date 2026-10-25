@@ -201,7 +201,7 @@ fn main() -> ExitCode {
         let online: [Option<String>; APP_CHANNELS] =
             std::array::from_fn(|i| engine.info.strips[i].format.and_then(|_| engine.info.strips[i].device_id.clone()));
         let errors = engine.info.strips[..CHANNELS.len()].iter().map(|s| s.error.clone()).collect();
-        Arc::new(Channels::new(&data_dir, engine.params.clone(), r, online, errors))
+        Arc::new(Channels::new(&data_dir, engine.params.clone(), r, online, errors, Some(engine.tapper.clone())))
     });
     let watcher = channel_state.as_ref().map(|c| c.watch(stop.clone()));
 

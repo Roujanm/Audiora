@@ -267,7 +267,7 @@ impl Api {
             .into_iter()
             .map(|a| {
                 let route = self.channels.as_ref().and_then(|c| c.route_of(&a.name));
-                let playing_in = self.channels.as_ref().and_then(|c| c.channel_of_device(&a.device_id));
+                let playing_in = self.channels.as_ref().and_then(|c| c.channel_now(&a.name, &a.device_id));
                 json!({
                     "instance_id": a.instance_id, "device_id": a.device_id, "device_name": a.device_name,
                     "pid": a.pid, "name": a.name, "volume": a.volume, "muted": a.muted,

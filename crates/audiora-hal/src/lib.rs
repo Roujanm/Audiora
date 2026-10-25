@@ -18,8 +18,13 @@ mod wasapi;
 pub use policy::{get_app_output, set_app_output};
 #[cfg(windows)]
 pub use proc_loopback::ProcessCapture;
+/// Sample rate every per-application capture delivers.
 #[cfg(windows)]
-pub use process::running_process_names;
+pub fn proc_loopback_rate() -> u32 {
+    proc_loopback::SAMPLE_RATE
+}
+#[cfg(windows)]
+pub use process::{process_table, process_tree_root, running_process_names, ProcessEntry};
 #[cfg(windows)]
 pub use sessions::{list_sessions, set_session, AppSession};
 #[cfg(windows)]

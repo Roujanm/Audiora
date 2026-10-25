@@ -9,7 +9,7 @@
   const renders = $derived(engine.devices.filter((d) => d.flow === 'render'));
   const captures = $derived(engine.devices.filter((d) => d.flow === 'capture'));
 
-  type Draft = { master_out: string; mic_in: string; mic_out: string; devices: Record<string, string> };
+  type Draft = { master_out: string; mic_in: string; mic_out: string; parking: string; devices: Record<string, string> };
   let draft = $state<Draft | null>(null);
   let busy = $state(false);
 
@@ -21,6 +21,7 @@
       master_out: c.master_out ?? '',
       mic_in: c.mic_in ?? '',
       mic_out: c.mic_out ?? '',
+      parking: c.parking ?? '',
       devices: Object.fromEntries(APP_CHANNEL_KEYS.map((k) => [k, c.devices[k] ?? ''])),
     };
   });
@@ -35,6 +36,7 @@
       draft.master_out !== (cfg.master_out ?? '') ||
       draft.mic_in !== (cfg.mic_in ?? '') ||
       draft.mic_out !== (cfg.mic_out ?? '') ||
+      draft.parking !== (cfg.parking ?? '') ||
       APP_CHANNEL_KEYS.some((k) => draft!.devices[k] !== (cfg.devices[k] ?? ''))
     );
   });
@@ -46,6 +48,9 @@
   const virtuals = $derived(renders.filter((d) => isVirtual(d.name)));
   const listening = $derived(draft?.master_out || engine.channels?.master_out.device_id || '');
   const picked = $derived(draft ? APP_CHANNEL_KEYS.map((k) => draft!.devices[k]).filter(Boolean) : []);
+  // outputs that can park apps: real outputs that are neither the speakers nor a channel's device
+  const parkable = $derived(renders.filter((d) => !isVirtual(d.name) && d.id !== listening));
+  const parked = $derived(engine.channels?.parking);
   const duplicate = $derived(new Set(picked).size !== picked.length || (!!listening && picked.includes(listening)));
 
   async function apply() {
@@ -56,6 +61,7 @@
         master_out: draft.master_out || null,
         mic_in: draft.mic_in || null,
         mic_out: draft.mic_out || null,
+        parking: draft.parking || null,
         devices: Object.fromEntries(APP_CHANNEL_KEYS.map((k) => [k, draft!.devices[k] || null])),
       });
       toast('Saved. Restarting the audio engine…', 'ok');
@@ -118,17 +124,31 @@
       </div>
 
       <div class="block">
-        <h3>Virtual outputs</h3>
+        <h3>How apps reach the channels</h3>
+        <label>
+          <span>Direct capture through <small>an output you do not listen to</small></span>
+          <select bind:value={draft.parking}>
+            <option value="">Automatic{parked?.auto && parked.device_name ? ` — ${shortName(parked.device_name)}` : ''}</option>
+            {#each parkable as d (d.id)}<option value={d.id}>{label(d)}</option>{/each}
+          </select>
+        </label>
+        <p class="muted tiny">
+          Routed apps play into this output while Audiora takes their sound straight from Windows — no driver or cable
+          needed. Choose a port with nothing plugged in (digital/optical or a monitor without speakers), otherwise you
+          hear those apps twice.
+        </p>
+
+        <h3 class="sub">Virtual outputs <small>(optional)</small></h3>
         {#each APP_CHANNEL_KEYS as k (k)}
           {@const m = channelMeta(k)!}
           {@const st = chState(k)}
           <label style:--c={m.color}>
             <span class="who"><i><Icon name={m.icon} size={13} /></i>{m.name}</span>
             <select bind:value={draft.devices[k]}>
-              <option value="">Automatic{st?.auto && st.device_name ? ` — ${shortName(st.device_name)}` : ''}</option>
+              <option value="">{st?.mode === 'direct' ? 'Direct capture' : 'Automatic'}{st?.auto && st.device_name ? ` — ${shortName(st.device_name)}` : ''}</option>
               {#each virtuals as d (d.id)}<option value={d.id} disabled={d.id === listening}>{label(d)}</option>{/each}
             </select>
-            <span class="chip" class:ok={st?.online} class:warn={!st?.online}>{st?.online ? 'ready' : 'no device'}</span>
+            <span class="chip" class:ok={st?.online} class:warn={!st?.online}>{st?.mode === 'direct' ? 'direct' : st?.online ? 'ready' : 'not set'}</span>
           </label>
           {#if st?.error}<p class="warn-line"><Icon name="alert" size={12} /> {st.error}</p>{/if}
           {@const chosen = renders.find((d) => d.id === draft!.devices[k])}
@@ -145,8 +165,8 @@
       <div class="howto">
         <Icon name="alert" size={16} />
         <div>
-          <strong>No virtual outputs found.</strong> Install virtual audio cables (for example the free <em>VB-Audio Virtual Cable</em> pack — A, B, C and D give you four),
-          then pick one for each channel above. Audiora's own driver will replace this step in a later release.
+          <strong>No output to capture apps through.</strong> Direct capture needs one output you do not listen to (a digital/optical
+          port or a monitor's HDMI audio). Choose one above, or plug in any second audio device.
         </div>
       </div>
     {/if}
@@ -188,6 +208,15 @@
     flex-direction: column;
     gap: 10px;
     min-width: 0;
+  }
+
+  h3.sub {
+    margin-top: 8px;
+  }
+
+  h3 small {
+    font-weight: 500;
+    color: var(--faint);
   }
 
   h3 {

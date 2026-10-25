@@ -19,6 +19,7 @@ use audiora_hal::{DeviceInfo, Flow};
 use serde_json::{json, Map, Value};
 
 use crate::cpresets::CPresets;
+use crate::engine::AppTapper;
 
 /// Channel key and display name, in mixer order. The first four are application mixes.
 pub const CHANNELS: [(&str, &str); 5] =
@@ -39,6 +40,9 @@ pub struct Config {
     /// so other programs can pick the cable's output as their microphone.
     pub mic_out: Option<String>,
     pub devices: [Option<String>; APP_CHANNELS],
+    /// An output nobody listens to (an unused S/PDIF or HDMI port). Channels without a virtual
+    /// device send their applications there and capture them directly — no driver needed.
+    pub parking: Option<String>,
 }
 
 fn opt(v: &Value) -> Option<String> {
@@ -51,7 +55,13 @@ impl Config {
             .ok()
             .and_then(|t| serde_json::from_str(&t).ok())
             .unwrap_or(Value::Null);
-        let mut c = Config { master_out: opt(&v["master_out"]), mic_in: opt(&v["mic_in"]), mic_out: opt(&v["mic_out"]), ..Default::default() };
+        let mut c = Config {
+            master_out: opt(&v["master_out"]),
+            mic_in: opt(&v["mic_in"]),
+            mic_out: opt(&v["mic_out"]),
+            parking: opt(&v["parking"]),
+            ..Default::default()
+        };
         for (i, (key, _)) in CHANNELS[..APP_CHANNELS].iter().enumerate() {
             c.devices[i] = opt(&v["devices"][*key]);
         }
@@ -63,7 +73,7 @@ impl Config {
         for (i, (key, _)) in CHANNELS[..APP_CHANNELS].iter().enumerate() {
             devices.insert((*key).into(), json!(self.devices[i]));
         }
-        json!({ "master_out": self.master_out, "mic_in": self.mic_in, "mic_out": self.mic_out, "devices": devices })
+        json!({ "master_out": self.master_out, "mic_in": self.mic_in, "mic_out": self.mic_out, "parking": self.parking, "devices": devices })
     }
 
     pub fn save(&self, dir: &Path) -> Result<(), String> {
@@ -120,6 +130,9 @@ pub struct Resolved {
     pub auto: [bool; APP_CHANNELS],
     /// Why a configured channel device is not used.
     pub blocked: [Option<String>; APP_CHANNELS],
+    /// Where applications of device-less channels play while Audiora captures them directly.
+    pub parking: Option<String>,
+    pub parking_auto: bool,
 }
 
 impl Resolved {
@@ -138,6 +151,10 @@ impl Resolved {
         if self.mic_out.as_deref() == Some(master.as_str()) {
             self.mic_out = None;
         }
+        // parking on the speakers would play every routed app twice
+        if self.parking.as_deref() == Some(master.as_str()) {
+            self.parking = None;
+        }
     }
 }
 
@@ -151,7 +168,8 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
         mic_out: exists(&cfg.mic_out, Flow::Render),
         ..Default::default()
     };
-    let chosen: Vec<String> = cfg.devices.iter().filter_map(|d| exists(d, Flow::Render)).collect();
+    let mut chosen: Vec<String> = cfg.devices.iter().filter_map(|d| exists(d, Flow::Render)).collect();
+    chosen.extend(exists(&cfg.parking, Flow::Render));
     // Master: the system default unless it is virtual (then it would be a loop) or taken by a
     // channel, else the most plausible real output.
     if r.master_out.is_none() {
@@ -209,6 +227,30 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
             r.devices[i] = Some(d.id.clone());
             r.auto[i] = true;
             used.insert(d.id.clone());
+        }
+    }
+    // Parking output for channels without a virtual device: chosen, else an output that normally
+    // has nothing attached (S/PDIF first, then monitor HDMI ports). Never ordinary speakers.
+    if r.devices.iter().any(Option::is_none) {
+        r.parking = exists(&cfg.parking, Flow::Render).filter(|p| !used.contains(p) || cfg.parking.as_ref() == Some(p));
+        if r.parking.is_none() {
+            let rank = |d: &DeviceInfo| {
+                let n = d.name.to_lowercase();
+                if ["digital output", "spdif", "s/pdif", "optical"].iter().any(|h| n.contains(h)) {
+                    Some(0)
+                } else if ["hdmi", "displayport", "high definition audio"].iter().any(|h| n.contains(h)) {
+                    Some(1)
+                } else {
+                    None
+                }
+            };
+            r.parking = devs
+                .iter()
+                .filter(|d| d.flow == Flow::Render && !is_virtual(&d.name) && !used.contains(&d.id))
+                .filter_map(|d| rank(d).map(|k| (k, d)))
+                .min_by_key(|(k, _)| *k)
+                .map(|(_, d)| d.id.clone());
+            r.parking_auto = r.parking.is_some();
         }
     }
     r.enforce_master();
@@ -281,11 +323,24 @@ pub struct Channels {
     routes: Mutex<Routes>,
     profiles: Mutex<Profiles>,
     pub presets: CPresets,
+    /// Starts direct captures of applications (channels without a virtual device).
+    tapper: Option<AppTapper>,
+    /// Running direct captures: process-tree root -> (channel, stop flag).
+    taps: Mutex<HashMap<u32, (String, Arc<AtomicBool>)>>,
 }
 
 impl Channels {
-    pub fn new(dir: &Path, params: Arc<MixerParams>, resolved: Resolved, online: [Option<String>; APP_CHANNELS], errors: Vec<Option<String>>) -> Self {
+    pub fn new(
+        dir: &Path,
+        params: Arc<MixerParams>,
+        resolved: Resolved,
+        online: [Option<String>; APP_CHANNELS],
+        errors: Vec<Option<String>>,
+        tapper: Option<AppTapper>,
+    ) -> Self {
         Self {
+            tapper,
+            taps: Mutex::default(),
             dir: dir.to_owned(),
             presets: CPresets::new(dir),
             config: Mutex::new(Config::load(dir)),
@@ -298,8 +353,24 @@ impl Channels {
         }
     }
 
+    /// True when channel `i` has no virtual device and captures its applications directly.
+    fn direct(&self, i: usize) -> bool {
+        i < APP_CHANNELS && self.online[i].is_none() && self.resolved.parking.is_some() && self.tapper.is_some()
+    }
+
+    /// Where applications of a channel must play: its virtual device, or the parking output.
     fn device_of(&self, key: &str) -> Option<&String> {
-        channel_index(key).and_then(|i| self.online.get(i)).and_then(Option::as_ref)
+        let i = channel_index(key)?;
+        self.online.get(i)?.as_ref().or_else(|| if self.direct(i) { self.resolved.parking.as_ref() } else { None })
+    }
+
+    pub fn parking(&self) -> Option<&str> {
+        self.resolved.parking.as_deref()
+    }
+
+    /// Our own devices: never remembered as an application's "previous" output.
+    fn ours(&self, device: &str) -> bool {
+        self.online.iter().flatten().any(|o| o == device) || self.parking() == Some(device)
     }
 
     /// Writes new device choices; they take effect when the engine restarts.
@@ -307,7 +378,12 @@ impl Channels {
         let mut cfg = self.config.lock().map_err(|_| "config lock poisoned")?;
         let mut next = cfg.clone();
         let take = |v: &Value| -> Option<Option<String>> { if v.is_null() { Some(None) } else { v.as_str().map(|s| Some(s.to_owned())) } };
-        for (field, slot) in [("master_out", &mut next.master_out), ("mic_in", &mut next.mic_in), ("mic_out", &mut next.mic_out)] {
+        for (field, slot) in [
+            ("master_out", &mut next.master_out),
+            ("mic_in", &mut next.mic_in),
+            ("mic_out", &mut next.mic_out),
+            ("parking", &mut next.parking),
+        ] {
             if let Some(v) = req.get(field) {
                 *slot = take(v).ok_or_else(|| format!("\"{field}\" must be a device id or null"))?;
             }
@@ -328,6 +404,9 @@ impl Channels {
         if clash(&master) {
             return Err("a channel cannot use the device you listen on: the sound would loop back into itself".into());
         }
+        if next.parking.is_some() && (next.parking == master || clash(&next.parking)) {
+            return Err("the parking output must be an output you do not listen to and no channel uses".into());
+        }
         next.save(&self.dir)?;
         *cfg = next;
         Ok(json!({ "restart": true }))
@@ -341,10 +420,11 @@ impl Channels {
             .enumerate()
             .map(|(i, (key, name))| {
                 if i < APP_CHANNELS {
+                    let mode = if self.online[i].is_some() { "device" } else if self.direct(i) { "direct" } else { "none" };
                     json!({
-                        "key": key, "name": name, "strip": i, "kind": "apps",
+                        "key": key, "name": name, "strip": i, "kind": "apps", "mode": mode,
                         "device_id": self.resolved.devices[i], "device_name": name_of(&self.resolved.devices[i]),
-                        "auto": self.resolved.auto[i], "online": self.online[i].is_some(), "error": self.errors[i],
+                        "auto": self.resolved.auto[i], "online": mode != "none", "error": self.errors[i],
                     })
                 } else {
                     json!({
@@ -359,6 +439,7 @@ impl Channels {
             "channels": list,
             "master_out": { "device_id": self.resolved.master_out, "device_name": name_of(&self.resolved.master_out), "auto": cfg.master_out.is_none() },
             "mic_out": { "device_id": self.resolved.mic_out, "device_name": name_of(&self.resolved.mic_out) },
+            "parking": { "device_id": self.resolved.parking, "device_name": name_of(&self.resolved.parking), "auto": self.resolved.parking_auto },
             "config": cfg.to_json(),
         })
     }
@@ -373,9 +454,13 @@ impl Channels {
         self.routes.lock().ok()?.map.get(&app.to_lowercase()).map(|(c, _)| c.clone())
     }
 
-    /// Which channel an application's audio currently plays into (by the device it uses).
-    pub fn channel_of_device(&self, device_id: &str) -> Option<&'static str> {
-        (0..APP_CHANNELS).find(|i| self.online[*i].as_deref() == Some(device_id)).map(|i| CHANNELS[i].0)
+    /// Which channel an application's audio currently reaches, judged by the device it plays into
+    /// (for the parking output: the channel the application is assigned to).
+    pub fn channel_now(&self, app: &str, device_id: &str) -> Option<String> {
+        if let Some(i) = (0..APP_CHANNELS).find(|i| self.online[*i].as_deref() == Some(device_id)) {
+            return Some(CHANNELS[i].0.to_owned());
+        }
+        (self.parking() == Some(device_id)).then(|| self.route_of(app)).flatten()
     }
 
     /// Assigns an application to a channel (`None` lets it go back to where it was).
@@ -388,7 +473,10 @@ impl Channels {
             None => None,
             Some(c) => {
                 let i = channel_index(c).filter(|i| *i < APP_CHANNELS).ok_or_else(|| format!("\"{c}\" is not an application channel"))?;
-                Some((c.to_owned(), self.online[i].clone().ok_or_else(|| format!("the {} channel has no working device; pick one in Setup", CHANNELS[i].1))?))
+                let dev = self.device_of(c).cloned().ok_or_else(|| {
+                    format!("the {} channel has nowhere to send apps: choose an unused output for direct capture in Setup", CHANNELS[i].1)
+                })?;
+                Some((c.to_owned(), dev))
             }
         };
         let sessions = audiora_hal::list_sessions().unwrap_or_default();
@@ -398,7 +486,7 @@ impl Channels {
             Some((ch, dev)) => {
                 // Remember what the user had, but never remember our own device as "previous".
                 let prev = routes.map.get(&key).map(|(_, p)| p.clone()).unwrap_or_else(|| {
-                    pids.first().and_then(|p| audiora_hal::get_app_output(*p).ok().flatten()).filter(|d| !self.online.iter().flatten().any(|o| o == d))
+                    pids.first().and_then(|p| audiora_hal::get_app_output(*p).ok().flatten()).filter(|d| !self.ours(d))
                 });
                 let mut err = None;
                 for pid in &pids {
@@ -408,6 +496,8 @@ impl Channels {
                 }
                 routes.map.insert(key.clone(), (ch, prev));
                 routes.save(&self.dir)?;
+                drop(routes);
+                self.sync_taps();
                 match err {
                     Some(e) => Err(e),
                     None => Ok(json!({ "app": app, "channel": channel, "live": !pids.is_empty() })),
@@ -419,6 +509,8 @@ impl Channels {
                     let _ = audiora_hal::set_app_output(*pid, prev.as_deref());
                 }
                 routes.save(&self.dir)?;
+                drop(routes);
+                self.sync_taps();
                 Ok(json!({ "app": app, "channel": Value::Null, "live": !pids.is_empty() }))
             }
         }
@@ -427,6 +519,11 @@ impl Channels {
     /// Sends every running routed application back to where it was. Called on shutdown so that
     /// closing Audiora never leaves programs playing into a device nobody is listening to.
     pub fn release_all(&self) {
+        if let Ok(mut taps) = self.taps.lock() {
+            for (_, (_, stop)) in taps.drain() {
+                stop.store(true, Ordering::Relaxed);
+            }
+        }
         let Ok(routes) = self.routes.lock() else { return };
         let sessions = audiora_hal::list_sessions().unwrap_or_default();
         for (app, (_, prev)) in &routes.map {
@@ -466,6 +563,44 @@ impl Channels {
         Ok(json!({}))
     }
 
+    /// Makes the running direct captures match the routes: one capture per program (its process
+    /// tree), on the channel it is assigned to, for channels that have no virtual device.
+    fn sync_taps(&self) {
+        let Some(tapper) = &self.tapper else { return };
+        let routes = self.routes.lock().map(|r| r.map.clone()).unwrap_or_default();
+        let sessions = audiora_hal::list_sessions().unwrap_or_default();
+        let table = audiora_hal::process_table();
+        let own = std::process::id();
+        let mut want: HashMap<u32, String> = HashMap::new();
+        for s in sessions.iter().filter(|s| !s.system_sounds && s.pid != 0 && s.pid != own) {
+            if let Some((ch, _)) = routes.get(&s.name.to_lowercase()) {
+                if channel_index(ch).is_some_and(|i| self.direct(i)) {
+                    want.insert(audiora_hal::process_tree_root(&table, s.pid), ch.clone());
+                }
+            }
+        }
+        let Ok(mut taps) = self.taps.lock() else { return };
+        taps.retain(|root, (ch, stop)| {
+            let keep = !stop.load(Ordering::Relaxed) && want.get(root) == Some(ch);
+            if !keep {
+                stop.store(true, Ordering::Relaxed);
+            }
+            keep
+        });
+        for (root, ch) in want {
+            if taps.contains_key(&root) {
+                continue;
+            }
+            let Some(strip) = channel_index(&ch) else { continue };
+            match tapper.attach(root, strip) {
+                Ok(stop) => {
+                    taps.insert(root, (ch, stop));
+                }
+                Err(e) => eprintln!("cannot capture process {root}: {e}"),
+            }
+        }
+    }
+
     fn apply_profile(&self, app: &str) {
         let per = self.profiles.lock().ok().and_then(|p| p.map.get(&app.to_lowercase()).cloned());
         for (channel, preset) in per.into_iter().flatten() {
@@ -502,6 +637,7 @@ impl Channels {
                     }
                     seen.retain(|p| now.contains_key(p));
                 }
+                me.sync_taps();
                 for _ in 0..15 {
                     if stop.load(Ordering::Relaxed) {
                         return;
@@ -591,6 +727,21 @@ mod tests {
         r.devices[2] = Some("sonos".into());
         r.enforce_master();
         assert!(r.devices[2].is_none() && r.blocked[2].is_some());
+    }
+
+    #[test]
+    fn parking_prefers_an_unused_digital_output_and_never_the_speakers() {
+        let devs = [
+            dev("Speakers (Sonos Roam)", Flow::Render, "sonos", true),
+            dev("1 - PHL 243V7 (AMD High Definition Audio Device)", Flow::Render, "hdmi", false),
+            dev("Realtek Digital Output (Realtek(R) Audio)", Flow::Render, "spdif", false),
+        ];
+        let r = resolve(&Config::default(), &devs, &[]);
+        assert_eq!(r.master_out.as_deref(), Some("sonos"));
+        assert_eq!(r.parking.as_deref(), Some("spdif"));
+        assert!(r.parking_auto);
+        let only_speakers = [dev("Speakers", Flow::Render, "spk", true)];
+        assert!(resolve(&Config::default(), &only_speakers, &[]).parking.is_none());
     }
 
     #[test]
