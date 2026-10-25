@@ -53,6 +53,15 @@ Every reply has `"ok": true|false` and echoes the request's `"id"`. Errors add `
 | `app_profiles` | | `profiles`: program → channel → preset |
 | `mic_test` | `action` (`record`/`play`/`stop`), `seconds` (record, 1–10, default 5) | records the processed microphone into memory, or plays it into the master |
 | `mic_test_status` | | `state` (`idle`/`recording`/`playing`), `seconds`, `length` |
+| `studio_list` | | `projects[]`: name, modified_ms (newest first) |
+| `studio_load` | `name` | `project`, `sample_rate`, `dir` — creates a project with Voice/Game/Chat/Media tracks if it does not exist |
+| `studio_save` | `name`, `project` | stores tracks, clips and mix; the mix applies to playback at once |
+| `studio_record` | `name`, `start` (frame), `tracks[]` (`{id, source}`) | `take`, `lanes`, `start` — records a new take and plays the other tracks meanwhile |
+| `studio_play` | `name`, `start` | `end` — plays the project's clips into the master |
+| `studio_stop` | | stops both; after a recording: `take`, `lanes`, `start`, `frames` |
+| `studio_status` | | `state` (`stopped`/`playing`/`recording`), `position`, `sample_rate` |
+| `studio_peaks` | `name`, `take` | `bin`, `frames`, `lanes[]` (min/max pairs) — waveform overview |
+| `studio_export` | `name` | `path`, `seconds`, `peak` — renders the mix to a 32-bit float WAV |
 | `shutdown` | | `stopping` — the engine finalizes recordings, saves the session, releases routed programs and exits |
 
 Booleans may be sent as `true`/`false`; they are stored as 1/0. `hw_*` commands fail with
@@ -101,6 +110,7 @@ order requested.
 | Source | Signal |
 |---|---|
 | `strip/N` | strip N raw, before gain/EQ/dynamics (record the untouched take) |
+| `post/N` | strip N after its whole chain and fader — the processed, "clean" signal |
 | `bus/N` | bus N after the mixer — what you hear |
 | aliases | `input` = `strip/0` (when there is an input), `tone` = the tone strip, `mix` = `bus/0` |
 

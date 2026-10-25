@@ -60,14 +60,14 @@ pub struct Mixer {
     strips: Vec<StripState>,
     buses: Vec<BusState>,
     scratch: Vec<f32>,
-    /// Strip whose processed, post-fader signal is copied into `post` (the microphone check).
-    post_strip: Option<usize>,
-    post: Vec<f32>,
+    /// Every strip's processed, post-fader signal of the last call (what the Studio records as a
+    /// "clean" source and the microphone check plays back).
+    post: Vec<Vec<f32>>,
     post_len: usize,
 }
 
-/// Longest call (in frames) whose post-fader tap is kept; longer calls are not tapped.
-const POST_TAP_FRAMES: usize = 16_384;
+/// Longest call (in frames) whose post-fader signals are kept; longer calls are not tapped.
+pub const POST_TAP_FRAMES: usize = 16_384;
 
 impl Mixer {
     pub fn new(sample_rate: f32, strips: usize, buses: usize) -> (Self, Arc<MixerParams>) {
@@ -106,23 +106,16 @@ impl Mixer {
                 })
                 .collect(),
             scratch: vec![0.0; MAX_BLOCK_FRAMES * 2],
-            post_strip: None,
-            post: vec![0.0; POST_TAP_FRAMES * 2],
+            post: (0..strips).map(|_| vec![0.0; POST_TAP_FRAMES * 2]).collect(),
             post_len: 0,
         };
         (mixer, params)
     }
 
-    /// Copies strip `strip`'s finished signal (after its fader) into [`post_tap`](Self::post_tap)
-    /// on every call; `None` stops it.
-    pub fn set_post_tap(&mut self, strip: Option<usize>) {
-        self.post_strip = strip;
-        self.post_len = 0;
-    }
-
-    /// The tapped strip's signal from the last [`process`](Self::process) call.
-    pub fn post_tap(&self) -> &[f32] {
-        &self.post[..self.post_len]
+    /// Strip `strip`'s finished signal (after its chain and fader) from the last
+    /// [`process`](Self::process) call; empty for calls longer than [`POST_TAP_FRAMES`].
+    pub fn post(&self, strip: usize) -> &[f32] {
+        self.post.get(strip).map_or(&[], |p| &p[..self.post_len])
     }
 
     /// `inputs[i]` is strip i, `outputs[b]` is bus b; all interleaved stereo
@@ -134,9 +127,9 @@ impl Mixer {
         let mut peaks_s = [[0f32; 2]; 64];
         let mut peaks_b = [[0f32; 2]; 32];
 
-        self.post_len = if self.post_strip.is_some() && total_frames <= POST_TAP_FRAMES { total_frames * 2 } else { 0 };
-        if self.post_len > 0 {
-            self.post[..self.post_len].fill(0.0);
+        self.post_len = if total_frames <= POST_TAP_FRAMES { total_frames * 2 } else { 0 };
+        for p in self.post.iter_mut() {
+            p[..self.post_len].fill(0.0);
         }
         let mut offset = 0;
         while offset < total_frames {
@@ -280,8 +273,8 @@ impl Mixer {
             peaks_s[i] = [pl, pr];
             st.gain_l = target_l;
             st.gain_r = target_r;
-            if self.post_strip == Some(i) && self.post_len > 0 {
-                self.post[range.clone()].copy_from_slice(buf);
+            if self.post_len > 0 {
+                self.post[i][range.clone()].copy_from_slice(buf);
             }
 
             for (b, out) in outputs.iter_mut().enumerate() {
@@ -542,17 +535,15 @@ mod tests {
     }
 
     #[test]
-    fn post_tap_copies_the_finished_strip() {
+    fn post_signals_are_the_finished_strips() {
         let (mut m, p) = Mixer::new(48_000.0, 2, 1);
         p.strips[1].gain_db.set(-6.0206);
-        m.set_post_tap(Some(1));
+        p.strips[0].mute.store(true, Ordering::Relaxed);
         run(&mut m, &[dc(0.25), dc(0.5)], 1);
-        let tap = m.post_tap();
-        assert_eq!(tap.len(), FRAMES * 2);
-        assert!((tap[100] - 0.25).abs() < 1e-3);
-        m.set_post_tap(None);
-        run(&mut m, &[dc(0.25), dc(0.5)], 1);
-        assert!(m.post_tap().is_empty());
+        assert_eq!(m.post(1).len(), FRAMES * 2);
+        assert!((m.post(1)[100] - 0.25).abs() < 1e-3);
+        assert!(m.post(0).iter().all(|v| v.abs() < 1e-6), "muted strip is silent");
+        assert!(m.post(7).is_empty());
     }
 
     #[test]

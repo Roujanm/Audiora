@@ -7,7 +7,7 @@
   import ChannelColumn from './components/ChannelColumn.svelte';
   import ChannelPage from './components/ChannelPage.svelte';
   import MasterColumn from './components/MasterColumn.svelte';
-  import Recorder from './components/Recorder.svelte';
+  import Studio from './components/Studio.svelte';
   import Hardware from './components/Hardware.svelte';
   import Setup from './components/Setup.svelte';
   import System from './components/System.svelte';
@@ -19,7 +19,7 @@
 
   engine.start();
 
-  type Tab = 'mixer' | ChannelKey | 'record' | 'hardware' | 'system';
+  type Tab = 'mixer' | ChannelKey | 'studio' | 'hardware' | 'system';
 
   function remembered<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
     try {
@@ -32,12 +32,14 @@
 
   const accentIds = ACCENTS.map((a) => a.id);
   let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'azure'));
-  let tab = $state<Tab>('mixer');
+  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'mic', 'studio', 'hardware', 'system'];
+  let tab = $state<Tab>(remembered('audiora.tab', TABS, 'mixer'));
 
   $effect(() => {
     document.documentElement.dataset.accent = accent;
     try {
       localStorage.setItem('audiora.accent', accent);
+      localStorage.setItem('audiora.tab', tab);
     } catch {
       /* private mode: preferences just are not remembered */
     }
@@ -53,13 +55,22 @@
     divider?: boolean;
   }
 
-  const NAV: NavItem[] = [
+  /** Left rail: the big areas of the product. */
+  const RAIL: NavItem[] = [
     { id: 'mixer', label: 'Mixer', icon: 'mixer', title: 'Mixer' },
-    ...CHANNELS.map((c) => ({ id: c.key as Tab, label: c.name, icon: c.icon, title: c.name, color: c.color })),
-    { id: 'record', label: 'Record', icon: 'record', title: 'Recorder', divider: true },
+    { id: 'studio', label: 'Studio', icon: 'record', title: 'Studio' },
     { id: 'hardware', label: 'Interface', icon: 'interface', title: 'Audio interface' },
     { id: 'system', label: 'Setup', icon: 'system', title: 'Setup & health' },
   ];
+
+  /** Header tabs of the mixer area: the overview and one page per channel. */
+  const CHANNEL_TABS: NavItem[] = [
+    { id: 'mixer', label: 'Overview', icon: 'mixer', title: 'Mixer' },
+    ...CHANNELS.map((c) => ({ id: c.key as Tab, label: c.name, icon: c.icon, title: c.name, color: c.color })),
+  ];
+
+  const NAV: NavItem[] = [...CHANNEL_TABS, ...RAIL.slice(1)];
+  const inMixer = $derived(tab === 'mixer' || CHANNELS.some((c) => c.key === tab));
 
   const channelList = $derived(engine.channels?.channels ?? []);
   const buses = $derived(engine.info?.buses ?? []);
@@ -184,8 +195,8 @@
           : currentChannel.online
             ? `${engine.appGroups.filter((a) => a.route === currentChannel.key).length} apps · ${currentChannel.mode === 'direct' ? 'direct capture' : shortName(currentChannel.device_name ?? '')}`
             : 'Not set up'
-        : tab === 'record'
-          ? '32-bit float WAV, multitrack'
+        : tab === 'studio'
+          ? 'Multitrack recording of every channel'
           : tab === 'hardware'
             ? 'Preamps, phantom power, monitoring'
             : 'Devices, channels and audio health',
@@ -200,10 +211,10 @@
       <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 14v-4M7 18V6M11 21V3M15 17V7M19 14v-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none" /></svg>
     </div>
     <div class="items">
-      {#each NAV as n (n.id)}
-        {#if n.divider}<hr />{/if}
-        <button class="item" class:active={tab === n.id} style:--c={n.color ?? 'var(--accent)'} aria-current={tab === n.id ? 'page' : undefined} onclick={() => (tab = n.id)}>
-          <span class="ico"><Icon name={n.icon} size={19} />{#if n.id === 'record' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}</span>
+      {#each RAIL as n (n.id)}
+        {@const active = n.id === 'mixer' ? inMixer : tab === n.id}
+        <button class="item" class:active aria-current={active ? 'page' : undefined} onclick={() => (tab = n.id)}>
+          <span class="ico"><Icon name={n.icon} size={20} />{#if n.id === 'studio' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}</span>
           <span class="lbl">{n.label}</span>
         </button>
       {/each}
@@ -213,10 +224,21 @@
 
   <div class="shell">
     <header class="top">
-      <div class="title">
-        <h1>{current.title}</h1>
-        <p class="muted">{subtitle}</p>
-      </div>
+      {#if inMixer}
+        <nav class="tabs" aria-label="Channels">
+          {#each CHANNEL_TABS as t (t.id)}
+            <button class="tab" class:active={tab === t.id} style:--c={t.color ?? 'var(--accent)'} aria-current={tab === t.id ? 'page' : undefined} onclick={() => (tab = t.id)}>
+              <Icon name={t.icon} size={16} />
+              <span>{t.label}</span>
+            </button>
+          {/each}
+        </nav>
+      {:else}
+        <div class="title">
+          <h1>{current.title}</h1>
+          <p class="muted">{subtitle}</p>
+        </div>
+      {/if}
 
       <div class="spacer"></div>
 
@@ -271,7 +293,7 @@
             {#if engine.lastError}<p class="chip bad err">{engine.lastError}</p>{/if}
           </div>
         </div>
-      {:else if !engine.channelMode && tab !== 'record' && tab !== 'hardware' && tab !== 'system'}
+      {:else if !engine.channelMode && tab !== 'studio' && tab !== 'hardware' && tab !== 'system'}
         <div class="connect panel pad" role="status">
           <span class="warn-ico"><Icon name="alert" size={26} /></span>
           <div>
@@ -293,8 +315,8 @@
         {#key currentChannel.key}
           <div class="scroll"><ChannelPage ch={currentChannel} onsetup={() => (tab = 'system')} /></div>
         {/key}
-      {:else if tab === 'record'}
-        <div class="scroll"><Recorder /></div>
+      {:else if tab === 'studio'}
+        <div class="fill"><Studio /></div>
       {:else if tab === 'hardware'}
         <div class="scroll"><Hardware /></div>
       {:else}
@@ -373,12 +395,6 @@
     scrollbar-width: none;
   }
 
-  .items hr {
-    width: 28px;
-    margin: 6px auto;
-    border: 0;
-    border-top: 1px solid var(--line-2);
-  }
 
   .item {
     display: flex;
@@ -498,6 +514,54 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--bg-0);
+    border: 1px solid var(--line);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tab {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 16px 0 13px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .tab :global(svg) {
+    color: var(--c);
+    opacity: 0.75;
+  }
+
+  .tab:hover {
+    color: var(--text);
+    background: var(--bg-2);
+  }
+
+  .tab.active {
+    color: var(--text);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--c) 24%, var(--bg-3)), color-mix(in oklab, var(--c) 12%, var(--bg-2)));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--c) 40%, transparent), 0 6px 18px -8px var(--c);
+  }
+
+  .tab.active :global(svg) {
+    opacity: 1;
   }
 
 
@@ -622,6 +686,12 @@
     height: 100%;
     overflow-y: auto;
     padding-right: 6px;
+  }
+
+  .fill {
+    height: 100%;
+    min-height: 0;
+    animation: view-in 0.24s var(--ease) both;
   }
 
   .stack {

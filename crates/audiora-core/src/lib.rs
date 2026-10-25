@@ -12,6 +12,6 @@ pub mod ring;
 
 pub use atomic::AtomicF32;
 pub use drift::{DriftResampler, FillReport};
-pub use mixer::{Mixer, MAX_BLOCK_FRAMES};
+pub use mixer::{Mixer, MAX_BLOCK_FRAMES, POST_TAP_FRAMES};
 pub use params::{BusParams, EqBandParams, MixerParams, StripParams, EQ_BANDS};
 pub use paths::ParamError;

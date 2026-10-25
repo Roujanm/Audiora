@@ -20,7 +20,8 @@ pub const MAX_REC_SOURCES: usize = 8;
 
 /// Names of everything the engine can record. Source index = position in the
 /// array the audio thread passes to [`AudioTap::push`]: all strips (raw,
-/// pre-fader), then all buses (post-mixer).
+/// pre-fader), then all buses (post-mixer), then every strip after its chain
+/// and fader (`post/N`, the processed "clean" signal).
 #[derive(Clone, Debug)]
 pub struct Layout {
     names: Vec<(String, usize)>,
@@ -34,6 +35,9 @@ impl Layout {
         }
         for b in 0..n_buses {
             names.push((format!("bus/{b}"), n_strips + b));
+        }
+        for i in 0..n_strips {
+            names.push((format!("post/{i}"), n_strips + n_buses + i));
         }
         // Friendly aliases kept from the first API version.
         if n_inputs > 0 {
@@ -150,7 +154,22 @@ impl RecController {
         &self.layout
     }
 
+    /// Frames written to the active take so far.
+    pub fn frames(&self) -> u64 {
+        self.active
+            .lock()
+            .ok()
+            .and_then(|a| a.as_ref().map(|a| a.session.status().frames_written.load(Ordering::Relaxed)))
+            .unwrap_or(0)
+    }
+
     pub fn start(&self, requested: &[String]) -> Result<Value, String> {
+        self.start_at(requested, None)
+    }
+
+    /// Like [`start`](Self::start), writing to `path` (a Studio project's take) instead of a
+    /// time-stamped file in the recordings folder.
+    pub fn start_at(&self, requested: &[String], path: Option<PathBuf>) -> Result<Value, String> {
         let mut active = self.active.lock().unwrap();
         if active.is_some() {
             return Err("already recording".into());
@@ -171,14 +190,20 @@ impl RecController {
             idx[i] = pos;
         }
 
-        std::fs::create_dir_all(&self.dir).map_err(|e| format!("recording folder: {e}"))?;
-        let stamp = chrono::Local::now().format("take-%Y%m%d-%H%M%S");
-        let mut path = self.dir.join(format!("{stamp}.wav"));
-        let mut n = 2;
-        while path.exists() {
-            path = self.dir.join(format!("{stamp}-{n}.wav"));
-            n += 1;
-        }
+        let path = match path {
+            Some(p) => p,
+            None => {
+                std::fs::create_dir_all(&self.dir).map_err(|e| format!("recording folder: {e}"))?;
+                let stamp = chrono::Local::now().format("take-%Y%m%d-%H%M%S");
+                let mut path = self.dir.join(format!("{stamp}.wav"));
+                let mut n = 2;
+                while path.exists() {
+                    path = self.dir.join(format!("{stamp}-{n}.wav"));
+                    n += 1;
+                }
+                path
+            }
+        };
 
         let channels = (names.len() * 2) as u16;
         let (session, prod) = RecordSession::start(&path, self.sample_rate, channels, 4.0)
@@ -269,7 +294,7 @@ impl RecController {
 }
 
 /// (channels, sample rate, header length) of a WAV written by `audiora-rec`.
-fn wav_info(path: &std::path::Path) -> Option<(u16, u32, u64)> {
+pub fn wav_info(path: &std::path::Path) -> Option<(u16, u32, u64)> {
     use std::io::Read;
     let mut head = [0u8; 64];
     std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;

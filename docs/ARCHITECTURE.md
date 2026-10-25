@@ -114,7 +114,8 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   extensible format for 3+ channels, RF64 beyond 4 GB, header re-patched every second so a crash
   keeps everything but the last second. Not yet: punch-in/out, take management, input monitoring.
 - **Presets**: one JSON file per preset, atomic writes, name validation (no path traversal); the last
-  session is restored on start. **Channel presets** store only the sound-shaping settings of one
+  session is restored on start and autosaved within two seconds of any change (a crash or forced
+  close loses nothing). **Channel presets** store only the sound-shaping settings of one
   channel (EQ, boost, Smart Volume, noise suppression, gate, compressor — never fader, mute or
   routing): built-in sets per channel plus the user's own, with favourites. **Game profiles** name a
   preset per program and channel; the engine applies it the moment that program starts making sound.
@@ -141,6 +142,12 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   interface. Ships a labelled simulator; the real USB protocol is pending.
 - **Licence** (`audiora-license`): offline Ed25519-signed files, optional lock to an R Interface
   serial; vendor tool issues them. Edition gating is a product decision not yet made.
+- **Studio** (`audiora-svc/studio.rs`): multitrack projects in `Music\Audiora\Studio\<name>`. Tracks
+  record any source — a channel's processed signal (`post/N`, e.g. the cleaned microphone), its raw
+  input, or the master — into takes (one WAV, one stereo lane per armed track); tracks hold
+  non-destructive clips (take, lane, start, offset, length). Playback mixes clips on a helper thread
+  into a lock-free ring the audio thread adds to the master; recording plays the other tracks so
+  parts can be overdubbed; waveform overviews are cached per take; export renders the mix to WAV.
 - **Not built (needs the driver):** virtual *input* devices, so the processed microphone appears as a
   microphone by itself (today it leaves through a user-chosen cable).
 - **Not built (large):** VST3 / CLAP hosting in a sandbox process.
@@ -176,6 +183,10 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   (Quiet/Balanced/Loud), compressor as a single *amount*, "hear yourself" (Mic) — followed by the
   apps in the channel with their own volumes and per-game profiles. Expert gate/compressor controls
   with transfer-curve graphs sit behind an *Advanced* disclosure.
+  The channel pages are tabs in the header (Overview, Game, Chat, Media, Aux, Mic); the rail holds the
+  areas: Mixer, **Studio** (track headers with arm/mute/solo/source/volume and live level, a canvas
+  timeline with ruler, playhead, waveforms and a growing live region while recording, transport with
+  keyboard shortcuts, split/move/delete clips, export), Interface and Setup.
   **Setup** assigns the virtual outputs, speakers, microphone and processed-microphone output, and
   shows audio health. The recorder and the audio-interface panel complete the rail.
   Layouts adapt down to the 980 x 620 minimum window.

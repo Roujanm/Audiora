@@ -17,6 +17,7 @@ mod engine;
 mod presets;
 mod rec;
 mod server;
+mod studio;
 
 use std::process::ExitCode;
 use std::sync::atomic::Ordering;
@@ -210,9 +211,35 @@ fn main() -> ExitCode {
     });
     let watcher = channel_state.as_ref().map(|c| c.watch(stop.clone()));
 
+    // Autosave: every change is on disk within two seconds, so a crash, a forced close or an update
+    // never loses settings (the clean-exit save below is just the final word).
+    let autosave = {
+        let (presets, params, stop) = (presets.clone(), engine.params.clone(), stop.clone());
+        std::thread::spawn(move || {
+            let mut saved = params.settings();
+            while !stop.load(Ordering::Relaxed) {
+                for _ in 0..20 {
+                    if stop.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                let now = params.settings();
+                if now != saved {
+                    match presets.save(last, &params) {
+                        Ok(_) => saved = now,
+                        Err(e) => eprintln!("autosave failed: {e}"),
+                    }
+                }
+            }
+        })
+    };
+
     let sim_r = args.iter().any(|a| a == "--sim-r") || (channel_mode && channels::Config::load(&data_dir).sim_r);
+    let studio = Arc::new(studio::Studio::new(studio::default_root(), engine.rec.clone(), engine.playback.clone()));
     let api = Arc::new(Api {
         mic_test: Some(engine.mic_test.clone()),
+        studio: Some(studio.clone()),
         channels: channel_state.clone(),
         params: engine.params.clone(),
         stats: engine.stats.clone(),
@@ -266,6 +293,9 @@ fn main() -> ExitCode {
     if let Some(w) = watcher {
         let _ = w.join();
     }
+    let _ = autosave.join();
+    // finish a Studio take before the engine closes its recorder
+    let _ = studio.stop();
     match presets.save(last, &engine.params) {
         Ok(n) => println!("session saved ({n} settings)"),
         Err(e) => eprintln!("could not save session: {e}"),

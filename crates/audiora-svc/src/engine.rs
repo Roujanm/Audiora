@@ -120,6 +120,7 @@ pub struct Engine {
     /// Adds and removes per-application captures while the engine runs.
     pub tapper: AppTapper,
     pub mic_test: Arc<MicTest>,
+    pub playback: Arc<Playback>,
     stop: Arc<AtomicBool>,
     threads: Vec<JoinHandle<()>>,
 }
@@ -162,6 +163,18 @@ impl MicTest {
     pub fn stop(&self) {
         self.cmd.store(3, Ordering::Release);
     }
+}
+
+/// Studio playback: a producer (the Studio player thread) fills a stereo ring at the master rate,
+/// the audio thread adds it to the master after the mixer.
+pub struct Playback {
+    /// Taken by whoever plays; returned when done.
+    pub producer: Mutex<Option<ring::Producer>>,
+    /// Set to drop everything queued (seek, stop); the audio thread clears it.
+    pub flush: AtomicBool,
+    /// Frames the audio thread has played so far (the playhead advances with this).
+    pub frames: AtomicU64,
+    pub sample_rate: AtomicU64,
 }
 
 /// Most applications captured at once; more are refused rather than allocating on the audio thread.
@@ -347,6 +360,13 @@ impl Engine {
         // Application taps reach the audio thread through a bounded channel (no allocation there).
         let (tap_tx, tap_rx) = mpsc::sync_channel::<AppTap>(MAX_APP_TAPS);
         let mic_test = Arc::new(MicTest::default());
+        let (play_prod, play_cons) = ring::ring(RING_SAMPLES * 2);
+        let playback = Arc::new(Playback {
+            producer: Mutex::new(Some(play_prod)),
+            flush: AtomicBool::new(false),
+            frames: AtomicU64::new(0),
+            sample_rate: AtomicU64::new(0),
+        });
         mic_test.strip.store(cfg.mic_strip.unwrap_or(usize::MAX), Ordering::Relaxed);
 
         // Master render thread: opens the master device and runs the mixer.
@@ -366,6 +386,8 @@ impl Engine {
                 analysis: analysis.clone(),
                 taps: tap_rx,
                 mic_test: mic_test.clone(),
+                playback: playback.clone(),
+                play_cons,
             };
             let (stop2, stats2, slot2) = (stop.clone(), stats.clone(), slot.clone());
             threads.push(std::thread::spawn(move || master_thread(args, stop2, stats2, slot2, tx)));
@@ -410,7 +432,8 @@ impl Engine {
         let rec = Arc::new(RecController::new(slot, master_fmt.sample_rate, rec_dir, layout));
 
         let tapper = AppTapper { tx: tap_tx, master: master_fmt, stats: stats.clone(), open: Arc::default() };
-        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, tapper, mic_test, stop, threads })
+        playback.sample_rate.store(master_fmt.sample_rate as u64, Ordering::Relaxed);
+        Ok(Engine { params, stats, info: EngineInfo { strips, buses }, rec, analysis, tapper, mic_test, playback, stop, threads })
     }
 
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
@@ -487,6 +510,8 @@ struct MasterArgs {
     analysis: Arc<Analysis>,
     taps: mpsc::Receiver<AppTap>,
     mic_test: Arc<MicTest>,
+    playback: Arc<Playback>,
+    play_cons: ring::Consumer,
 }
 
 fn master_thread(
@@ -533,13 +558,16 @@ fn master_thread(
     let ch = fmt.channels as usize;
     let tone_step = a.tone_hz.map(|hz| TAU * hz / fmt.sample_rate as f32);
     let mut phase = 0f32;
-    let mut tap = AudioTap::new(slot, cap / 2, n_strips + a.n_buses);
+    let mut tap = AudioTap::new(slot, cap / 2, 2 * n_strips + a.n_buses);
     let (mut analysis_tap, analysis_thread) =
         analysis::spawn(a.analysis.clone(), fmt.sample_rate as f32, cap / 2, stop.clone());
     let mut taps: Vec<AppTap> = Vec::with_capacity(MAX_APP_TAPS);
     let mt = a.mic_test.clone();
     mt.rate.store(fmt.sample_rate as usize, Ordering::Relaxed);
     let mut mic_buf = vec![0f32; MIC_TEST_MAX_SECS * fmt.sample_rate as usize * 2];
+    let silence = vec![0f32; cap];
+    let mut play_buf = vec![0f32; cap];
+    let pb = a.playback.clone();
     let mut tap_buf = vec![0f32; cap];
     // finished taps are freed on this helper thread, never on the audio thread
     let (reaper_tx, reaper_rx) = mpsc::sync_channel::<AppTap>(MAX_APP_TAPS);
@@ -605,13 +633,11 @@ fn master_thread(
             1 => {
                 let strip = mt.strip.load(Ordering::Relaxed);
                 if strip < n_strips {
-                    mixer.set_post_tap(Some(strip));
                     mt.pos.store(0, Ordering::Relaxed);
                     mt.state.store(1, Ordering::Relaxed);
                 }
             }
             2 if mt.len.load(Ordering::Relaxed) > 0 => {
-                mixer.set_post_tap(None);
                 mt.pos.store(0, Ordering::Relaxed);
                 mt.state.store(2, Ordering::Relaxed);
             }
@@ -619,7 +645,6 @@ fn master_thread(
                 if mt.state.load(Ordering::Relaxed) == 1 {
                     mt.len.store(mt.pos.load(Ordering::Relaxed), Ordering::Relaxed);
                 }
-                mixer.set_post_tap(None);
                 mt.state.store(0, Ordering::Relaxed);
             }
             _ => {}
@@ -634,7 +659,7 @@ fn master_thread(
 
         match mt.state.load(Ordering::Relaxed) {
             1 => {
-                let tap = mixer.post_tap();
+                let tap = mixer.post(mt.strip.load(Ordering::Relaxed));
                 let pos = mt.pos.load(Ordering::Relaxed);
                 let limit = mt.limit.load(Ordering::Relaxed).min(mic_buf.len() / 2);
                 let take = (tap.len() / 2).min(limit.saturating_sub(pos));
@@ -642,7 +667,6 @@ fn master_thread(
                 mt.pos.store(pos + take, Ordering::Relaxed);
                 if pos + take >= limit {
                     mt.len.store(pos + take, Ordering::Relaxed);
-                    mixer.set_post_tap(None);
                     mt.state.store(0, Ordering::Relaxed);
                 }
             }
@@ -661,14 +685,31 @@ fn master_thread(
             _ => {}
         }
 
+        // Studio playback joins the master after the mixer
+        if pb.flush.swap(false, Ordering::Acquire) {
+            while a.play_cons.pop_slice(&mut play_buf[..]) > 0 {}
+        }
+        let got = a.play_cons.pop_slice(&mut play_buf[..n]);
+        if got > 0 {
+            for (o, v) in bus_bufs[0][..got].iter_mut().zip(&play_buf[..got]) {
+                *o += *v;
+            }
+            pb.frames.fetch_add((got / 2) as u64, Ordering::Relaxed);
+        }
+
         for (prod, bus) in a.extra_prods.iter_mut().zip(&bus_bufs[1..]) {
             if prod.push_slice(&bus[..n]) < n {
                 stats.capture_drops.fetch_add(1, Ordering::Relaxed);
             }
         }
 
-        let sources: ArrayVec<&[f32], { MAX_STRIPS + MAX_BUSES }> =
+        // recordable sources: raw strips, buses, then every strip's finished signal (Layout order)
+        let mut sources: ArrayVec<&[f32], { 2 * MAX_STRIPS + MAX_BUSES }> =
             in_bufs.iter().chain(bus_bufs.iter()).map(|b| &b[..n]).collect();
+        for i in 0..n_strips {
+            let p = mixer.post(i);
+            sources.push(if p.len() >= n { &p[..n] } else { &silence[..n] });
+        }
         tap.push(frames, &sources);
         analysis_tap.push(&sources, &bus_bufs[0][..n]);
 

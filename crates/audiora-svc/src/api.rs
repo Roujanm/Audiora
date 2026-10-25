@@ -23,6 +23,7 @@ use serde_json::{json, Map, Value};
 
 use crate::analysis::{Analysis, SPECTRUM_OFF};
 use crate::engine::{MicTest, Stats};
+use crate::studio::Studio;
 use crate::channels::{channel_index, Channels};
 use crate::presets::{PresetStore, LAST, LAST_CHANNELS};
 use crate::rec::{self, RecController};
@@ -47,6 +48,8 @@ pub struct Api {
     pub channels: Option<Arc<Channels>>,
     /// Record-and-listen-back check of the processed microphone.
     pub mic_test: Option<Arc<MicTest>>,
+    /// Multitrack projects.
+    pub studio: Option<Arc<Studio>>,
 }
 
 impl Api {
@@ -74,6 +77,23 @@ impl Api {
             "apps" => self.apps(),
             "channels" => self.channels_cmd(),
             "mic_test" => self.mic_test_cmd(&req),
+            "studio_list" => self.st().map(|s| s.list()),
+            "studio_load" => self.st().and_then(|s| s.load(str_arg(&req, "name")?)),
+            "studio_save" => self.st().and_then(|s| s.save(str_arg(&req, "name")?, &req["project"])),
+            "studio_play" => self.st().and_then(|s| s.play(str_arg(&req, "name")?, req["start"].as_u64().unwrap_or(0), &[])),
+            "studio_record" => self.st().and_then(|s| {
+                let tracks: Vec<(String, String)> = req["tracks"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|t| Some((t["id"].as_str()?.to_owned(), t["source"].as_str()?.to_owned())))
+                    .collect();
+                s.record(str_arg(&req, "name")?, &tracks, req["start"].as_u64().unwrap_or(0))
+            }),
+            "studio_stop" => self.st().and_then(|s| s.stop()),
+            "studio_status" => self.st().map(|s| s.status()),
+            "studio_peaks" => self.st().and_then(|s| s.peaks(str_arg(&req, "name")?, str_arg(&req, "take")?)),
+            "studio_export" => self.st().and_then(|s| s.export(str_arg(&req, "name")?)),
             "mic_test_status" => self.mic_test.as_ref().map(|m| Self::mic_test_json(m)).ok_or_else(|| "no microphone check in this layout".to_string()),
             "config_set" => self.ch().and_then(|c| c.config_set(&req)),
             "routes" => self.ch().map(|c| c.routes_json()),
@@ -251,6 +271,10 @@ impl Api {
         Ok(Self::mic_test_json(m))
     }
 
+    fn st(&self) -> Result<&Arc<Studio>, String> {
+        self.studio.as_ref().ok_or_else(|| "the studio is not available".to_string())
+    }
+
     fn ch(&self) -> Result<&Arc<Channels>, String> {
         self.channels.as_ref().ok_or_else(|| "this engine runs in the flat layout (no channels)".to_string())
     }
@@ -417,6 +441,10 @@ impl Api {
     }
 }
 
+fn str_arg<'a>(req: &'a Value, name: &str) -> Result<&'a str, String> {
+    req.get(name).and_then(Value::as_str).ok_or_else(|| format!("missing \"{name}\""))
+}
+
 fn as_number(v: &Value) -> Option<f64> {
     match v {
         Value::Bool(b) => Some(*b as u8 as f64),
@@ -440,7 +468,7 @@ mod tests {
         let analysis = Arc::new(Analysis::default());
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
         let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
-        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}), channels: None, mic_test: None }
+        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}), channels: None, mic_test: None, studio: None }
     }
 
     fn call(a: &Api, line: &str) -> Value {

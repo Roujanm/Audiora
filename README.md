@@ -17,6 +17,9 @@ Proprietary — all rights reserved.
   Audiora mixes it (per-app output routing + loopback, live, no driver of ours). Per-channel presets
   with favourites, per-game profiles that load by themselves when the game starts, per-program
   volumes, Smart Volume, ClearCast noise cancellation, gate, compressor. Works without any driver or cable — see below.
+* **Studio**: multitrack recorder wired to the whole system — record the processed microphone,
+  any channel or the master on separate tracks, overdub over earlier tracks, see waveforms, split and
+  move clips, mute/solo/volume per track, export the mix. Everything autosaves.
 * **App** (`app/`): Svelte 5 + Tauri 2 with a hardware-style interface (knobs, machined faders, LED
   meters, five accent colours): the channel mixer with Master and the app list at the left, one page
   per channel, recorder with takes list, interface panel, Setup. Live meters at 30 Hz, master LUFS
