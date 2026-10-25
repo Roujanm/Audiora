@@ -4,18 +4,26 @@
 
 mod format;
 #[cfg(windows)]
+mod policy;
+#[cfg(windows)]
 mod proc_loopback;
+#[cfg(windows)]
+mod process;
 #[cfg(windows)]
 mod sessions;
 #[cfg(windows)]
 mod wasapi;
 
 #[cfg(windows)]
+pub use policy::{get_app_output, set_app_output};
+#[cfg(windows)]
 pub use proc_loopback::ProcessCapture;
+#[cfg(windows)]
+pub use process::running_process_names;
 #[cfg(windows)]
 pub use sessions::{list_sessions, set_session, AppSession};
 #[cfg(windows)]
-pub use wasapi::{default_device_id, list_devices, CaptureStream, RenderStream};
+pub use wasapi::{dump_properties, default_device_id, list_devices, CaptureStream, RenderStream};
 
 pub use format::SampleFormat;
 

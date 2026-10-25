@@ -7,7 +7,7 @@ use std::f32::consts::TAU;
 use std::process::ExitCode;
 
 use audiora_core::{Mixer, MAX_BLOCK_FRAMES};
-use audiora_hal::{list_devices, list_sessions, set_session, Flow, Mode, ProcessCapture, RenderStream};
+use audiora_hal::{get_app_output, set_app_output, CaptureStream, list_devices, list_sessions, set_session, Flow, Mode, ProcessCapture, RenderStream};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -15,6 +15,9 @@ fn main() -> ExitCode {
         Some("devices") => devices(),
         Some("tone") => tone(&args[1..]),
         Some("proccap") => proccap(&args[1..]),
+        Some("route") => route(&args[1..]),
+        Some("props") => props(&args[1..]),
+        Some("loopcap") => loopcap(&args[1..]),
         _ => {
             eprintln!("usage: audiora devices | tone [--device ID] [--freq HZ] [--secs S] [--gain DB] [--bass DB]");
             return ExitCode::from(2);
@@ -123,5 +126,76 @@ fn proccap(args: &[String]) -> Res {
         let _ = set_session(&s.device_id, &s.instance_id, Some(s.volume), Some(false));
     }
     result?;
+    Ok(())
+}
+
+fn find_render(name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let n = name.to_lowercase();
+    list_devices()?
+        .into_iter()
+        .find(|d| d.flow == Flow::Render && d.name.to_lowercase().contains(&n))
+        .map(|d| d.id)
+        .ok_or_else(|| format!("no output device matching '{name}'").into())
+}
+
+/// `route PID DEVICE-NAME-PART | default | get` — per-app output device.
+fn route(args: &[String]) -> Res {
+    let pid: u32 = args.first().and_then(|a| a.parse().ok()).ok_or("usage: route PID NAME|default|get")?;
+    match args.get(1).map(String::as_str) {
+        Some("get") | None => println!("pid {pid} -> {:?}", get_app_output(pid)?),
+        Some("default") => {
+            set_app_output(pid, None)?;
+            println!("pid {pid} -> system default");
+        }
+        Some(name) => {
+            let id = find_render(name)?;
+            set_app_output(pid, Some(&id))?;
+            println!("pid {pid} -> {id}; reads back {:?}", get_app_output(pid)?);
+        }
+    }
+    Ok(())
+}
+
+/// `loopcap DEVICE-NAME-PART [--secs S]` — peak of what a render device is playing.
+fn loopcap(args: &[String]) -> Res {
+    use std::cell::Cell;
+    let id = find_render(args.first().map(String::as_str).unwrap_or(""))?;
+    let secs: u64 = flag(args, "--secs", 5);
+    let cap = CaptureStream::open_loopback(Some(&id))?;
+    println!("{:?}", cap.format());
+    let ch = cap.format().channels as usize;
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let start = std::time::Instant::now();
+    let (peak, audio, idle, last) = (Cell::new(0f32), Cell::new(0usize), Cell::new(0usize), Cell::new(0u64));
+    let tick = || {
+        let t = start.elapsed().as_secs();
+        if t != last.get() {
+            println!("t={t}s audio_frames={} idle_frames={} peak={:.4}", audio.get(), idle.get(), peak.get());
+            peak.set(0.0);
+            last.set(t);
+            if t >= secs {
+                stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    };
+    cap.run_until_idle(
+        &stop,
+        |buf, n| {
+            audio.set(audio.get() + n);
+            peak.set(buf.chunks_exact(ch).fold(peak.get(), |m, f| m.max(f[0].abs())));
+            tick();
+        },
+        Some(|n: usize| {
+            idle.set(idle.get() + n);
+            tick();
+        }),
+    )?;
+    Ok(())
+}
+
+fn props(args: &[String]) -> Res {
+    for (k, v) in audiora_hal::dump_properties(&find_render(args.first().map(String::as_str).unwrap_or(""))?)? {
+        println!("{k} = {v}");
+    }
     Ok(())
 }

@@ -32,8 +32,9 @@ enum Target<'a> {
     Meter(&'a AtomicF32),
 }
 
-const STRIP_LEAVES: [&str; 7 + 1] =
-    ["gain_db", "balance", "mute", "solo", "bus_mask", "peak_l", "peak_r", "denoise"];
+const STRIP_LEAVES: [&str; 9] =
+    ["gain_db", "balance", "mute", "solo", "bus_mask", "peak_l", "peak_r", "denoise", "boost_db"];
+const SMART_LEAVES: [&str; 3] = ["enabled", "target_db", "gain_db"];
 const GATE_LEAVES: [&str; 6] =
     ["enabled", "threshold_db", "attack_ms", "release_ms", "range_db", "open"];
 const COMP_LEAVES: [&str; 8] =
@@ -57,6 +58,13 @@ impl MixerParams {
                     ["solo"] => Ok(Target::Flag(&s.solo)),
                     ["bus_mask"] => Ok(Target::Mask(&s.bus_mask)),
                     ["denoise"] => Ok(Target::Flag(&s.denoise)),
+                    ["boost_db"] => Ok(Target::Float(&s.boost_db, 0.0, 12.0)),
+                    ["smart", name] => match *name {
+                        "enabled" => Ok(Target::Flag(&s.smart.enabled)),
+                        "target_db" => Ok(Target::Float(&s.smart.target_db, -40.0, -10.0)),
+                        "gain_db" => Ok(Target::Meter(&s.smart.gain_db)),
+                        _ => Err(UnknownPath),
+                    },
                     ["peak_l"] => Ok(Target::Meter(&s.peak_l)),
                     ["peak_r"] => Ok(Target::Meter(&s.peak_r)),
                     ["eq", b, name] => {
@@ -154,6 +162,9 @@ impl MixerParams {
                     paths.push(format!("strip/{i}/eq/{b}/{n}"));
                 }
             }
+            for n in SMART_LEAVES {
+                paths.push(format!("strip/{i}/smart/{n}"));
+            }
             for n in COMP_LEAVES {
                 paths.push(format!("strip/{i}/comp/{n}"));
             }
@@ -210,11 +221,11 @@ mod tests {
     fn every_listed_path_resolves() {
         let p = MixerParams::new(3, 2);
         let paths = p.paths();
-        assert_eq!(paths.len(), 3 * (8 + 6 + 12 + 8) + 2 * (4 + 4));
+        assert_eq!(paths.len(), 3 * (9 + 6 + 18 + 3 + 8) + 2 * (4 + 4));
         for path in &paths {
             assert!(p.get(path).is_ok(), "{path}");
         }
-        assert!(paths.iter().any(|k| k == "strip/1/eq/3/q"));
+        assert!(paths.iter().any(|k| k == "strip/1/eq/5/q"));
     }
 
     #[test]

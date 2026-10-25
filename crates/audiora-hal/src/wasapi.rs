@@ -9,7 +9,7 @@ use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOU
 use windows::Win32::Media::Audio::{
     eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IAudioClient3, IAudioRenderClient, IMMDevice,
     IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_EXCLUSIVE,
-    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, DEVICE_STATE_ACTIVE, WAVEFORMATEX,
+    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, WAVEFORMATEX,
     WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
@@ -26,7 +26,7 @@ use crate::{DeviceInfo, Flow, HalError, Mode, Result, SampleFormat, StreamFormat
 
 const WAVE_FORMAT_IEEE_FLOAT: u16 = 3;
 
-fn init_com() {
+pub(crate) fn init_com() {
     // Ignore the result: S_FALSE / RPC_E_CHANGED_MODE just mean COM is already up.
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -165,11 +165,21 @@ fn open_device(flow: Flow, id: Option<&str>) -> Result<IMMDevice> {
 }
 
 fn open_stream(flow: Flow, id: Option<&str>, mode: Mode) -> Result<Shared> {
+    open_stream_inner(flow, id, mode, false)
+}
+
+/// `loopback` taps what a render device is playing; it needs shared mode and the default period.
+fn open_stream_inner(flow: Flow, id: Option<&str>, mode: Mode, loopback: bool) -> Result<Shared> {
     let dev = open_device(flow, id)?;
-    if mode == Mode::Exclusive {
+    if mode == Mode::Exclusive && !loopback {
         return open_exclusive(&dev);
     }
-    let low_latency = mode == Mode::LowLatency;
+    let low_latency = mode == Mode::LowLatency && !loopback;
+    let flags = if loopback {
+        AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_LOOPBACK
+    } else {
+        AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+    };
     let client: IAudioClient = unsafe { dev.Activate(CLSCTX_ALL, None) }
         .map_err(|e| HalError(format!("activate: {e}")))?;
     let (fmt, is_float) = mix_format(&client).map_err(|e| HalError(format!("mix format: {e}")))?;
@@ -204,7 +214,7 @@ fn open_stream(flow: Flow, id: Option<&str>, mode: Mode) -> Result<Shared> {
         if !achieved_low {
             init = client.Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                flags,
                 0,
                 0,
                 ptr,
@@ -358,7 +368,11 @@ fn open_exclusive(dev: &IMMDevice) -> Result<Shared> {
 
 /// Waits up to 100 ms (keeps stop requests responsive); a timeout is not an error.
 fn wait_event(event: HANDLE) -> Result<bool> {
-    match unsafe { WaitForSingleObject(event, 100) } {
+    wait_event_ms(event, 100)
+}
+
+fn wait_event_ms(event: HANDLE, ms: u32) -> Result<bool> {
+    match unsafe { WaitForSingleObject(event, ms) } {
         r if r == WAIT_OBJECT_0 => Ok(true),
         r if r == WAIT_TIMEOUT => Ok(false),
         _ => Err(HalError("wait on device event failed".into())),
@@ -461,6 +475,13 @@ impl CaptureStream {
         Ok(Self { s, capture })
     }
 
+    /// Taps what the render device `device_id` is playing (`None` = default output).
+    pub fn open_loopback(device_id: Option<&str>) -> Result<Self> {
+        let s = open_stream_inner(Flow::Render, device_id, Mode::Shared, true)?;
+        let capture: IAudioCaptureClient = unsafe { s.client.GetService()? };
+        Ok(Self { s, capture })
+    }
+
     pub fn format(&self) -> StreamFormat {
         self.s.format
     }
@@ -470,8 +491,23 @@ impl CaptureStream {
     pub fn run_until(
         &self,
         stop: &AtomicBool,
-        mut on_audio: impl FnMut(&[f32], usize),
+        on_audio: impl FnMut(&[f32], usize),
     ) -> Result<()> {
+        self.run_until_idle(stop, on_audio, None::<fn(usize)>)
+    }
+
+    /// Like [`run_until`](Self::run_until), but wakes every 10 ms and reports the frames of wall
+    /// time that passed without a packet to `on_idle` — a loopback tap delivers nothing while
+    /// its device is idle, and the graph needs a steady stream of (silent) samples.
+    pub fn run_until_idle(
+        &self,
+        stop: &AtomicBool,
+        mut on_audio: impl FnMut(&[f32], usize),
+        mut on_idle: Option<impl FnMut(usize)>,
+    ) -> Result<()> {
+        let rate = self.s.format.sample_rate as f64;
+        let wait_ms = if on_idle.is_some() { 10 } else { 100 };
+        let mut last = std::time::Instant::now();
         let ch = self.s.format.channels as usize;
         let sample = self.s.sample;
         let exclusive = self.s.format.exclusive;
@@ -482,9 +518,18 @@ impl CaptureStream {
             self.s.client.Start()?;
             let result = (|| -> Result<()> {
                 while !stop.load(Ordering::Relaxed) {
-                    if !wait_event(self.s.event)? {
+                    if !wait_event_ms(self.s.event, wait_ms)? {
+                        if let Some(idle) = on_idle.as_mut() {
+                            let now = std::time::Instant::now();
+                            let frames = (now.duration_since(last).as_secs_f64() * rate) as usize;
+                            if frames > 0 {
+                                last = now;
+                                idle(frames.min(4800));
+                            }
+                        }
                         continue;
                     }
+                    last = std::time::Instant::now();
                     loop {
                         // Exclusive event-driven capture hands over exactly one buffer per
                         // event, and GetNextPacketSize is not meaningful there: reading until
@@ -526,4 +571,22 @@ impl CaptureStream {
             result
         }
     }
+}
+
+/// Debug helper: every string property of a device's property store.
+pub fn dump_properties(device_id: &str) -> Result<Vec<(String, String)>> {
+    use windows::Win32::Foundation::PROPERTYKEY;
+    let dev = open_device(Flow::Render, Some(device_id))?;
+    let mut out = Vec::new();
+    unsafe {
+        let store = dev.OpenPropertyStore(STGM_READ)?;
+        for i in 0..store.GetCount()? {
+            let mut key = PROPERTYKEY::default();
+            store.GetAt(i, &mut key)?;
+            if let Ok(v) = store.GetValue(&key) {
+                out.push((format!("{:?},{}", key.fmtid, key.pid), v.to_string()));
+            }
+        }
+    }
+    Ok(out)
 }

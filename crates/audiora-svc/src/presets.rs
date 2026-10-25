@@ -9,6 +9,12 @@ use serde_json::{json, Map, Value};
 
 /// Name used for the automatic save on exit; hidden from `list`.
 pub const LAST: &str = "_last";
+/// Same for the channel layout (Game/Chat/Media/Aux/Mic), whose strip numbers mean something else.
+pub const LAST_CHANNELS: &str = "_last_ch";
+
+fn reserved(name: &str) -> bool {
+    name == LAST || name == LAST_CHANNELS
+}
 
 pub struct PresetStore {
     dir: PathBuf,
@@ -33,7 +39,7 @@ impl PresetStore {
     }
 
     fn path(&self, name: &str) -> Result<PathBuf, String> {
-        if name != LAST && !valid_name(name) {
+        if !reserved(name) && !valid_name(name) {
             return Err("preset names may use letters, digits, space, - and _ (max 64)".into());
         }
         Ok(self.dir.join(format!("{name}.json")))
@@ -87,7 +93,7 @@ impl PresetStore {
                 let p = e.path();
                 (p.extension()? == "json").then(|| p.file_stem()?.to_str().map(str::to_owned))?
             })
-            .filter(|n| n != LAST)
+            .filter(|n| !reserved(n))
             .collect();
         names.sort_by_key(|n| n.to_lowercase());
         names

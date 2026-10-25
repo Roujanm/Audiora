@@ -11,6 +11,8 @@
 
 mod analysis;
 mod api;
+mod channels;
+mod cpresets;
 mod engine;
 mod presets;
 mod rec;
@@ -22,7 +24,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use api::Api;
-use engine::{Engine, EngineConfig, NodeInfo};
+use engine::{Engine, EngineConfig, InputSpec, NodeInfo};
+use channels::{Channels, APP_CHANNELS, CHANNELS};
 use presets::PresetStore;
 use serde_json::{json, Value};
 
@@ -39,9 +42,9 @@ fn config_from_args(args: &[String]) -> EngineConfig {
     let inputs = if args.iter().any(|a| a == "--no-input") {
         vec![]
     } else if ins.is_empty() {
-        vec![None]
+        vec![InputSpec::capture(None)]
     } else {
-        ins.into_iter().map(Some).collect()
+        ins.into_iter().map(|d| InputSpec::capture(Some(d))).collect()
     };
     let outs = args_all(args, "--out");
     EngineConfig {
@@ -49,6 +52,7 @@ fn config_from_args(args: &[String]) -> EngineConfig {
         outputs: if outs.is_empty() { vec![None] } else { outs.into_iter().map(Some).collect() },
         tone_hz: arg(args, "--tone"),
         rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
+        tolerant_inputs: false,
         mode: if args.iter().any(|a| a == "--exclusive") {
             audiora_hal::Mode::Exclusive
         } else if args.iter().any(|a| a == "--low-latency") {
@@ -57,6 +61,51 @@ fn config_from_args(args: &[String]) -> EngineConfig {
             audiora_hal::Mode::Shared
         },
     }
+}
+
+/// Channel layout: four application mixes tapped from virtual outputs, then the microphone.
+fn channel_config(args: &[String], data_dir: &std::path::Path) -> (EngineConfig, channels::Resolved) {
+    let devs = audiora_hal::list_devices().unwrap_or_default();
+    let running = audiora_hal::running_process_names();
+    let mut resolved = channels::resolve(&channels::Config::load(data_dir), &devs, &running);
+    if let Some(out) = args_all(args, "--out").into_iter().next() {
+        resolved.master_out = Some(out);
+    }
+    let mut inputs: Vec<InputSpec> = (0..APP_CHANNELS)
+        .map(|i| InputSpec {
+            device: resolved.devices[i].clone(),
+            loopback: true,
+            silent: resolved.devices[i].is_none(),
+            name: Some(CHANNELS[i].1.to_string()),
+            channel: Some(CHANNELS[i].0),
+        })
+        .collect();
+    inputs.push(InputSpec {
+        device: resolved.mic_in.clone(),
+        loopback: false,
+        silent: resolved.mic_in.is_none() || args.iter().any(|a| a == "--no-mic"),
+        name: Some("Mic".into()),
+        channel: Some("mic"),
+    });
+    let mut outputs = vec![resolved.master_out.clone()];
+    if let Some(m) = &resolved.mic_out {
+        outputs.push(Some(m.clone()));
+    }
+    let cfg = EngineConfig {
+        inputs,
+        outputs,
+        tone_hz: arg(args, "--tone"),
+        rec_dir: arg::<std::path::PathBuf>(args, "--rec-dir"),
+        tolerant_inputs: true,
+        mode: if args.iter().any(|a| a == "--exclusive") {
+            audiora_hal::Mode::Exclusive
+        } else if args.iter().any(|a| a == "--low-latency") {
+            audiora_hal::Mode::LowLatency
+        } else {
+            audiora_hal::Mode::Shared
+        },
+    };
+    (cfg, resolved)
 }
 
 fn node_json(index: usize, n: &NodeInfo) -> Value {
@@ -71,6 +120,8 @@ fn node_json(index: usize, n: &NodeInfo) -> Value {
         "low_latency": n.format.map(|f| f.low_latency),
         "exclusive": n.format.map(|f| f.exclusive),
         "bit_depth": n.format.map(|f| f.bit_depth),
+        "channel": n.channel,
+        "error": n.error,
     })
 }
 
@@ -79,7 +130,16 @@ fn main() -> ExitCode {
     let port: u16 = arg(&args, "--port").unwrap_or(7878);
     let run_for: Option<f32> = arg(&args, "--secs");
 
-    let engine = match Engine::start(config_from_args(&args)) {
+    let data_dir = arg::<std::path::PathBuf>(&args, "--data-dir").unwrap_or_else(presets::default_data_dir);
+    // Channel layout unless devices were spelled out for the flat per-device layout.
+    let channel_mode = !args.iter().any(|a| matches!(a.as_str(), "--in" | "--no-input" | "--legacy"));
+    let (cfg, resolved) = if channel_mode {
+        let (c, r) = channel_config(&args, &data_dir);
+        (c, Some(r))
+    } else {
+        (config_from_args(&args), None)
+    };
+    let engine = match Engine::start(cfg) {
         Ok(e) => e,
         Err(e) => {
             eprintln!("error: {e}");
@@ -107,16 +167,33 @@ fn main() -> ExitCode {
 
     let strips: Vec<Value> = engine.info.strips.iter().enumerate().map(|(i, n)| node_json(i, n)).collect();
     let buses: Vec<Value> = engine.info.buses.iter().enumerate().map(|(i, n)| node_json(i, n)).collect();
-    let data_dir = arg::<std::path::PathBuf>(&args, "--data-dir").unwrap_or_else(presets::default_data_dir);
     let presets = Arc::new(PresetStore::new(&data_dir));
-    if !args.iter().any(|a| a == "--fresh") && presets.exists(presets::LAST) {
-        match presets.load(presets::LAST, &engine.params) {
+    let last = if channel_mode { presets::LAST_CHANNELS } else { presets::LAST };
+    if channel_mode {
+        // Application mixes feed the speakers; the microphone goes nowhere unless an output
+        // was chosen for it (a mic sent to the headphones would echo the user's own voice).
+        for strip in &engine.params.strips[..APP_CHANNELS] {
+            strip.bus_mask.store(1, Ordering::Relaxed);
+        }
+        engine.params.strips[channels::MIC].bus_mask.store(if engine.info.buses.len() > 1 { 0b10 } else { 0 }, Ordering::Relaxed);
+    }
+    if !args.iter().any(|a| a == "--fresh") && presets.exists(last) {
+        match presets.load(last, &engine.params) {
             Ok((applied, skipped)) => println!("restored last session ({applied} settings, {skipped} skipped)"),
             Err(e) => eprintln!("could not restore last session: {e}"),
         }
     }
 
+    let channel_state = resolved.map(|r| {
+        let online: [Option<String>; APP_CHANNELS] =
+            std::array::from_fn(|i| engine.info.strips[i].format.and_then(|_| engine.info.strips[i].device_id.clone()));
+        let errors = engine.info.strips[..CHANNELS.len()].iter().map(|s| s.error.clone()).collect();
+        Arc::new(Channels::new(&data_dir, engine.params.clone(), r, online, errors))
+    });
+    let watcher = channel_state.as_ref().map(|c| c.watch(stop.clone()));
+
     let api = Arc::new(Api {
+        channels: channel_state.clone(),
         params: engine.params.clone(),
         stats: engine.stats.clone(),
         rec: engine.rec.clone(),
@@ -130,6 +207,7 @@ fn main() -> ExitCode {
         }),
         info: json!({
             "api": api::API_VERSION,
+            "channel_mode": channel_mode,
             "recordings_dir": engine.rec.dir().display().to_string(),
             "rec_sources": engine.rec.layout().list(),
             "strips": strips,
@@ -162,7 +240,13 @@ fn main() -> ExitCode {
     }
     println!("control API: tcp 127.0.0.1:{port} (JSON lines), websocket 127.0.0.1:{ws_port}");
     let result = server::serve(api.clone(), port, stop);
-    match presets.save(presets::LAST, &engine.params) {
+    if let Some(c) = &channel_state {
+        c.release_all();
+    }
+    if let Some(w) = watcher {
+        let _ = w.join();
+    }
+    match presets.save(last, &engine.params) {
         Ok(n) => println!("session saved ({n} settings)"),
         Err(e) => eprintln!("could not save session: {e}"),
     }

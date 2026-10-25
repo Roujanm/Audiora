@@ -27,7 +27,13 @@ use crate::{HalError, Result};
 pub const SAMPLE_RATE: u32 = 48_000;
 pub const CHANNELS: usize = 2;
 
-type Done = Arc<(Mutex<Option<windows::core::Result<IAudioClient>>>, Condvar)>;
+/// The client handed back by `ActivateAudioInterfaceAsync` is agile: it may be used from any thread.
+struct AgileClient(windows::core::Result<IAudioClient>);
+// SAFETY: the completion handler is registered as `IAgileObject` and the activated interface
+// is documented to be free-threaded.
+unsafe impl Send for AgileClient {}
+
+type Done = Arc<(Mutex<Option<AgileClient>>, Condvar)>;
 
 #[implement(IActivateAudioInterfaceCompletionHandler)]
 struct Handler {
@@ -45,7 +51,7 @@ impl IActivateAudioInterfaceCompletionHandler_Impl for Handler_Impl {
             unk.ok_or_else(|| windows::core::Error::from(windows::Win32::Foundation::E_POINTER))?.cast::<IAudioClient>()
         })();
         let (slot, cv) = &*self.done;
-        *slot.lock().unwrap() = Some(result);
+        *slot.lock().unwrap() = Some(AgileClient(result));
         cv.notify_all();
         Ok(())
     }
@@ -117,7 +123,7 @@ impl ProcessCapture {
                 }
                 guard = cv.wait_timeout(guard, left).unwrap().0;
             }
-            let client = guard.take().unwrap()?;
+            let client = guard.take().unwrap().0?;
             drop(guard);
 
             let fmt = WAVEFORMATEX {

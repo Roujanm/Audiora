@@ -4,6 +4,7 @@
 mod biquad;
 mod denoise;
 mod dynamics;
+mod leveler;
 mod loudness;
 mod spectrum;
 mod resample;
@@ -11,6 +12,7 @@ mod resample;
 pub use biquad::{Biquad, BiquadCoeffs, FilterKind};
 pub use denoise::{Denoiser, DENOISE_FRAME, DENOISE_SAMPLE_RATE};
 pub use dynamics::{CompSettings, Compressor, Gate, GateSettings, Limiter, LimiterSettings};
+pub use leveler::Leveler;
 pub use loudness::{LoudnessMeter, LUFS_FLOOR};
 pub use spectrum::{band_frequency, SpectrumAnalyzer, SPECTRUM_BANDS, SPECTRUM_FFT, SPECTRUM_FLOOR};
 pub use resample::LinearResampler;

@@ -23,7 +23,8 @@ use serde_json::{json, Map, Value};
 
 use crate::analysis::{Analysis, SPECTRUM_OFF};
 use crate::engine::Stats;
-use crate::presets::{PresetStore, LAST};
+use crate::channels::{channel_index, Channels};
+use crate::presets::{PresetStore, LAST, LAST_CHANNELS};
 use crate::rec::{self, RecController};
 
 pub const API_VERSION: u32 = 1;
@@ -42,6 +43,8 @@ pub struct Api {
     pub data_dir: std::path::PathBuf,
     /// Static engine description returned by `info`.
     pub info: Value,
+    /// Channel model (Game/Chat/Media/Aux/Mic); `None` in the flat device-per-strip layout.
+    pub channels: Option<Arc<Channels>>,
 }
 
 impl Api {
@@ -66,7 +69,21 @@ impl Api {
                 self.stop.store(true, Relaxed);
                 Ok(json!({ "stopping": true }))
             }
-            "apps" => Self::apps(),
+            "apps" => self.apps(),
+            "channels" => self.channels_cmd(),
+            "config_set" => self.ch().and_then(|c| c.config_set(&req)),
+            "routes" => self.ch().map(|c| c.routes_json()),
+            "app_route" => self.app_route(&req),
+            "app_profiles" => self.ch().map(|c| c.profiles_json()),
+            "app_profile_set" => self.app_profile_set(&req),
+            "cpreset_list" => self.cpreset(&req, |c, ch, _, _| c.presets.list(ch)),
+            "cpreset_save" => self.cpreset_named(&req, |c, ch, name, strip| c.presets.save(ch, name, strip, &self.params)),
+            "cpreset_load" => self.cpreset_named(&req, |c, ch, name, strip| c.presets.load(ch, name, strip, &self.params)),
+            "cpreset_delete" => self.cpreset_named(&req, |c, ch, name, _| c.presets.delete(ch, name)),
+            "cpreset_favorite" => {
+                let on = req.get("on").and_then(Value::as_bool).unwrap_or(true);
+                self.cpreset_named(&req, |c, ch, name, _| c.presets.favorite(ch, name, on))
+            }
             "app_set" => {
                 let dev = req.get("device").and_then(Value::as_str);
                 let inst = req.get("instance_id").and_then(Value::as_str);
@@ -205,15 +222,57 @@ impl Api {
         }
     }
 
-    fn apps() -> Result<Value, String> {
+    fn ch(&self) -> Result<&Arc<Channels>, String> {
+        self.channels.as_ref().ok_or_else(|| "this engine runs in the flat layout (no channels)".to_string())
+    }
+
+    fn channels_cmd(&self) -> Result<Value, String> {
+        let devs = audiora_hal::list_devices().map_err(|e| e.to_string())?;
+        Ok(self.ch()?.channels_json(&devs))
+    }
+
+    fn app_route(&self, req: &Value) -> Result<Value, String> {
+        let app = req.get("app").and_then(Value::as_str).ok_or("missing \"app\"")?;
+        let channel = match req.get("channel") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(c)) => Some(c.as_str()),
+            Some(_) => return Err("\"channel\" must be a channel key or null".into()),
+        };
+        self.ch()?.route_app(app, channel)
+    }
+
+    fn app_profile_set(&self, req: &Value) -> Result<Value, String> {
+        let app = req.get("app").and_then(Value::as_str).ok_or("missing \"app\"")?;
+        let channel = req.get("channel").and_then(Value::as_str).ok_or("missing \"channel\"")?;
+        let preset = req.get("preset").and_then(Value::as_str);
+        self.ch()?.profile_set(app, channel, preset)
+    }
+
+    fn cpreset(&self, req: &Value, f: impl FnOnce(&Channels, &str, &str, usize) -> Result<Value, String>) -> Result<Value, String> {
+        let ch = req.get("channel").and_then(Value::as_str).ok_or("missing \"channel\"")?;
+        let strip = channel_index(ch).ok_or_else(|| format!("unknown channel \"{ch}\""))?;
+        f(self.ch()?, ch, "", strip)
+    }
+
+    fn cpreset_named(&self, req: &Value, f: impl FnOnce(&Channels, &str, &str, usize) -> Result<Value, String>) -> Result<Value, String> {
+        let name = req.get("name").and_then(Value::as_str).ok_or("missing \"name\"")?;
+        let ch = req.get("channel").and_then(Value::as_str).ok_or("missing \"channel\"")?;
+        let strip = channel_index(ch).ok_or_else(|| format!("unknown channel \"{ch}\""))?;
+        f(self.ch()?, ch, name, strip)
+    }
+
+    fn apps(&self) -> Result<Value, String> {
         let list = audiora_hal::list_sessions().map_err(|e| e.to_string())?;
         let apps: Vec<Value> = list
             .into_iter()
             .map(|a| {
+                let route = self.channels.as_ref().and_then(|c| c.route_of(&a.name));
+                let playing_in = self.channels.as_ref().and_then(|c| c.channel_of_device(&a.device_id));
                 json!({
                     "instance_id": a.instance_id, "device_id": a.device_id, "device_name": a.device_name,
                     "pid": a.pid, "name": a.name, "volume": a.volume, "muted": a.muted,
                     "peak": a.peak, "active": a.active, "system_sounds": a.system_sounds,
+                    "route": route, "playing_in": playing_in,
                 })
             })
             .collect();
@@ -274,7 +333,7 @@ impl Api {
         f: impl FnOnce(&str) -> Result<Value, String>,
     ) -> Result<Value, String> {
         match req.get("name").and_then(Value::as_str) {
-            Some(n) if n != LAST => f(n),
+            Some(n) if n != LAST && n != LAST_CHANNELS => f(n),
             Some(_) => Err("that name is reserved".into()),
             None => Err("missing \"name\"".into()),
         }
@@ -352,7 +411,7 @@ mod tests {
         let analysis = Arc::new(Analysis::default());
         let presets = Arc::new(PresetStore::new(&std::env::temp_dir().join(format!("audiora-api-presets-{}", std::process::id()))));
         let hw: Option<Mutex<Box<dyn HardwareInterface>>> = Some(Mutex::new(Box::new(audiora_device::SimulatedR::new())));
-        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}) }
+        Api { params, stats: Arc::new(Stats::default()), rec, analysis, presets, hw, stop: Default::default(), data_dir: std::env::temp_dir(), info: json!({}), channels: None }
     }
 
     fn call(a: &Api, line: &str) -> Value {
@@ -487,7 +546,7 @@ mod tests {
     fn state_contains_params_and_stats() {
         let a = api();
         let r = call(&a, r#"{"cmd":"state"}"#);
-        assert!(r["params"]["strip/1/eq/3/q"].is_number());
+        assert!(r["params"]["strip/1/eq/5/q"].is_number());
         assert_eq!(r["stats"]["underruns"], 0);
     }
 }

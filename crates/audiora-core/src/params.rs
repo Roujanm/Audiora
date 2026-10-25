@@ -4,7 +4,7 @@ use audiora_dsp::{CompSettings, GateSettings, LimiterSettings};
 
 use crate::AtomicF32;
 
-pub const EQ_BANDS: usize = 4;
+pub const EQ_BANDS: usize = 6;
 
 #[derive(Debug)]
 pub struct EqBandParams {
@@ -93,6 +93,22 @@ impl CompParams {
     }
 }
 
+/// Smart Volume: automatic leveling towards a target loudness.
+#[derive(Debug)]
+pub struct SmartParams {
+    pub enabled: AtomicBool,
+    /// Target loudness in dBFS (roughly RMS).
+    pub target_db: AtomicF32,
+    /// Meter: gain currently applied in dB.
+    pub gain_db: AtomicF32,
+}
+
+impl SmartParams {
+    fn new() -> Self {
+        Self { enabled: AtomicBool::new(false), target_db: AtomicF32::new(-24.0), gain_db: AtomicF32::new(0.0) }
+    }
+}
+
 #[derive(Debug)]
 pub struct LimiterParams {
     pub enabled: AtomicBool,
@@ -118,13 +134,15 @@ impl LimiterParams {
 }
 
 /// Control-thread view of one input strip. Band layout is fixed:
-/// 0 = low shelf, 1 = peak, 2 = peak, 3 = high shelf.
-/// Signal order: denoise -> gate -> EQ -> compressor -> fader/balance.
+/// 0 = low shelf (sub bass), 1-4 = peaks (bass, low mids, mids, upper mids), 5 = high shelf.
+/// Signal order: boost -> denoise -> gate -> EQ -> smart volume -> compressor -> fader/balance.
 #[derive(Debug)]
 pub struct StripParams {
     pub gain_db: AtomicF32,
     /// -1.0 (left) .. 1.0 (right); 0.0 is unity on both channels.
     pub balance: AtomicF32,
+    /// Extra gain ahead of the processing chain, 0..=12 dB ("volume boost").
+    pub boost_db: AtomicF32,
     pub mute: AtomicBool,
     pub solo: AtomicBool,
     /// Bit `n` set = strip feeds bus `n`.
@@ -132,6 +150,7 @@ pub struct StripParams {
     pub denoise: AtomicBool,
     pub gate: GateParams,
     pub eq: [EqBandParams; EQ_BANDS],
+    pub smart: SmartParams,
     pub comp: CompParams,
     /// Post-fader peak of the last processed call (linear).
     pub peak_l: AtomicF32,
@@ -143,17 +162,21 @@ impl StripParams {
         Self {
             gain_db: AtomicF32::new(0.0),
             balance: AtomicF32::new(0.0),
+            boost_db: AtomicF32::new(0.0),
             mute: AtomicBool::new(false),
             solo: AtomicBool::new(false),
             bus_mask: AtomicU32::new(1),
             denoise: AtomicBool::new(false),
             gate: GateParams::new(),
             eq: [
-                EqBandParams::new(100.0, 0.707),
-                EqBandParams::new(400.0, 1.0),
-                EqBandParams::new(2500.0, 1.0),
-                EqBandParams::new(8000.0, 0.707),
+                EqBandParams::new(60.0, 0.707),
+                EqBandParams::new(160.0, 1.0),
+                EqBandParams::new(500.0, 1.0),
+                EqBandParams::new(1800.0, 1.0),
+                EqBandParams::new(5000.0, 1.0),
+                EqBandParams::new(10000.0, 0.707),
             ],
+            smart: SmartParams::new(),
             comp: CompParams::new(),
             peak_l: AtomicF32::new(0.0),
             peak_r: AtomicF32::new(0.0),

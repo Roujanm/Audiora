@@ -1,13 +1,13 @@
 //! Strip -> bus mixer. `process` never allocates, locks or blocks.
 //!
-//! Strip chain:  denoise -> gate -> EQ -> compressor -> fader/balance -> buses
+//! Strip chain:  boost -> denoise -> gate -> EQ -> smart volume -> compressor -> fader/balance -> buses
 //! Bus chain:    sum -> fader -> limiter -> output
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use audiora_dsp::{
-    db_to_lin, Biquad, BiquadCoeffs, Compressor, Denoiser, FilterKind, Gate, Limiter,
+    db_to_lin, Biquad, BiquadCoeffs, Compressor, Denoiser, FilterKind, Gate, Leveler, Limiter,
     DENOISE_SAMPLE_RATE,
 };
 
@@ -16,15 +16,23 @@ use crate::params::{MixerParams, StripParams, EQ_BANDS};
 /// Longest block handled in one pass; longer inputs are chunked internally.
 pub const MAX_BLOCK_FRAMES: usize = 4096;
 
-const BAND_KINDS: [FilterKind; EQ_BANDS] =
-    [FilterKind::LowShelf, FilterKind::Peak, FilterKind::Peak, FilterKind::HighShelf];
+const BAND_KINDS: [FilterKind; EQ_BANDS] = [
+    FilterKind::LowShelf,
+    FilterKind::Peak,
+    FilterKind::Peak,
+    FilterKind::Peak,
+    FilterKind::Peak,
+    FilterKind::HighShelf,
+];
 
 struct StripState {
     denoiser: Option<Box<Denoiser>>,
     gate: Gate,
     comp: Compressor,
+    leveler: Leveler,
     gate_on: bool,
     comp_on: bool,
+    smart_on: bool,
     eq: [[Biquad; 2]; EQ_BANDS],
     /// (freq, gain_db, q) the filters were last configured with.
     eq_cache: [(f32, f32, f32); EQ_BANDS],
@@ -59,8 +67,10 @@ impl Mixer {
                     denoiser: denoise_ok.then(|| Box::new(Denoiser::new())),
                     gate: Gate::new(sample_rate),
                     comp: Compressor::new(sample_rate),
+                    leveler: Leveler::new(sample_rate),
                     gate_on: false,
                     comp_on: false,
+                    smart_on: false,
                     eq: [[Biquad::default(); 2]; EQ_BANDS],
                     eq_cache: [(f32::NAN, 0.0, 0.0); EQ_BANDS],
                     eq_active: false,
@@ -138,6 +148,14 @@ impl Mixer {
             let buf = &mut self.scratch[..frames * 2];
             buf.copy_from_slice(&inputs[i][range.clone()]);
 
+            let boost = p.boost_db.get();
+            if boost > 0.01 {
+                let g = db_to_lin(boost);
+                for v in buf.iter_mut() {
+                    *v *= g;
+                }
+            }
+
             if p.denoise.load(Ordering::Relaxed) {
                 if let Some(d) = st.denoiser.as_mut() {
                     d.process(buf);
@@ -162,6 +180,15 @@ impl Mixer {
                         f[1] = band[1].process(f[1]);
                     }
                 }
+            }
+
+            if p.smart.enabled.load(Ordering::Relaxed) {
+                p.smart.gain_db.set(st.leveler.process(buf, p.smart.target_db.get()));
+                st.smart_on = true;
+            } else if st.smart_on {
+                st.leveler.reset();
+                p.smart.gain_db.set(0.0);
+                st.smart_on = false;
             }
 
             if p.comp.enabled.load(Ordering::Relaxed) {
@@ -405,6 +432,26 @@ mod tests {
         p.strips[0].denoise.store(true, Ordering::Relaxed);
         let out = run(&mut m, &[dc(0.5)], 1);
         assert!(out[0][..100].iter().all(|&s| s.abs() < 1e-3), "10 ms of latency, silent first");
+    }
+
+    #[test]
+    fn boost_adds_gain_before_the_chain() {
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        p.strips[0].boost_db.set(6.0206);
+        let out = run(&mut m, &[dc(0.25)], 1);
+        assert!((out[0][100] - 0.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn smart_volume_levels_a_loud_strip_down() {
+        let (mut m, p) = Mixer::new(48_000.0, 1, 1);
+        p.strips[0].smart.enabled.store(true, Ordering::Relaxed);
+        p.strips[0].smart.target_db.set(-24.0);
+        let loud = sine(0.7, 1000.0);
+        for _ in 0..400 {
+            run(&mut m, std::slice::from_ref(&loud), 1);
+        }
+        assert!(p.strips[0].smart.gain_db.get() < -4.0, "gain {}", p.strips[0].smart.gain_db.get());
     }
 
     #[test]

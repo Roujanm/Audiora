@@ -28,10 +28,35 @@ pub const MAX_STRIPS: usize = 16;
 pub const MAX_BUSES: usize = 8;
 const RING_SAMPLES: usize = 1 << 17;
 
+/// One mixer strip fed from outside the graph.
+#[derive(Clone, Debug, Default)]
+pub struct InputSpec {
+    /// Device id (`None` = system default).
+    pub device: Option<String>,
+    /// Tap what a render device is playing instead of recording a capture device. This is how an
+    /// application mix reaches the mixer: apps are routed to a virtual output, Audiora listens to it.
+    pub loopback: bool,
+    /// No device at all: the strip stays in the layout but is silent.
+    pub silent: bool,
+    /// Display name overriding the device name.
+    pub name: Option<String>,
+    /// Fixed channel this strip belongs to ("game", "chat", "media", "aux", "mic").
+    pub channel: Option<&'static str>,
+}
+
+impl InputSpec {
+    pub fn capture(device: Option<String>) -> Self {
+        Self { device, ..Self::default() }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct EngineConfig {
-    /// One entry per capture device (`None` = system default). Empty = no inputs.
-    pub inputs: Vec<Option<String>>,
+    /// One entry per input strip. Empty = no inputs.
+    pub inputs: Vec<InputSpec>,
+    /// An input that cannot be opened leaves its strip silent (and reports why) instead of
+    /// stopping the engine.
+    pub tolerant_inputs: bool,
     /// One entry per output bus: the first is the master device that clocks
     /// the mixer. Must not be empty.
     pub outputs: Vec<Option<String>>,
@@ -63,6 +88,10 @@ pub struct NodeInfo {
     pub name: String,
     pub device_id: Option<String>,
     pub format: Option<StreamFormat>,
+    /// Fixed channel key for channel-mode strips.
+    pub channel: Option<&'static str>,
+    /// Why the strip is silent although it was configured.
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -138,20 +167,39 @@ impl Engine {
             }
         }
 
-        // Capture devices.
-        let mut in_cons = Vec::new();
-        let mut in_formats = Vec::new();
-        for (i, dev) in cfg.inputs.iter().enumerate() {
+        // Input devices. Silent or failed inputs keep their strip but have no thread.
+        let mut in_cons: Vec<Option<ring::Consumer>> = Vec::new();
+        let mut in_formats: Vec<Option<StreamFormat>> = Vec::new();
+        let mut in_errors: Vec<Option<String>> = Vec::new();
+        for (i, spec) in cfg.inputs.iter().enumerate() {
+            if spec.silent {
+                in_cons.push(None);
+                in_formats.push(None);
+                in_errors.push(None);
+                continue;
+            }
             let (prod, cons) = ring::ring(RING_SAMPLES);
             let (tx, rx) = mpsc::channel::<Result<StreamFormat, String>>();
-            let (dev, stop2, stats2, ll) = (dev.clone(), stop.clone(), stats.clone(), cfg.mode);
-            threads.push(std::thread::spawn(move || capture_thread(dev, ll, prod, stop2, stats2, tx)));
-            match rx.recv() {
-                Ok(Ok(f)) => in_formats.push(f),
-                Ok(Err(e)) => return abort(&stop, threads, format!("input {i}: {e}")),
-                Err(_) => return abort(&stop, threads, format!("input {i}: thread died")),
+            let (dev, lb, stop2, stats2, ll) = (spec.device.clone(), spec.loopback, stop.clone(), stats.clone(), cfg.mode);
+            threads.push(std::thread::spawn(move || capture_thread(dev, lb, ll, prod, stop2, stats2, tx)));
+            let opened = match rx.recv() {
+                Ok(r) => r,
+                Err(_) => Err("thread died".to_string()),
+            };
+            match opened {
+                Ok(f) => {
+                    in_formats.push(Some(f));
+                    in_cons.push(Some(cons));
+                    in_errors.push(None);
+                }
+                Err(e) if cfg.tolerant_inputs => {
+                    eprintln!("input {i} unavailable: {e}");
+                    in_formats.push(None);
+                    in_cons.push(None);
+                    in_errors.push(Some(e));
+                }
+                Err(e) => return abort(&stop, threads, format!("input {i}: {e}")),
             }
-            in_cons.push(cons);
         }
 
         // Master render thread: opens the master device and runs the mixer.
@@ -180,18 +228,29 @@ impl Engine {
 
         // Layout shown to clients.
         let mut strips = Vec::new();
-        for (i, dev) in cfg.inputs.iter().enumerate() {
-            let (name, id) = resolve(Flow::Capture, dev);
-            strips.push(NodeInfo { kind: "input", name, device_id: id, format: Some(in_formats[i]) });
+        for (i, spec) in cfg.inputs.iter().enumerate() {
+            let (name, id) = if spec.silent {
+                (String::from("(no device)"), None)
+            } else {
+                resolve(if spec.loopback { Flow::Render } else { Flow::Capture }, &spec.device)
+            };
+            strips.push(NodeInfo {
+                kind: "input",
+                name: spec.name.clone().unwrap_or(name),
+                device_id: id,
+                format: in_formats[i],
+                channel: spec.channel,
+                error: in_errors[i].clone(),
+            });
         }
-        strips.push(NodeInfo { kind: "tone", name: "Tone generator".into(), device_id: None, format: None });
+        strips.push(NodeInfo { kind: "tone", name: "Tone generator".into(), device_id: None, format: None, channel: None, error: None });
         let buses: Vec<NodeInfo> = cfg
             .outputs
             .iter()
             .enumerate()
             .map(|(b, dev)| {
                 let (name, id) = resolve(Flow::Render, dev);
-                NodeInfo { kind: "bus", name, device_id: id, format: out_formats[b] }
+                NodeInfo { kind: "bus", name, device_id: id, format: out_formats[b], channel: None, error: None }
             })
             .collect();
 
@@ -264,8 +323,8 @@ struct MasterArgs {
     device: Option<String>,
     mode: Mode,
     tone_hz: Option<f32>,
-    in_cons: Vec<ring::Consumer>,
-    in_formats: Vec<StreamFormat>,
+    in_cons: Vec<Option<ring::Consumer>>,
+    in_formats: Vec<Option<StreamFormat>>,
     extra_prods: Vec<ring::Producer>,
     rate_txs: Vec<mpsc::Sender<StreamFormat>>,
     n_buses: usize,
@@ -306,10 +365,10 @@ fn master_thread(
     let _ = ready.send(Ok((fmt, params)));
 
     let cap = (fmt.buffer_frames as usize).max(MAX_BLOCK_FRAMES) * 2;
-    let mut resamplers: Vec<DriftResampler> = a
+    let mut resamplers: Vec<Option<DriftResampler>> = a
         .in_formats
         .iter()
-        .map(|f| DriftResampler::new(f.sample_rate, fmt.sample_rate, target_frames(f, &fmt)))
+        .map(|f| f.map(|f| DriftResampler::new(f.sample_rate, fmt.sample_rate, target_frames(&f, &fmt))))
         .collect();
     let mut in_bufs: Vec<Vec<f32>> = (0..n_strips).map(|_| vec![0.0; cap]).collect();
     let mut bus_bufs: Vec<Vec<f32>> = (0..a.n_buses).map(|_| vec![0.0; cap]).collect();
@@ -326,7 +385,11 @@ fn master_thread(
         tap.poll();
 
         for i in 0..n_in {
-            let r = resamplers[i].fill(&mut a.in_cons[i], &mut in_bufs[i][..n]);
+            let (Some(rs), Some(cons)) = (resamplers[i].as_mut(), a.in_cons[i].as_mut()) else {
+                in_bufs[i][..n].fill(0.0);
+                continue;
+            };
+            let r = rs.fill(cons, &mut in_bufs[i][..n]);
             if r.underrun {
                 stats.underruns.fetch_add(1, Ordering::Relaxed);
             }
@@ -446,13 +509,15 @@ fn output_thread(
 
 fn capture_thread(
     device: Option<String>,
+    loopback: bool,
     mode: Mode,
-    mut prod: ring::Producer,
+    prod: ring::Producer,
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
     ready: mpsc::Sender<Result<StreamFormat, String>>,
 ) {
-    let stream = match CaptureStream::open(device.as_deref(), mode) {
+    let open = || if loopback { CaptureStream::open_loopback(device.as_deref()) } else { CaptureStream::open(device.as_deref(), mode) };
+    let stream = match open() {
         Ok(s) => s,
         Err(e) => {
             let _ = ready.send(Err(e.to_string()));
@@ -463,7 +528,17 @@ fn capture_thread(
     let _ = ready.send(Ok(fmt));
 
     let ch = fmt.channels as usize;
+    let prod = std::cell::RefCell::new(prod);
     let mut stereo = vec![0f32; fmt.buffer_frames as usize * 2 * 2];
+    let zeros = vec![0f32; 4800 * 2];
+    let push = |block: &[f32]| {
+        let mut prod = prod.borrow_mut();
+        if prod.free() < block.len() {
+            stats.capture_drops.fetch_add(1, Ordering::Relaxed);
+        } else {
+            prod.push_slice(block);
+        }
+    };
     let mut on_audio = |data: &[f32], frames: usize| {
         if frames * 2 > stereo.len() {
             return;
@@ -472,23 +547,25 @@ fn capture_thread(
             stereo[i * 2] = f[0];
             stereo[i * 2 + 1] = if ch > 1 { f[1] } else { f[0] };
         }
-        let block = &stereo[..frames * 2];
-        if prod.free() < block.len() {
-            stats.capture_drops.fetch_add(1, Ordering::Relaxed);
-        } else {
-            prod.push_slice(block);
-        }
+        push(&stereo[..frames * 2]);
     };
+    // A loopback tap is silent (no packets at all) while nothing plays on its device; the graph
+    // still needs its samples, so wall-clock time is turned into zeros.
+    let on_idle = |frames: usize| push(&zeros[..frames.min(4800) * 2]);
 
     let mut stream = stream;
     loop {
-        let result = stream.run_until(&stop, &mut on_audio);
+        let result = if loopback {
+            stream.run_until_idle(&stop, &mut on_audio, Some(&on_idle))
+        } else {
+            stream.run_until(&stop, &mut on_audio)
+        };
         if stop.load(Ordering::Relaxed) {
             break;
         }
         stats.device_errors.fetch_add(1, Ordering::Relaxed);
         eprintln!("capture lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
-        match reopen(&stop, fmt, || CaptureStream::open(device.as_deref(), mode), |s| s.format()) {
+        match reopen(&stop, fmt, open, |s| s.format()) {
             Some(s) => stream = s,
             None => break,
         }
