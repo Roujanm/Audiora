@@ -9,6 +9,7 @@ export function stripColor(node: Pick<NodeInfo, 'kind'> | undefined, index: numb
 }
 
 export const ACCENTS = [
+  { id: 'mono', label: 'Audiora mono', swatch: '#e6e9ef' },
   { id: 'azure', label: 'Azure', swatch: '#4d9bff' },
   { id: 'violet', label: 'Violet', swatch: '#9a86ff' },
   { id: 'emerald', label: 'Emerald', swatch: '#34dba0' },

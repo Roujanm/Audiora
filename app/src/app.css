@@ -1,6 +1,13 @@
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 
+/* animatable angle for the opening animation's clockwise reveal */
+@property --sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 /* ------------------------------------------------------------------ tokens */
 :root {
   color-scheme: dark;
@@ -49,6 +56,12 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+:root[data-accent='mono'] {
+  --accent: #dfe4ec;
+  --accent-hi: #ffffff;
+  --accent-lo: #8a93a3;
+  --on-accent: #0b0d10;
+}
 :root[data-accent='violet'] {
   --accent: #9a86ff;
   --accent-hi: #c0b3ff;

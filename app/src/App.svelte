@@ -15,6 +15,8 @@
   import Popover from './components/Popover.svelte';
   import CommandPalette, { type Command } from './components/CommandPalette.svelte';
   import Toasts from './components/Toasts.svelte';
+  import Logo from './components/Logo.svelte';
+  import Splash from './components/Splash.svelte';
   import { toast } from './lib/toast.svelte.ts';
 
   engine.start();
@@ -31,7 +33,17 @@
   }
 
   const accentIds = ACCENTS.map((a) => a.id);
-  let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'azure'));
+  // the black-and-white Audiora identity becomes the look once, for installs that kept the old default
+  try {
+    if (!localStorage.getItem('audiora.brand-v1')) {
+      localStorage.setItem('audiora.brand-v1', '1');
+      localStorage.setItem('audiora.accent', 'mono');
+    }
+  } catch {
+    /* storage unavailable: defaults apply */
+  }
+  let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'mono'));
+  let splash = $state(true);
   const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'mic', 'studio', 'hardware', 'system'];
   let tab = $state<Tab>(remembered('audiora.tab', TABS, 'mixer'));
 
@@ -205,10 +217,12 @@
 
 <svelte:window onkeydown={onwindowkey} />
 
+{#if splash}<Splash ondone={() => (splash = false)} />{/if}
+
 <div class="app">
   <nav class="rail" aria-label="Sections">
     <div class="logo" aria-label="Audiora">
-      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 14v-4M7 18V6M11 21V3M15 17V7M19 14v-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none" /></svg>
+      <Logo variant="mark" size={30} />
     </div>
     <div class="items">
       {#each RAIL as n (n.id)}
@@ -374,13 +388,14 @@
   }
 
   .logo {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
     display: grid;
     place-items: center;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 45%, #7b5cff));
-    box-shadow: 0 8px 24px -8px var(--accent-glow), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+    border-radius: 13px;
+    color: #fff;
+    background: #000;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 24px -10px rgba(0, 0, 0, 0.9);
   }
 
   .items {
