@@ -41,6 +41,27 @@ formats other than 48 kHz, per-endpoint volume state (the sliders of the four ou
 sample's one virtual mixer; the engine does not use them), a declarative (DCH) INF: the endpoint
 names are still registered under HKLM\...\MediaCategories.
 
+## Keeping it crash-free
+
+A bug in kernel code crashes Windows (blue screen) instead of just one program, so the driver is
+kept deliberately small and every change goes through these gates before a package exists:
+
+* **Tiny change set.** Microsoft's sample is a well-tested base; Audiora adds about 150 lines
+  (the cable plus the endpoint tables). No allocation, no files, no IOCTLs, no DSP in the kernel.
+* **Kernel rules by construction.** The whole audio path runs from non-paged code and data (it is
+  called at DISPATCH_LEVEL from the stream timer); the cable takes one spin lock, always *inside*
+  the stream's position lock, never the other way round, so there is no lock-order deadlock.
+* **The cable is tested with a real compiler** (`scripts\driver-test.ps1`, no WDK needed):
+  the exact driver source is compiled into a user-mode program at `/W4 /WX /analyze` and checked
+  for prefill, gap-free streaming, jitter, late start, overflow, underrun, restart and two-thread
+  races.
+* **WDK code analysis** with the driver rules runs on every build, warnings fail it;
+  `driver-build.ps1 -Sdv` adds Static Driver Verifier.
+* **Driver Verifier** on the test machine during the first runs (DESIGN.md, verification).
+
+No process can promise that untested kernel code never crashes; these gates are how it gets as
+close to that as possible before it ever loads.
+
 ## Build (on your PC)
 
 1. Install the Windows Driver Kit that matches your Windows SDK
