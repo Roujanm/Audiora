@@ -241,6 +241,10 @@ Arguments:
         {
             return STATUS_BUFFER_TOO_SMALL;
         }
+        else if (ResultantFormat == NULL)
+        {
+            return STATUS_INVALID_PARAMETER;
+        }
 
         //Set ResultantFormat to be the only supported format for the MicArray endpoint. 
         PKSDATAFORMAT_WAVEFORMATEXTENSIBLE resultantFormat;

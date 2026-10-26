@@ -271,7 +271,7 @@ class CAdapterCommon :
         _In_opt_ PCWSTR                                             TemplateReferenceString,
         _In_ ULONG                                                  cPropertyCount,
         _In_reads_opt_(cPropertyCount) const SIMPLEAUDIOSAMPLE_DEVPROPERTY        *pProperties,
-        _Out_ _At_(AudioSymbolicLinkName->Buffer, __drv_allocatesMem(Mem)) PUNICODE_STRING AudioSymbolicLinkName
+        _Out_ PUNICODE_STRING AudioSymbolicLinkName   /* Buffer allocated on success; caller frees it */
     );
 
     NTSTATUS MigrateDeviceInterfaceTemplateParameters
@@ -1417,7 +1417,7 @@ CAdapterCommon::CreateAudioInterfaceWithProperties
     _In_opt_ PCWSTR TemplateReferenceString,
     _In_ ULONG cPropertyCount,
     _In_reads_opt_(cPropertyCount) const SIMPLEAUDIOSAMPLE_DEVPROPERTY *pProperties,
-    _Out_ _At_(AudioSymbolicLinkName->Buffer, __drv_allocatesMem(Mem)) PUNICODE_STRING AudioSymbolicLinkName
+    _Out_ PUNICODE_STRING AudioSymbolicLinkName   /* Buffer allocated on success; caller frees it */
 )
 /*++
 
@@ -2747,6 +2747,7 @@ Return Value:
         &KSCATEGORY_AUDIO,
         &referenceString,
         &TemplateSymbolicLinkName);
+    IF_FAILED_JUMP(ntStatus, Exit);   // Audiora: never open a key for a link that was not created
 
     // Open the template device interface's registry key path
     ntStatus = IoOpenDeviceInterfaceRegistryKey(&TemplateSymbolicLinkName, GENERIC_READ, &hTemplateDeviceInterfaceParametersKey);

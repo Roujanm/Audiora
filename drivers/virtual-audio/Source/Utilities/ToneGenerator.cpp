@@ -96,35 +96,37 @@ VOID ToneGenerator::InitNewFrame
         return;
     }
 
-    /* Use __analysis_assume to suppress the reports of a false OACR error. */
-    for(ULONG i = 0; i < m_ChannelCount; ++i)
+    // Audiora: the sample is built in a local buffer and copied with an explicit bounds check,
+    // so no format can write past the frame.
+    RtlZeroMemory(Frame, FrameSize);
+    BYTE bytes[4] = { 0 };
+    DWORD size = 0;
+    if (m_BitsPerSample == 8)
     {
-        if (m_BitsPerSample == 8)
-        {
-            __analysis_assume((DWORD)m_ChannelCount == FrameSize);
-            unsigned char *dataBuffer = reinterpret_cast<unsigned char *>(Frame);
-            dataBuffer[i] = ConvertToUChar(sinValue);
-        }
-        else if (m_BitsPerSample == 16)
-        {
-            __analysis_assume((DWORD)(m_ChannelCount) * 2 == FrameSize);
-            short *dataBuffer = reinterpret_cast<short *>(Frame);
-            dataBuffer[i] = ConvertToShort(sinValue);
-        }
-        else if (m_BitsPerSample == 24)
-        {
-            __analysis_assume((DWORD)(m_ChannelCount) * 3 == FrameSize);
-            BYTE *dataBuffer = Frame;
-            long val = ConvertToLong(sinValue);
-            val = val >> 8;
-            RtlCopyMemory(dataBuffer, &val, 3);
-        }
-        else if (m_BitsPerSample == 32)
-        {
-            __analysis_assume((DWORD)(m_ChannelCount) * 4 == FrameSize);
-            long *dataBuffer = reinterpret_cast<long *>(Frame);
-            dataBuffer[i] = ConvertToLong(sinValue);
-        }
+        bytes[0] = ConvertToUChar(sinValue);
+        size = 1;
+    }
+    else if (m_BitsPerSample == 16)
+    {
+        short val = ConvertToShort(sinValue);
+        RtlCopyMemory(bytes, &val, sizeof(val));
+        size = 2;
+    }
+    else if (m_BitsPerSample == 24)
+    {
+        long val = ConvertToLong(sinValue) >> 8;
+        RtlCopyMemory(bytes, &val, 3);
+        size = 3;
+    }
+    else if (m_BitsPerSample == 32)
+    {
+        long val = ConvertToLong(sinValue);
+        RtlCopyMemory(bytes, &val, sizeof(val));
+        size = 4;
+    }
+    for (DWORD offset = 0; size != 0 && offset + size <= FrameSize; offset += size)
+    {
+        RtlCopyMemory(Frame + offset, bytes, size);
     }
 
     m_Theta += m_SampleIncrement;

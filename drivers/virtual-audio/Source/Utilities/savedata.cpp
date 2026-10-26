@@ -517,7 +517,7 @@ CSaveData::Initialize
     {
         // Allocate data file name.
         //
-        RtlStringCchPrintfW(szTemp, MAX_PATH, L"%s_%s_%d.wav", DEFAULT_FILE_NAME, HOST_FILE_NAME, m_ulStreamId);
+        RtlStringCchPrintfW(szTemp, MAX_PATH, L"%s_%s_%u.wav", DEFAULT_FILE_NAME, HOST_FILE_NAME, m_ulStreamId);
         m_FileName.Length = 0;
         ntStatus = RtlStringCchLengthW (szTemp, sizeof(szTemp)/sizeof(szTemp[0]), &cLen);
     }

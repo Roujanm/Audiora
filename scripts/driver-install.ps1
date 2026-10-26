@@ -2,21 +2,21 @@
 #requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Installs (or removes) the test-signed Audiora Virtual Audio driver. FOR THE TEST VM ONLY.
+  Installs (or removes) the test-signed Audiora Virtual Audio driver.
 .DESCRIPTION
-  Run from the folder driver-build.ps1 produced (dist\driver), inside the virtual machine, in an
-  elevated PowerShell. It
+  Run from the folder driver-build.ps1 produced (dist\driver), in an elevated PowerShell. It
     1. refuses to run unless test signing is on (that switch is yours to flip, see below),
-    2. trusts the WDK test certificate (LocalMachine Root + TrustedPublisher),
+    2. trusts the Audiora test certificate (LocalMachine Root + TrustedPublisher),
     3. adds the driver package to the driver store and creates the ROOT\AudioraVirtualAudio device.
-  -Uninstall removes the device and the driver package again.
+  -Uninstall removes the device, the driver package and the test certificate again.
 
-  Test signing (once per VM, then reboot; Secure Boot must be off in the VM's firmware settings):
+  Before the first install: create a System Restore point. Test signing (then restart; Secure Boot
+  must be off in the firmware settings, which also stops some anti-cheat games until it is back on):
       bcdedit /set testsigning on
-  Never do this on your everyday PC.
+  To go back afterwards: run -Uninstall, then  bcdedit /set testsigning off  and restart.
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\driver-vm-install.ps1
-  powershell -ExecutionPolicy Bypass -File .\driver-vm-install.ps1 -Uninstall
+  powershell -ExecutionPolicy Bypass -File .\driver-install.ps1
+  powershell -ExecutionPolicy Bypass -File .\driver-install.ps1 -Uninstall
 #>
 param([switch]$Uninstall)
 $ErrorActionPreference = "Stop"
@@ -129,14 +129,18 @@ if ($Uninstall) {
         pnputil /delete-driver $p /uninstall /force | Out-Null
         Write-Host "Removed driver package $p"
     }
+    foreach ($store in "Root", "TrustedPublisher") {
+        Get-ChildItem "Cert:\LocalMachine\$store" | Where-Object { $_.Subject -eq "CN=Audiora Test Driver Signing" } | Remove-Item
+    }
+    Write-Host "Removed the Audiora test certificate. To turn test signing off: bcdedit /set testsigning off, then restart."
     return
 }
 
 $ts = bcdedit /enum "{current}" | Select-String "testsigning\s+Yes"
 if (-not $ts) {
-    Write-Host "Test signing is off. In this VM (never on your everyday PC) run, as administrator:" -ForegroundColor Yellow
+    Write-Host "Test signing is off. Create a System Restore point, then run as administrator:" -ForegroundColor Yellow
     Write-Host "    bcdedit /set testsigning on" -ForegroundColor Yellow
-    Write-Host "then reboot (Secure Boot must be disabled in the VM settings) and run this script again." -ForegroundColor Yellow
+    Write-Host "restart (Secure Boot must be off in the firmware settings) and run this script again." -ForegroundColor Yellow
     exit 1
 }
 
@@ -147,7 +151,7 @@ $cer = Join-Path $here "AudioraVA-test.cer"
 if (Test-Path $cer) {
     Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
     Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null
-    Write-Host "Trusted the WDK test certificate."
+    Write-Host "Trusted the Audiora test certificate."
 }
 
 # a reinstall replaces the old device instead of adding a second one

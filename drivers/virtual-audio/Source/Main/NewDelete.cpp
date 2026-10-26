@@ -30,6 +30,18 @@ extern "C" {
 * Functions
 */
 
+// Audiora: driver memory is never executable. A caller asking for executable non-paged pool gets
+// ordinary (no-execute) non-paged pool instead.
+static PVOID AllocateNoExecute(size_t iSize, POOL_FLAGS poolFlags, ULONG tag)
+{
+    if (poolFlags & POOL_FLAG_NON_PAGED_EXECUTE)
+    {
+        poolFlags = (poolFlags & ~POOL_FLAG_NON_PAGED_EXECUTE) | POOL_FLAG_NON_PAGED;
+    }
+    _Analysis_assume_((poolFlags & POOL_FLAG_NON_PAGED_EXECUTE) == 0);
+    return ExAllocatePool2(poolFlags, iSize, tag);
+}
+
 /*****************************************************************************
 * ::new()
 *****************************************************************************
@@ -42,7 +54,7 @@ PVOID operator new
     ULONG       tag
 )
 {
-    PVOID result = ExAllocatePool2(poolFlags, iSize, tag);
+    PVOID result = AllocateNoExecute(iSize, poolFlags, tag);
 
     return result;
 }
@@ -59,7 +71,7 @@ PVOID operator new
     POOL_FLAGS  poolFlags
 )
 {
-    PVOID result = ExAllocatePool2(poolFlags, iSize, SIMPLEAUDIOSAMPLE_POOLTAG);
+    PVOID result = AllocateNoExecute(iSize, poolFlags, SIMPLEAUDIOSAMPLE_POOLTAG);
 
     return result;
 }

@@ -11,9 +11,9 @@ program's device list) shows:
 
 This is the SteelSeries Sonar / Voicemeeter model, with no third-party driver.
 
-Status: **source written, not yet built or tested.** It needs the Windows Driver Kit and a test VM
-(see below). Do not install it on an everyday PC until it has passed the checks in
-[DESIGN.md](DESIGN.md#verification-before-any-release).
+Status: **builds and is test-signed** (`scripts\driver-build.ps1`), passes MSVC + WDK driver code
+analysis with no warnings and InfVerif; **not yet loaded on any machine.** Do not give it to anyone
+until it has passed the checks in [DESIGN.md](DESIGN.md#verification-before-any-release).
 
 ## How it works (v1)
 
@@ -56,40 +56,43 @@ kept deliberately small and every change goes through these gates before a packa
   for prefill, gap-free streaming, jitter, late start, overflow, underrun, restart and two-thread
   races.
 * **WDK code analysis** with the driver rules runs on every build, warnings fail it;
-  `driver-build.ps1 -Sdv` adds Static Driver Verifier.
+  Static Driver Verifier needs the full WDK and is not run yet.
 * **Driver Verifier** on the test machine during the first runs (DESIGN.md, verification).
 
 No process can promise that untested kernel code never crashes; these gates are how it gets as
 close to that as possible before it ever loads.
 
-## Build (on your PC)
+## Build
 
-1. Install the Windows Driver Kit that matches your Windows SDK
-   (https://learn.microsoft.com/windows-hardware/drivers/download-the-wdk). Visual Studio 2022
-   with the C++ workload is already installed.
-2. `powershell -ExecutionPolicy Bypass -File scripts\check-driver-env.ps1` (read-only) should
-   report the WDK as found.
-3. `powershell -ExecutionPolicy Bypass -File scripts\driver-build.ps1`
+`powershell -ExecutionPolicy Bypass -File scripts\driver-build.ps1`
 
-The build only compiles and test-signs; it installs nothing. The result is in `dist\driver\`.
+Needs only Visual Studio 2022 / Build Tools with the C++ workload. The WDK is not installed: the
+script downloads Microsoft's WDK and SDK NuGet packages once into `driversirtual-audio\packages`
+(git-ignored, about 310 MB) and calls the compiler with the WDK's kernel-driver options. It runs the
+cable tests, compiles at `/W4 /WX /analyze` with the WDK driver rules (Microsoft's headers are
+excluded, Audiora's code is not), links, stamps and verifies the INF, and test-signs `AudioraVA.sys`
+and the catalog with a self-signed "Audiora Test Driver Signing" certificate kept in
+`%USERPROFILE%\.audiora\driver-test.pfx` (never committed, never added to a certificate store
+by the build). Result: `dist\driver\`. Installs nothing.
 
-## Test (in a virtual machine)
+Fixes made to the Microsoft sample because the analysis flagged them: memory is never allocated as
+executable, a status that was ignored is checked, a NULL output buffer is rejected, the test-tone
+writer is bounds-checked, and the sample's demo code that registered the current thread as a stream
+resource (and overwrote the endpoint install status) is removed.
 
-Windows 11 Pro for Workstations includes Hyper-V.
+## Install (test machine)
 
-1. Turn on Hyper-V (Windows Features → Hyper-V, then restart). This is a change to your PC's
-   settings, so you do it.
-2. Hyper-V Manager → New → Virtual Machine: Generation 2, 4 GB RAM, a Windows 11 ISO.
-   In the VM's Settings → Security, **untick Secure Boot** (this is the VM's firmware, not your
-   PC's). Install Windows in the VM.
-3. In the VM, elevated: `bcdedit /set testsigning on`, then restart the VM.
-4. Copy `dist\driver\` into the VM (Enhanced Session lets you paste files) and run, elevated:
-   `powershell -ExecutionPolicy Bypass -File .\driver-vm-install.ps1`
-5. Check Settings → System → Sound in the VM for the six endpoints. Then copy Audiora's installer
-   into the VM and check that it picks them up.
+Test-signed drivers only load where test signing is on, which is your decision on your machine:
 
-`driver-vm-install.ps1 -Uninstall` removes the device and the package again. If the VM blue-screens,
-that is what the VM is for: revert to a checkpoint (take one before step 4).
+1. Create a System Restore point.
+2. Secure Boot off in the firmware settings (some anti-cheat games refuse to run while it is off),
+   then elevated: `bcdedit /set testsigning on`, restart.
+3. Elevated, in `dist\driver\`: `powershell -ExecutionPolicy Bypass -File .\driver-install.ps1`
+4. Settings → System → Sound should list the six endpoints; Audiora picks them up by itself.
+
+To go back: `driver-install.ps1 -Uninstall` (device, package and test certificate), then
+`bcdedit /set testsigning off`, Secure Boot on, restart. A virtual machine (Hyper-V, Secure Boot off
+in the VM's settings, a checkpoint before installing) is the safer place for the very first load.
 
 ## Before anyone else gets it
 
