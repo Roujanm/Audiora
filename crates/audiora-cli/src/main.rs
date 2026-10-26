@@ -18,6 +18,7 @@ fn main() -> ExitCode {
         Some("route") => route(&args[1..]),
         Some("props") => props(&args[1..]),
         Some("loopcap") => loopcap(&args[1..]),
+        Some("cabletest") => cabletest(&args[1..]),
         _ => {
             eprintln!("usage: audiora devices | tone [--device ID] [--freq HZ] [--secs S] [--gain DB] [--bass DB]");
             return ExitCode::from(2);
@@ -209,6 +210,85 @@ fn loopcap(args: &[String]) -> Res {
         }),
     )?;
     Ok(())
+}
+
+/// End-to-end check of the Audiora Virtual Audio driver's mic cable: plays a 1 kHz tone at
+/// -12 dBFS into "Audiora Mic Feed" while recording "Audiora Microphone", then reports level,
+/// pitch, gaps and delay, and passes or fails.
+fn cabletest(args: &[String]) -> Res {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let secs: f32 = flag(args, "--secs", 5.0);
+    let devs = list_devices()?;
+    let find = |flow: Flow, words: &[&str]| {
+        devs.iter()
+            .find(|d| d.flow == flow && words.iter().all(|w| d.name.to_lowercase().contains(w)))
+            .map(|d| (d.id.clone(), d.name.clone()))
+    };
+    let (feed_id, feed_name) = find(Flow::Render, &["audiora", "mic feed"]).ok_or("Audiora Mic Feed not found: is the driver installed?")?;
+    let (mic_id, mic_name) = find(Flow::Capture, &["audiora", "microphone"]).ok_or("Audiora Microphone not found: is the driver installed?")?;
+    println!("feed: {feed_name}\nmic:  {mic_name}");
+
+    let cap = CaptureStream::open(Some(&mic_id), Mode::Shared)?;
+    let cfmt = cap.format();
+    let (ch, rate) = (cfmt.channels as usize, cfmt.sample_rate as f32);
+    const FREQ: f32 = 1000.0;
+    const AMP: f32 = 0.25; // -12 dBFS peak, -15 dBFS RMS
+
+    let start = std::time::Instant::now();
+    let player = std::thread::spawn(move || -> Result<(), String> {
+        let stream = RenderStream::open(Some(&feed_id), Mode::Shared).map_err(|e| e.to_string())?;
+        let f = stream.format();
+        let (och, step) = (f.channels as usize, TAU * FREQ / f.sample_rate as f32);
+        let mut phase = 0f32;
+        stream
+            .run(secs, |out, _| {
+                for frame in out.chunks_exact_mut(och) {
+                    frame.fill(phase.sin() * AMP);
+                    phase = (phase + step) % TAU;
+                }
+            })
+            .map_err(|e| e.to_string())
+    });
+
+    let stop = AtomicBool::new(false);
+    let mut rec: Vec<f32> = Vec::with_capacity(((secs + 1.0) * rate) as usize);
+    cap.run_until(&stop, |buf, n| {
+        rec.extend(buf.chunks_exact(ch).take(n).map(|f| f[0]));
+        if start.elapsed().as_secs_f32() > secs + 0.7 {
+            stop.store(true, Ordering::Relaxed);
+        }
+    })?;
+    player.join().map_err(|_| "player thread panicked")??;
+
+    let Some(first) = rec.iter().position(|v| v.abs() > 0.02) else {
+        println!("RESULT: FAIL - nothing arrived at the microphone ({} samples recorded, all silent)", rec.len());
+        return Err("cable test failed".into());
+    };
+    let delay_ms = first as f32 * 1000.0 / rate;
+    // steady part: skip the first 200 ms of audio, stop 300 ms before the tone ends
+    let a = first + (0.2 * rate) as usize;
+    let b = (first + ((secs - 0.3) * rate) as usize).min(rec.len());
+    let steady = &rec[a.min(b)..b];
+    let rms = (steady.iter().map(|v| v * v).sum::<f32>() / steady.len().max(1) as f32).sqrt();
+    let rms_db = 20.0 * rms.max(1e-9).log10();
+    let crossings = steady.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
+    let hz = crossings as f32 * rate / steady.len().max(1) as f32;
+    // a gap: 1 ms or more of silence in the middle of the tone
+    let (mut gaps, mut run) = (0usize, 0usize);
+    for v in steady {
+        if v.abs() < 1e-4 {
+            run += 1;
+            if run == (rate / 1000.0) as usize {
+                gaps += 1;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    println!("level {rms_db:.1} dBFS RMS (expected -15.1), pitch {hz:.1} Hz (expected {FREQ}), gaps {gaps}, first audio after {delay_ms:.0} ms");
+    let ok = (-18.0..=-12.0).contains(&rms_db) && (FREQ - 10.0..=FREQ + 10.0).contains(&hz) && gaps == 0;
+    println!("RESULT: {}", if ok { "PASS - the mic cable carries audio cleanly" } else { "FAIL" });
+    if ok { Ok(()) } else { Err("cable test failed".into()) }
 }
 
 fn props(args: &[String]) -> Res {
