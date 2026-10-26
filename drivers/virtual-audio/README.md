@@ -11,9 +11,14 @@ program's device list) shows:
 
 This is the SteelSeries Sonar / Voicemeeter model, with no third-party driver.
 
-Status: **builds and is test-signed** (`scripts\driver-build.ps1`), passes MSVC + WDK driver code
-analysis with no warnings and InfVerif; **not yet loaded on any machine.** Do not give it to anyone
-until it has passed the checks in [DESIGN.md](DESIGN.md#verification-before-any-release).
+Status: **works on a test machine** (2026-10-26, Hyper-V Windows 11 VM, test-signed 0.1.1.0): the
+driver loads, all six endpoints appear with their names, and `audiora.exe cabletest` passes: a
+1 kHz tone at -15.1 dBFS RMS played into Audiora Mic Feed arrives at Audiora Microphone at
+-15.1 dBFS RMS, 999.8 Hz, no gaps, first audio after 73 ms. Not yet run under Driver Verifier or for
+long periods; see [DESIGN.md](DESIGN.md#verification-before-any-release) before giving it to anyone.
+
+Note for testing in a VM: an Enhanced Session (Remote Desktop) shows only "Remote Audio"; use the
+basic console connection to see and use the Audiora endpoints.
 
 ## How it works (v1)
 
