@@ -146,6 +146,10 @@ DEFINE_PCAUTOMATION_TABLE_PROP(AutomationSpeakerTopoFilter, PropertiesSpeakerTop
 // ...). The GUIDs are internal linkage on purpose: every translation unit that includes this
 // header gets its own copy and nothing has to be instantiated elsewhere.
 //
+// The bridge pin is a line connector, not a speaker: Windows ignores the pin name of any endpoint
+// whose category is KSNODETYPE_SPEAKER and calls it "Speakers", so the outputs would be five
+// identical "Speakers". As line connectors they show up as "Audiora Game", "Audiora Chat", ...
+//
 static const GUID AUDIORA_NAME_GAME     = { 0xec7886ef, 0x060a, 0x488f, { 0x92, 0x7d, 0x2b, 0x52, 0x3f, 0x5f, 0x75, 0xd2 } };
 static const GUID AUDIORA_NAME_CHAT     = { 0x82c2fa21, 0x67ed, 0x4aeb, { 0xac, 0x99, 0x48, 0xd3, 0x01, 0x9b, 0x2f, 0xd7 } };
 static const GUID AUDIORA_NAME_MEDIA    = { 0x49bc6d4d, 0x4f67, 0x44b4, { 0xa4, 0xf1, 0xd3, 0x35, 0xac, 0x33, 0xe3, 0x06 } };
@@ -179,7 +183,7 @@ PCPIN_DESCRIPTOR Prefix##TopoMiniportPins[] =                                   
       SpeakerTopoPinDataRangePointersBridge,                                                    \
       KSPIN_DATAFLOW_OUT,                                                                       \
       KSPIN_COMMUNICATION_NONE,                                                                 \
-      &KSNODETYPE_SPEAKER,                                                                      \
+      &KSNODETYPE_LINE_CONNECTOR,                                                               \
       &NameGuid,                                                                                \
       0                                                                                         \
     }                                                                                           \

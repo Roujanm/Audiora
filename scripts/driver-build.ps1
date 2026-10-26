@@ -124,7 +124,7 @@ python (Join-Path $drv "tools\make_inx.py")
 if ($LASTEXITCODE -ne 0) { throw "INF generation failed" }
 $inf = Join-Path $out "AudioraVA.inf"
 Copy-Item "$src\Main\AudioraVA.inx" $inf -Force
-& "$wdk\bin\$kit\x64\stampinf.exe" -f $inf -a amd64 -k $kmdf -v "0.1.0.0" -d "*" 1>$null
+& "$wdk\bin\$kit\x64\stampinf.exe" -f $inf -a amd64 -k $kmdf -v "0.1.1.0" -d "*" 1>$null
 if ($LASTEXITCODE -ne 0) { throw "stampinf failed" }
 
 $infverif = "$wdk\tools\$kit\x64\infverif.exe"
