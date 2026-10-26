@@ -21,6 +21,7 @@
 
   const meta = $derived(channelMeta(ch.key)!);
   const isMic = $derived(ch.kind === 'mic');
+  const boostMax = $derived(isMic ? 48 : 12);
   const p = (leaf: string) => `strip/${ch.strip}/${leaf}`;
   const g = (leaf: string, d = 0) => engine.get(p(leaf), d);
   const on = (leaf: string) => g(leaf) > 0.5;
@@ -192,8 +193,13 @@
       </SettingRow>
     {/if}
 
-    <SettingRow icon="volume" title="Volume boost" description="For sources that are too quiet." value={boost > 0.05 ? signed(boost) : ''}>
-      <input type="range" min="0" max="12" step="0.5" value={boost} style="--fill: {(boost / 12) * 100}%" aria-label="Volume boost" oninput={(e) => engine.set(p('boost_db'), +e.currentTarget.value)} />
+    <SettingRow
+      icon="volume"
+      title={isMic ? 'Mic gain' : 'Volume boost'}
+      description={isMic ? 'Up to +48 dB for quiet dynamic mics. The limiter keeps it from clipping.' : 'For sources that are too quiet.'}
+      value={boost > 0.05 ? signed(boost) : ''}
+    >
+      <input type="range" min="0" max={boostMax} step="0.5" value={boost} style="--fill: {(Math.min(boost, boostMax) / boostMax) * 100}%" aria-label={isMic ? 'Mic gain' : 'Volume boost'} oninput={(e) => engine.set(p('boost_db'), +e.currentTarget.value)} />
     </SettingRow>
 
     <SettingRow

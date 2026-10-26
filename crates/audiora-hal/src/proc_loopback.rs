@@ -162,6 +162,8 @@ impl ProcessCapture {
     /// Silent packets arrive as zeros. Returns an error if the process's stream goes away.
     pub fn run_until(&self, stop: &AtomicBool, mut on_audio: impl FnMut(&[f32], usize)) -> Result<()> {
         let mut zeros = vec![0f32; 4096 * CHANNELS];
+        // same scheduling class as the device threads, so a busy PC cannot starve an app's capture
+        let _mmcss = crate::wasapi::Mmcss::enter();
         unsafe {
             self.client.Start()?;
             let result = (|| -> Result<()> {

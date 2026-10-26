@@ -188,6 +188,8 @@ pub struct AppTap {
     cons: ring::Consumer,
     rs: DriftResampler,
     stop: Arc<AtomicBool>,
+    /// The application was playing sound in the last block: running dry now is a real gap.
+    playing: bool,
 }
 
 /// Starts application captures; cheap to clone and safe to use from any thread.
@@ -245,8 +247,10 @@ impl AppTapper {
             exclusive: false,
             bit_depth: 32,
         };
-        let rs = DriftResampler::new(rate, self.master.sample_rate, target_frames(&prod_fmt, &self.master));
-        if self.tx.try_send(AppTap { strip, cons, rs, stop: stop.clone() }).is_err() {
+        // applications hand Windows their audio in bursts (often 20-40 ms): start with a roomier
+        // buffer than a device needs; it still grows by itself if one app is burstier than that
+        let rs = DriftResampler::new(rate, self.master.sample_rate, 2 * target_frames(&prod_fmt, &self.master));
+        if self.tx.try_send(AppTap { strip, cons, rs, stop: stop.clone(), playing: false }).is_err() {
             stop.store(true, Ordering::Relaxed);
             return Err(format!("at most {MAX_APP_TAPS} applications can be captured at once"));
         }
@@ -605,8 +609,12 @@ fn master_thread(
             }
             let t = &mut taps[k];
             if t.strip < n_in {
-                // running dry is the application being quiet, not a glitch
+                // running dry while quiet is the application pausing; while playing it is a glitch
                 let r = t.rs.fill(&mut t.cons, &mut tap_buf[..n]);
+                if r.underrun && t.playing {
+                    stats.underruns.fetch_add(1, Ordering::Relaxed);
+                }
+                t.playing = !r.underrun && tap_buf[..n].iter().any(|v| v.abs() > 1e-4);
                 if r.dropped {
                     stats.drift_drops.fetch_add(1, Ordering::Relaxed);
                 }

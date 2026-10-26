@@ -14,6 +14,12 @@ const MAX_TRIM: f64 = 0.005;
 const TRIM_GAIN: f64 = 0.02;
 /// Fill-level smoothing per call (~1 s at 10-20 ms callbacks).
 const FILL_ALPHA: f64 = 0.02;
+/// After an underrun the fill target grows by this factor (jitter buffer learns the producer's bursts).
+const GROW: f64 = 1.5;
+/// The target never grows past this multiple of the configured one.
+const MAX_GROWTH: f64 = 6.0;
+/// Seconds of clean playback before the target eases back toward the configured one.
+const RELAX_AFTER_S: f64 = 60.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FillReport {
@@ -32,6 +38,12 @@ pub struct DriftResampler {
     cpos: usize,
     clen: usize,
     target: f64,
+    base_target: f64,
+    out_rate: f64,
+    clean_frames: f64,
+    /// Seconds of clean playback before relaxing; doubles whenever a relax led to a new underrun.
+    relax_s: f64,
+    relaxed: bool,
     fill_avg: f64,
     have_avg: bool,
     primed: bool,
@@ -50,6 +62,11 @@ impl DriftResampler {
             cpos: 0,
             clen: 0,
             target: target_frames.max(16) as f64,
+            base_target: target_frames.max(16) as f64,
+            out_rate: out_rate.max(1) as f64,
+            clean_frames: 0.0,
+            relax_s: RELAX_AFTER_S,
+            relaxed: false,
             fill_avg: 0.0,
             have_avg: false,
             primed: false,
@@ -63,6 +80,35 @@ impl DriftResampler {
     /// Current effective input/output ratio (nominal plus drift trim).
     pub fn ratio(&self) -> f64 {
         self.ratio
+    }
+
+    /// Current fill target in input frames (grows after underruns, relaxes when stable).
+    pub fn target_frames(&self) -> usize {
+        self.target as usize
+    }
+
+    /// An underrun means the producer delivers in bigger bursts than the buffer allows for:
+    /// give it more room (bounded) so the next burst does not run dry.
+    fn grow(&mut self) {
+        self.target = (self.target * GROW).min(self.base_target * MAX_GROWTH);
+        self.clean_frames = 0.0;
+        if self.relaxed {
+            // the smaller buffer was too small after all: wait much longer before trying again
+            self.relax_s = (self.relax_s * 2.0).min(3600.0);
+            self.relaxed = false;
+        }
+    }
+
+    fn relax(&mut self, out_frames: usize) {
+        if self.target <= self.base_target {
+            return;
+        }
+        self.clean_frames += out_frames as f64;
+        if self.clean_frames >= self.out_rate * self.relax_s {
+            self.clean_frames = 0.0;
+            self.relaxed = true;
+            self.target = (self.target * 0.85).max(self.base_target);
+        }
     }
 
     /// Input frames waiting in the ring plus the internal read-ahead chunk.
@@ -150,12 +196,14 @@ impl DriftResampler {
                     None => {
                         self.primed = false;
                         report.underrun = true;
+                        self.grow();
                         out[i * 2..].fill(0.0);
                         return report;
                     }
                 }
             }
         }
+        self.relax(out.len() / 2);
         report
     }
 }
@@ -272,5 +320,24 @@ mod tests {
         let r = rs.fill(&mut c, &mut out);
         assert!(r.dropped);
         assert!(c.available() / 2 < 480 * 3);
+    }
+
+    #[test]
+    fn bursty_producer_teaches_the_buffer_to_grow_then_stays_clean() {
+        // a Bluetooth-like producer: 1920 frames every 4th 480-frame callback
+        let (mut p, mut c) = ring(1 << 16);
+        let mut rs = DriftResampler::new(48_000, 48_000, 480);
+        let mut out = vec![0f32; 480 * 2];
+        let (mut early, mut late) = (0, 0);
+        for k in 0..4000usize {
+            if k % 4 == 0 {
+                p.push_slice(&sine_frames(k * 480, 1920, 48_000.0, 1000.0));
+            }
+            let r = rs.fill(&mut c, &mut out);
+            if k < 400 { early += r.underrun as usize } else { late += r.underrun as usize }
+        }
+        assert!(early > 0, "the small start target should run dry at least once");
+        assert_eq!(late, 0, "after growing, bursts must no longer underrun");
+        assert!(rs.target_frames() <= 480 * 6);
     }
 }

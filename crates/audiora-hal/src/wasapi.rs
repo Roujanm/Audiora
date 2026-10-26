@@ -140,10 +140,10 @@ struct Shared {
 
 /// Registers the calling thread with the Multimedia Class Scheduler (Pro Audio)
 /// so Windows keeps its audio callbacks on time under load.
-struct Mmcss(Option<HANDLE>);
+pub(crate) struct Mmcss(Option<HANDLE>);
 
 impl Mmcss {
-    fn enter() -> Self {
+    pub(crate) fn enter() -> Self {
         let mut task = 0u32;
         Self(unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut task) }.ok())
     }

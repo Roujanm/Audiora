@@ -60,7 +60,7 @@ impl MixerParams {
                     ["solo"] => Ok(Target::Flag(&s.solo)),
                     ["bus_mask"] => Ok(Target::Mask(&s.bus_mask)),
                     ["denoise"] => Ok(Target::Flag(&s.denoise)),
-                    ["boost_db"] => Ok(Target::Float(&s.boost_db, 0.0, 12.0)),
+                    ["boost_db"] => Ok(Target::Float(&s.boost_db, 0.0, 48.0)),
                     ["denoise_mix"] => Ok(Target::Float(&s.denoise_mix, 0.0, 1.0)),
                     ["lowcut", name] => match *name {
                         "enabled" => Ok(Target::Flag(&s.lowcut.enabled)),
