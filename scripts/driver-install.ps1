@@ -149,8 +149,12 @@ if (-not (Test-Path $inf)) { throw "AudioraVA.inf not found next to this script"
 
 $cer = Join-Path $here "AudioraVA-test.cer"
 if (Test-Path $cer) {
-    Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
-    Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null
+    # certutil, not Import-Certificate: the PowerShell cmdlet is refused writing to the machine Root
+    # store on some Windows 11 builds even when elevated
+    foreach ($store in "Root", "TrustedPublisher") {
+        certutil -f -addstore $store $cer | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "could not add the test certificate to LocalMachine\$store (certutil exit $LASTEXITCODE)" }
+    }
     Write-Host "Trusted the Audiora test certificate."
 }
 
