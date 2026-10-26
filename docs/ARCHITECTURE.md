@@ -272,7 +272,7 @@ Audiora/
 | Engine, mixer, DSP, recorder, presets, control API, exclusive mode, per-app volumes, device-loss recovery | Built and tested |
 | Svelte app + Tauri shell | Built; verified live against the engine in a browser and inside the Tauri window (dev and embedded-asset builds); installer not built |
 | R Interface | Simulator only — real protocol unknown |
-| Virtual audio driver | Designed — blocked: WDK missing, no safe test machine |
+| Virtual audio driver | v1 source written (six endpoints, kernel mic cable); not built yet: WDK missing; test in a Hyper-V VM (`drivers/virtual-audio/README.md`) |
 | ASIO driver | Designed — blocked: Steinberg licence decision |
 | Per-app routing | Built on virtual cables (loopback + per-app output); verified live, including streams moving while they play. Own driver pending |
 | VST3 / CLAP hosting, convolution, true-peak / LRA meters | Not started |

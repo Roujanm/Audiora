@@ -1,7 +1,11 @@
 # Audiora Virtual Audio — driver design
 
-Status: **design only**. Building needs Visual Studio 2022 + the Windows Driver Kit (the WDK is not installed on
-the current dev machine, see `scripts/check-driver-env.ps1`) and a dedicated test machine.
+Status: **v1 source written** (`Source/`, see [README.md](README.md)); not yet built: needs the Windows
+Driver Kit and a test VM. v1 differs from the full design below in one place: instead of the control
+interface and shared-memory rings, the engine records the four outputs with WASAPI loopback (as it
+does for any output today) and the microphone is a kernel *cable* (Mic Feed output → Microphone
+input). That keeps the kernel side to a ring buffer and no IOCTLs; the rings remain the plan for
+lower latency.
 
 ## Goal
 

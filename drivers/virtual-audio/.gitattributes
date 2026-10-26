@@ -1,0 +1,2 @@
+# UTF-16 INF templates must never get line-ending conversion
+*.inx -text

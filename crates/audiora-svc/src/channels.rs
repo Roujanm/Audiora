@@ -202,6 +202,17 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
         let usable = |d: &&DeviceInfo| d.flow == Flow::Capture && !is_virtual(&d.name) && d.sample_rate >= 16_000;
         r.mic_in = devs.iter().filter(usable).find(|d| d.is_default).or_else(|| devs.iter().find(usable)).map(|d| d.id.clone());
     }
+    // Processed microphone: Audiora's own driver has a "Mic Feed" output wired to the
+    // "Audiora Microphone" every program can pick, so with the driver installed this just works.
+    if r.mic_out.is_none() {
+        r.mic_out = devs
+            .iter()
+            .find(|d| {
+                let n = d.name.to_lowercase();
+                d.flow == Flow::Render && n.contains("audiora") && n.contains("mic feed")
+            })
+            .map(|d| d.id.clone());
+    }
     let mut used: HashSet<String> = HashSet::new();
     used.extend(r.master_out.clone());
     used.extend(r.mic_out.clone());
@@ -458,7 +469,7 @@ impl Channels {
         json!({
             "channels": list,
             "master_out": { "device_id": self.resolved.master_out, "device_name": name_of(&self.resolved.master_out), "auto": cfg.master_out.is_none() },
-            "mic_out": { "device_id": self.resolved.mic_out, "device_name": name_of(&self.resolved.mic_out) },
+            "mic_out": { "device_id": self.resolved.mic_out, "device_name": name_of(&self.resolved.mic_out), "auto": cfg.mic_out.is_none() },
             "parking": { "device_id": self.resolved.parking, "device_name": name_of(&self.resolved.parking), "auto": self.resolved.parking_auto },
             "config": cfg.to_json(),
         })
@@ -714,6 +725,29 @@ mod tests {
         assert_eq!(r.devices[1].as_deref(), Some("chat"));
         assert!(r.devices[0].is_some() && r.devices[0] != r.devices[1]);
         assert!(r.auto[0] && r.auto[1]);
+    }
+
+    #[test]
+    fn audiora_driver_endpoints_are_picked_up_without_setup() {
+        // names as Windows shows them once the Audiora Virtual Audio driver is installed
+        let devs = [
+            dev("Headphones (JBL Quantum 360)", Flow::Render, "jbl", true),
+            dev("Audiora Game (Audiora Virtual Audio)", Flow::Render, "game", false),
+            dev("Audiora Chat (Audiora Virtual Audio)", Flow::Render, "chat", false),
+            dev("Audiora Media (Audiora Virtual Audio)", Flow::Render, "media", false),
+            dev("Audiora Aux (Audiora Virtual Audio)", Flow::Render, "aux", false),
+            dev("Audiora Mic Feed (Audiora Virtual Audio)", Flow::Render, "feed", false),
+            dev("Audiora Microphone (Audiora Virtual Audio)", Flow::Capture, "amic", true),
+            dev("Microphone (Realtek)", Flow::Capture, "mic", false),
+        ];
+        let r = resolve(&Config::default(), &devs, &[]);
+        assert_eq!(r.master_out.as_deref(), Some("jbl"));
+        let ch: Vec<_> = r.devices.iter().map(|d| d.as_deref()).collect();
+        assert_eq!(ch, [Some("game"), Some("chat"), Some("media"), Some("aux")]);
+        assert_eq!(r.mic_out.as_deref(), Some("feed"));
+        // even as the Windows default, Audiora's own microphone is never the engine's input (a loop)
+        assert_eq!(r.mic_in.as_deref(), Some("mic"));
+        assert!(r.parking.is_none(), "no parking needed when every channel has its device");
     }
 
     #[test]
