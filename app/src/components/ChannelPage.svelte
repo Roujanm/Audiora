@@ -12,6 +12,7 @@
   import PresetPicker from './PresetPicker.svelte';
   import Segmented from './Segmented.svelte';
   import SettingRow from './SettingRow.svelte';
+  import SignalChain from './SignalChain.svelte';
 
   interface Props {
     ch: ChannelEntry;
@@ -120,7 +121,10 @@
     </Popover>
   </div>
 
-  {#if isMic}<MicCheck />{/if}
+  {#if isMic}
+    <SignalChain strip={ch.strip} color={meta.color} {boostMax} />
+    <MicCheck />
+  {/if}
 
   <ChannelEq strip={ch.strip} color={meta.color} />
 

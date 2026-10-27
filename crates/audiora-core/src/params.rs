@@ -182,6 +182,8 @@ pub struct StripParams {
     /// Post-fader peak of the last processed call (linear).
     pub peak_l: AtomicF32,
     pub peak_r: AtomicF32,
+    /// Peak entering the chain, after the volume boost / mic gain (linear): gain staging.
+    pub in_peak: AtomicF32,
 }
 
 impl StripParams {
@@ -211,6 +213,7 @@ impl StripParams {
             limiter: LimiterParams::new(),
             peak_l: AtomicF32::new(0.0),
             peak_r: AtomicF32::new(0.0),
+            in_peak: AtomicF32::new(0.0),
         }
     }
 }

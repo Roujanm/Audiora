@@ -32,8 +32,8 @@ enum Target<'a> {
     Meter(&'a AtomicF32),
 }
 
-const STRIP_LEAVES: [&str; 10] =
-    ["gain_db", "balance", "mute", "solo", "bus_mask", "peak_l", "peak_r", "denoise", "boost_db", "denoise_mix"];
+const STRIP_LEAVES: [&str; 11] =
+    ["gain_db", "balance", "mute", "solo", "bus_mask", "peak_l", "peak_r", "denoise", "boost_db", "denoise_mix", "in_peak"];
 const LOWCUT_LEAVES: [&str; 2] = ["enabled", "freq"];
 const DEESS_LEAVES: [&str; 3] = ["enabled", "threshold_db", "gr_db"];
 const SMART_LEAVES: [&str; 3] = ["enabled", "target_db", "gain_db"];
@@ -88,6 +88,7 @@ impl MixerParams {
                     },
                     ["peak_l"] => Ok(Target::Meter(&s.peak_l)),
                     ["peak_r"] => Ok(Target::Meter(&s.peak_r)),
+                    ["in_peak"] => Ok(Target::Meter(&s.in_peak)),
                     ["eq", b, name] => {
                         let band = s.eq.get(idx(b)?).ok_or(UnknownPath)?;
                         match *name {
@@ -252,7 +253,7 @@ mod tests {
     fn every_listed_path_resolves() {
         let p = MixerParams::new(3, 2);
         let paths = p.paths();
-        assert_eq!(paths.len(), 3 * (10 + 7 + 18 + 3 + 8 + 2 + 3 + 4) + 2 * (4 + 4));
+        assert_eq!(paths.len(), 3 * (11 + 7 + 18 + 3 + 8 + 2 + 3 + 4) + 2 * (4 + 4));
         for path in &paths {
             assert!(p.get(path).is_ok(), "{path}");
         }

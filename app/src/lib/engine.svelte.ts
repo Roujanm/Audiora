@@ -20,7 +20,8 @@ import type {
   TakeEntry,
 } from './protocol.ts';
 
-const WS_URL = 'ws://127.0.0.1:7879';
+// ?ws=PORT points a development build at a separate test engine instead of the user's own
+const WS_URL = `ws://127.0.0.1:${(typeof location !== 'undefined' && new URLSearchParams(location.search).get('ws')) || '7879'}`;
 const STATE_POLL_MS = 1000;
 const HW_POLL_MS = 100;
 const DIRTY_GRACE_MS = 600;
@@ -291,7 +292,7 @@ class EngineClient {
     const gauges: Record<string, number> = {};
     this.#meterPaths.forEach((path, i) => {
       const v = values[i] ?? 0;
-      if (path.endsWith('/peak_l') || path.endsWith('/peak_r')) {
+      if (path.endsWith('/peak_l') || path.endsWith('/peak_r') || path.endsWith('/in_peak')) {
         meters[path] = stepMeter(this.meters[path], v, now, elapsed);
       } else {
         gauges[path] = v;

@@ -187,6 +187,7 @@ impl Mixer {
                     *v *= g;
                 }
             }
+            p.in_peak.set(buf.iter().fold(0.0f32, |m, v| m.max(v.abs())));
 
             if p.lowcut.enabled.load(Ordering::Relaxed) {
                 st.lowcut.process(buf, p.lowcut.freq.get());
@@ -501,6 +502,8 @@ mod tests {
         p.strips[0].boost_db.set(6.0206);
         let out = run(&mut m, &[dc(0.25)], 1);
         assert!((out[0][100] - 0.5).abs() < 1e-3);
+        // the input meter shows the level entering the chain, boost included
+        assert!((p.strips[0].in_peak.get() - 0.5).abs() < 1e-3, "in_peak {}", p.strips[0].in_peak.get());
     }
 
     #[test]
