@@ -32,7 +32,8 @@ class Desktop {
     const { getVersion } = await import('@tauri-apps/api/app');
     this.version = await getVersion();
     await this.#initAutostart();
-    setTimeout(() => void this.check(false), 8000);
+    // look for an update shortly after start, so a new version greets the user when Audiora opens
+    setTimeout(() => void this.check(false), 3000);
     setInterval(() => void this.check(false), CHECK_EVERY_MS);
   }
 

@@ -6,16 +6,19 @@
   1. Bump "version" in app\src-tauri\tauri.conf.json first.
   2. Run this script. It builds the engine and the app, signs the installer with the update key
      (%USERPROFILE%\.audiora\updater.key, never committed) and writes latest.json.
-  3. Create a GitHub release named v<version> on Roujanm/Audiora and upload the two files the script
-     prints. Running copies of Audiora find the update within six hours (or at once with Setup >
-     Check now) and offer to install it.
-  The repository must be public, or the update URL must point somewhere public, for apps to reach it.
+  3. Publish: with -Publish the script creates the GitHub release v<version> itself (GitHub CLI
+     `gh`, signed in once with `gh auth login`); otherwise create it on github.com and upload the
+     two files the script prints. Audiora checks for updates when it opens (and every six hours)
+     and offers the new version in a pop-up.
+  The repository must be public for running copies of Audiora to reach the update.
+  -Notes: one line per change (`n between lines); they are listed in the update pop-up.
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File scripts\release.ps1 -Notes "Studio: trimming and fades"
+  powershell -ExecutionPolicy Bypass -File scripts\release.ps1 -Notes "Music channel`nNew Setup page" -Publish
 #>
 param(
     [string]$Notes = "Improvements and fixes.",
-    [string]$Repo = "Roujanm/Audiora"
+    [string]$Repo = "Roujanm/Audiora",
+    [switch]$Publish
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -71,4 +74,12 @@ Write-Host ""
 Write-Host "Release ready in $out" -ForegroundColor Green
 Write-Host "  $($setup.Name)   (installer, also the update package)"
 Write-Host "  latest.json      (update manifest)"
-Write-Host "Publish: create release v$version on https://github.com/$Repo/releases and upload both files."
+if ($Publish) {
+    $gh = Get-Command gh -ErrorAction SilentlyContinue
+    if (-not $gh) { throw "GitHub CLI not found: install it (winget install GitHub.cli), run 'gh auth login' once, then run with -Publish again" }
+    & gh release create "v$version" (Join-Path $out $setup.Name) (Join-Path $out "latest.json") --repo $Repo --title "Audiora $version" --notes $Notes
+    if ($LASTEXITCODE -ne 0) { throw "publishing the release failed" }
+    Write-Host "Published: https://github.com/$Repo/releases/tag/v$version" -ForegroundColor Green
+} else {
+    Write-Host "Publish: create release v$version on https://github.com/$Repo/releases and upload both files (or run again with -Publish)."
+}
