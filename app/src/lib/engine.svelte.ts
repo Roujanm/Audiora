@@ -242,6 +242,8 @@ class EngineClient {
         await Promise.all([this.refreshChannels(), this.refreshRoutes(), this.refreshProfiles(), this.refreshApps().catch(() => {})]);
         for (const c of ['game', 'chat', 'media', 'aux', 'mic']) await this.refreshChannelPresets(c);
         this.#timers.push(window.setInterval(() => void this.refreshApps().catch(() => {}), 1500));
+        // headphones plugged in a moment ago show up in every device list within two seconds
+        this.#timers.push(window.setInterval(() => void this.refreshDevices().catch(() => {}), 2000));
       }
       this.connected = true;
       this.connecting = false;

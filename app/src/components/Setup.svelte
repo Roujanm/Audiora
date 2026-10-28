@@ -82,8 +82,10 @@
   }
 
   // Bluetooth hands-free microphones run at 8-16 kHz and switch the headset to telephone quality
-  const label = (d: { name: string; flow: string; sample_rate: number }) =>
-    shortName(d.name) + (d.flow === 'capture' && d.sample_rate > 0 && d.sample_rate < 16000 ? ' — hands-free (makes the headset sound robotic)' : '');
+  const label = (d: { name: string; flow: string; sample_rate: number; default?: boolean }) =>
+    shortName(d.name) +
+    (d.default ? ' · Windows default' : '') +
+    (d.flow === 'capture' && d.sample_rate > 0 && d.sample_rate < 16000 ? ' — hands-free (makes the headset sound robotic)' : '');
   const chState = (k: string) => engine.channels?.channels.find((c) => c.key === k);
 </script>
 
@@ -108,7 +110,7 @@
         <label>
           <span>Speakers / headphones</span>
           <select bind:value={draft.master_out}>
-            <option value="">Automatic{engine.channels?.master_out.auto && engine.channels.master_out.device_name ? ` — ${shortName(engine.channels.master_out.device_name)}` : ''}</option>
+            <option value="">Automatic, follows Windows{engine.channels?.master_out.auto && engine.channels.master_out.device_name ? ` — now ${shortName(engine.channels.master_out.device_name)}` : ''}</option>
             {#each renders as d (d.id)}<option value={d.id}>{label(d)}</option>{/each}
           </select>
         </label>

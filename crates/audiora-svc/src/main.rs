@@ -260,6 +260,37 @@ fn main() -> ExitCode {
         })
     });
 
+    // An automatic output follows Windows: plug in headphones (Windows makes them the default
+    // output) and the engine moves onto them. It restarts itself for that; the desktop app starts
+    // it again within a second. Only when nothing was chosen in Setup and no --out was given.
+    let follow = (channel_mode && !args.iter().any(|a| a == "--out")).then(|| {
+        let (stop, dir, current) = (stop.clone(), data_dir.clone(), engine.info.buses[0].device_id.clone());
+        std::thread::spawn(move || {
+            let mut seen = 0;
+            while !stop.load(Ordering::Relaxed) {
+                for _ in 0..20 {
+                    if stop.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                let cfg = channels::Config::load(&dir);
+                if cfg.master_out.is_some() {
+                    seen = 0;
+                    continue;
+                }
+                let devs = audiora_hal::list_devices().unwrap_or_default();
+                let pick = channels::resolve(&cfg, &devs, &audiora_hal::running_process_names()).master_out;
+                // two readings in a row: Windows settles the default a moment after a device arrives
+                seen = if pick.is_some() && pick != current { seen + 1 } else { 0 };
+                if seen >= 2 {
+                    println!("output changed to {}; restarting onto it", pick.unwrap_or_default());
+                    stop.store(true, Ordering::Relaxed);
+                }
+            }
+        })
+    });
+
     let sim_r = args.iter().any(|a| a == "--sim-r") || (channel_mode && channels::Config::load(&data_dir).sim_r);
     let studio = Arc::new(studio::Studio::new(studio::default_root(), engine.rec.clone(), engine.playback.clone()));
     let api = Arc::new(Api {
@@ -321,6 +352,9 @@ fn main() -> ExitCode {
     let _ = autosave.join();
     if let Some(m) = mic_mute {
         let _ = m.join();
+    }
+    if let Some(f) = follow {
+        let _ = f.join();
     }
     // finish a Studio take before the engine closes its recorder
     let _ = studio.stop();
