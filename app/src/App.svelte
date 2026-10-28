@@ -6,7 +6,8 @@
   import type { ChannelKey } from './lib/protocol.ts';
   import ChannelColumn from './components/ChannelColumn.svelte';
   import ChannelPage from './components/ChannelPage.svelte';
-  import MasterColumn from './components/MasterColumn.svelte';
+  import AppsDock from './components/AppsDock.svelte';
+  import MasterStage from './components/MasterStage.svelte';
   import Studio from './components/Studio.svelte';
   import Hardware from './components/Hardware.svelte';
   import Setup from './components/Setup.svelte';
@@ -194,9 +195,20 @@
   });
 
   const current = $derived(NAV.find((n) => n.id === tab)!);
+  // the aurora breathes with the master output (0 = silence, 1 = loud)
+  const auroraLevel = $derived(
+    Math.max(0, Math.min(1, (Math.max(engine.peakDb('bus/0/peak_l'), engine.peakDb('bus/0/peak_r')) + 50) / 44)).toFixed(2),
+  );
   const master = $derived(buses[0]);
   const s = $derived(engine.stats);
   const glitches = $derived(s.underruns + s.drift_drops + s.capture_drops + s.device_errors);
+  const glitchTitle = $derived(
+    engine.glitchLog.length
+      ? ['Recent glitches:', ...engine.glitchLog.slice(0, 8).map((g) => `${new Date(g.t * 1000).toLocaleTimeString()}  ${g.kind} · ${g.place}`)].join(
+          String.fromCharCode(10),
+        )
+      : 'Underruns, drift drops, dropped blocks and device errors since start',
+  );
   const routedCount = $derived(engine.appGroups.filter((a) => a.route).length);
   const ready = $derived(channelList.filter((c) => c.kind === 'apps' && c.online).length);
   const subtitle = $derived(
@@ -222,40 +234,26 @@
 
 {#if splash}<Splash ondone={() => (splash = false)} />{/if}
 
-<div class="app">
-  <nav class="rail" aria-label="Sections">
-    <div class="logo" aria-label="Audiora">
-      <Logo variant="glyph" size={30} />
-    </div>
-    <div class="items">
-      {#each RAIL as n (n.id)}
-        {@const active = n.id === 'mixer' ? inMixer : tab === n.id}
-        <button class="item" class:active aria-current={active ? 'page' : undefined} onclick={() => (tab = n.id)}>
-          <span class="ico"><Icon name={n.icon} size={20} />{#if n.id === 'studio' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}</span>
-          <span class="lbl">{n.label}</span>
-        </button>
-      {/each}
-    </div>
-    <span class="brand-foot">Roujan<br />Digital</span>
-  </nav>
+<div class="app" style:--lvl={auroraLevel}>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <div class="shell">
     <header class="top">
-      {#if inMixer}
-        <nav class="tabs" aria-label="Channels">
-          {#each CHANNEL_TABS as t (t.id)}
-            <button class="tab" class:active={tab === t.id} style:--c={t.color ?? 'var(--accent)'} aria-current={tab === t.id ? 'page' : undefined} onclick={() => (tab = t.id)}>
-              <Icon name={t.icon} size={16} />
-              <span>{t.label}</span>
-            </button>
-          {/each}
-        </nav>
-      {:else}
-        <div class="title">
-          <h1>{current.title}</h1>
-          <p class="muted">{subtitle}</p>
-        </div>
-      {/if}
+      <div class="brand" aria-label="Audiora">
+        <span class="logo"><Logo variant="glyph" size={22} /></span>
+        <span class="word">Audiora</span>
+      </div>
+
+      <nav class="primary" aria-label="Sections">
+        {#each RAIL as n (n.id)}
+          {@const active = n.id === 'mixer' ? inMixer : tab === n.id}
+          <button class="item" class:active aria-current={active ? 'page' : undefined} onclick={() => (tab = n.id)}>
+            <Icon name={n.icon} size={16} />
+            <span>{n.label}</span>
+            {#if n.id === 'studio' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}
+          </button>
+        {/each}
+      </nav>
 
       <div class="spacer"></div>
 
@@ -298,6 +296,22 @@
       </Popover>
     </header>
 
+    {#if inMixer && engine.connected}
+      <nav class="tabs" aria-label="Channels">
+        {#each CHANNEL_TABS as t (t.id)}
+          <button class="tab" class:active={tab === t.id} style:--c={t.color ?? 'var(--accent)'} aria-current={tab === t.id ? 'page' : undefined} onclick={() => (tab = t.id)}>
+            <Icon name={t.icon} size={15} />
+            <span>{t.label}</span>
+          </button>
+        {/each}
+      </nav>
+    {:else if !inMixer}
+      <div class="title">
+        <h1>{current.title}</h1>
+        <p class="muted">{subtitle}</p>
+      </div>
+    {/if}
+
     <main>
       {#if !engine.connected}
         <div class="connect panel pad" role="status">
@@ -319,13 +333,15 @@
           </div>
         </div>
       {:else if tab === 'mixer'}
-        <div class="mixer">
-          <MasterColumn />
-          <div class="divider"></div>
+        <div class="overview">
+          <MasterStage />
+          <div class="mixer">
+          <div class="side"><AppsDock /></div>
           <div class="channels">
             {#each channelList as c (c.key)}
               <ChannelColumn ch={c} onopen={() => (tab = c.key)} onsetup={() => (tab = 'system')} />
             {/each}
+          </div>
           </div>
         </div>
       {:else if currentChannel}
@@ -358,7 +374,7 @@
 
     <footer class="foot">
       {#if engine.connected}
-        <span class="chip" class:warn={glitches > 6} title="Underruns, drift drops, dropped blocks and device errors since start">
+        <span class="chip" class:warn={glitches > 6} title={glitchTitle}>
           {glitches === 0 ? 'No audio glitches' : `${glitches} glitch events`}
         </span>
         {#if engine.rec.recording}<span class="chip bad">● Recording</span>{/if}
@@ -375,99 +391,81 @@
 
 <style>
   .app {
-    display: grid;
-    grid-template-columns: 84px 1fr;
+    position: relative;
     height: 100%;
+    isolation: isolate;
   }
 
-  /* ----- rail */
-  .rail {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 22px;
-    padding: 18px 0 14px;
-    background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
-    border-right: 1px solid var(--line);
+  /* ----- aurora: three slow light fields behind everything, brighter while sound plays */
+  .aurora {
+    position: fixed;
+    inset: -20%;
+    z-index: -1;
+    pointer-events: none;
+    filter: blur(70px) saturate(130%);
+    opacity: calc(0.45 + var(--lvl, 0) * 0.45);
+    transition: opacity 0.35s linear;
   }
 
-  .logo {
-    width: 46px;
-    height: 46px;
-    display: grid;
-    place-items: center;
-    border-radius: 13px;
-    color: #fff;
-    background: #000;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 24px -10px rgba(0, 0, 0, 0.9);
-  }
-
-  .items {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    width: 100%;
-    padding: 0 10px;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    scrollbar-width: none;
-  }
-
-
-  .item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: none;
-    gap: 3px;
-    padding: 7px 0 6px;
-    border: 0;
-    border-radius: 12px;
-    background: none;
-    color: var(--muted);
-    position: relative;
-    transition: color 0.15s, background 0.15s;
-  }
-
-  .item:hover {
-    color: var(--text);
-    background: var(--bg-2);
-  }
-
-  .item.active {
-    color: var(--c);
-    background: color-mix(in oklab, var(--c) 15%, transparent);
-  }
-
-  .item.active::before {
-    content: '';
+  .aurora i {
     position: absolute;
-    left: -10px;
-    top: 14px;
-    bottom: 14px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: var(--c);
-    box-shadow: 0 0 12px var(--c);
+    width: 46vw;
+    height: 46vw;
+    border-radius: 50%;
+    mix-blend-mode: screen;
   }
 
-  .ico {
-    position: relative;
-    display: grid;
+  .aurora i:nth-child(1) {
+    left: 8%;
+    top: 4%;
+    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 30%, #3a6bff 30%), transparent 65%);
+    animation: drift-a 26s ease-in-out infinite alternate;
   }
 
-  .lbl {
-    font-size: 10px;
-    font-weight: 600;
+  .aurora i:nth-child(2) {
+    right: 4%;
+    top: 18%;
+    background: radial-gradient(circle, color-mix(in oklab, #2ed3e6 40%, transparent), transparent 65%);
+    animation: drift-b 32s ease-in-out infinite alternate;
+  }
+
+  .aurora i:nth-child(3) {
+    left: 32%;
+    bottom: -6%;
+    background: radial-gradient(circle, color-mix(in oklab, #a58bff 38%, transparent), transparent 65%);
+    animation: drift-c 38s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift-a {
+    to {
+      transform: translate(14vw, 8vh) scale(1.15);
+    }
+  }
+
+  @keyframes drift-b {
+    to {
+      transform: translate(-16vw, 12vh) scale(0.9);
+    }
+  }
+
+  @keyframes drift-c {
+    to {
+      transform: translate(10vw, -14vh) scale(1.2);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora i {
+      animation: none;
+    }
   }
 
   .recdot {
     position: absolute;
-    top: -2px;
-    right: -5px;
-    width: 8px;
-    height: 8px;
+    top: 6px;
+    right: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--rec);
     box-shadow: 0 0 8px var(--rec);
@@ -480,20 +478,11 @@
     }
   }
 
-  .brand-foot {
-    font-size: 8.5px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--faint);
-    text-align: center;
-    line-height: 1.5;
-  }
-
   /* ----- shell */
   .shell {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto auto 1fr auto;
+    height: 100%;
     min-width: 0;
     min-height: 0;
   }
@@ -503,14 +492,77 @@
     z-index: 20; /* popovers open over the page below */
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 22px;
-    border-bottom: 1px solid var(--line);
-    background: color-mix(in oklab, var(--bg-1) 70%, transparent);
-    backdrop-filter: blur(10px);
+    gap: 14px;
+    margin: 14px 18px 0;
+    padding: 8px 10px 8px 14px;
+    border-radius: 18px;
+    background: var(--glass);
+    border: 1px solid var(--glass-line);
+    backdrop-filter: blur(22px) saturate(150%);
+    box-shadow: var(--shadow-2);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-right: 6px;
+  }
+
+  .logo {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    color: #fff;
+    background: #000;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 16px -6px rgba(0, 0, 0, 0.9);
+  }
+
+  .word {
+    font-size: 15px;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+  }
+
+  .primary {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 13px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--glass-line);
+  }
+
+  .item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .item:hover {
+    color: var(--text);
+  }
+
+  .item.active {
+    color: var(--on-accent);
+    background: linear-gradient(180deg, var(--accent-hi), var(--accent));
+    box-shadow: 0 6px 18px -8px var(--accent-glow);
   }
 
   .title {
+    margin: 16px 26px 0;
     min-width: 0;
   }
 
@@ -518,17 +570,14 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 12px;
   }
 
   .title h1 {
-    font-size: 19px;
-    font-weight: 700;
-    letter-spacing: -0.015em;
+    font-size: 24px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
     line-height: 1.15;
-  }
-
-  .title p {
-    font-size: 12px;
   }
 
   .spacer {
@@ -537,11 +586,8 @@
 
   .tabs {
     display: flex;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 14px;
-    background: var(--bg-0);
-    border: 1px solid var(--line);
+    gap: 6px;
+    margin: 14px 18px 0;
     min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
@@ -552,37 +598,57 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 36px;
-    padding: 0 16px 0 13px;
-    border: 0;
-    border-radius: 10px;
-    background: none;
-    color: var(--muted);
+    height: 34px;
+    padding: 0 15px 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-line);
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    color: var(--text-2);
     font-weight: 600;
     font-size: 13px;
-    transition: color 0.15s, background 0.15s;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
   }
 
   .tab :global(svg) {
     color: var(--c);
-    opacity: 0.75;
   }
 
   .tab:hover {
     color: var(--text);
-    background: var(--bg-2);
+    border-color: color-mix(in oklab, var(--c) 40%, var(--glass-line));
   }
 
   .tab.active {
     color: var(--text);
-    background: linear-gradient(180deg, color-mix(in oklab, var(--c) 24%, var(--bg-3)), color-mix(in oklab, var(--c) 12%, var(--bg-2)));
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--c) 40%, transparent), 0 6px 18px -8px var(--c);
+    border-color: color-mix(in oklab, var(--c) 70%, transparent);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--c) 30%, transparent), color-mix(in oklab, var(--c) 12%, transparent));
+    box-shadow: 0 0 22px -6px var(--c);
   }
 
-  .tab.active :global(svg) {
-    opacity: 1;
+  .overview {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    min-height: 0;
   }
 
+  .overview .mixer {
+    flex: 1;
+  }
+
+  .side {
+    width: 248px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .side > :global(*) {
+    flex: 1;
+  }
 
   /* every view fades and rises in when it is opened */
   .mixer,
@@ -669,7 +735,7 @@
   main {
     min-height: 0;
     min-width: 0;
-    padding: 18px 22px;
+    padding: 14px 18px 10px;
     overflow: hidden;
   }
 
@@ -693,12 +759,6 @@
 
   .channels > :global(.col) {
     max-height: 760px;
-  }
-
-  .divider {
-    width: 1px;
-    flex: none;
-    background: linear-gradient(180deg, transparent, var(--line-2) 12%, var(--line-2) 88%, transparent);
   }
 
   .scroll {
@@ -839,9 +899,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 9px 22px;
-    border-top: 1px solid var(--line);
-    background: color-mix(in oklab, var(--bg-1) 70%, transparent);
+    padding: 6px 26px 12px;
     font-size: 12px;
   }
 

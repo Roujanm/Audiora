@@ -54,6 +54,10 @@
   --mono: 'JetBrains Mono Variable', 'Cascadia Mono', ui-monospace, monospace;
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Aurora: frosted glass over a moving light field */
+  --glass: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
+  --glass-line: rgba(255, 255, 255, 0.09);
 }
 
 :root[data-accent='mono'] {
@@ -100,10 +104,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 12% -10%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 60%),
-    radial-gradient(900px 500px at 100% 110%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 55%),
-    var(--bg-0);
+  background: #05070b;
   color: var(--text);
   font: 13px/1.45 var(--font);
   font-feature-settings: 'cv11', 'ss01', 'tnum';
@@ -183,10 +184,11 @@ h2.eyebrow,
 /* ------------------------------------------------------------ surfaces */
 .panel {
   position: relative;
-  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-2);
+  background: var(--glass), color-mix(in oklab, var(--bg-1) 72%, transparent);
+  border: 1px solid var(--glass-line);
+  border-radius: 20px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(20px) saturate(140%);
 }
 
 .panel.pad {

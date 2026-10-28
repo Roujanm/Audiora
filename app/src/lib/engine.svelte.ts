@@ -80,6 +80,8 @@ class EngineClient {
   /** Other meters as reported: gain reduction in dB, gate open flag. */
   gauges = $state<Record<string, number>>({});
   stats = $state<Stats>({ callbacks: 0, underruns: 0, drift_drops: 0, capture_drops: 0, device_errors: 0 });
+  /** The engine's recent glitches, newest first: unix time, kind and where it happened. */
+  glitchLog = $state<{ t: number; kind: string; place: string }[]>([]);
   rec = $state<RecStatus>({ recording: false });
   takes = $state<TakeEntry[]>([]);
   presets = $state<string[]>([]);
@@ -406,6 +408,7 @@ class EngineClient {
     }
     this.params = next;
     this.stats = r.stats as Stats;
+    this.glitchLog = (r.glitches as { t: number; kind: string; place: string }[] | undefined) ?? [];
   }
 
   // ---- presets ----------------------------------------------------------
