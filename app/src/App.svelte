@@ -10,7 +10,6 @@
   import MasterStage from './components/MasterStage.svelte';
   import VoiceStudio from './components/VoiceStudio.svelte';
   import Studio from './components/Studio.svelte';
-  import Hardware from './components/Hardware.svelte';
   import Setup from './components/Setup.svelte';
   import System from './components/System.svelte';
   import Icon, { type IconName } from './components/Icon.svelte';
@@ -26,7 +25,7 @@
   engine.start();
   void desktop.start();
 
-  type Tab = 'mixer' | ChannelKey | 'studio' | 'hardware' | 'system';
+  type Tab = 'mixer' | ChannelKey | 'studio' | 'system';
 
   function remembered<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
     try {
@@ -49,7 +48,7 @@
   }
   let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'mono'));
   let splash = $state(true);
-  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'mic', 'studio', 'hardware', 'system'];
+  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'mic', 'studio', 'system'];
   let tab = $state<Tab>(remembered('audiora.tab', TABS, 'mixer'));
 
   $effect(() => {
@@ -77,7 +76,6 @@
     { id: 'mixer', label: 'Mixer', icon: 'mixer', title: 'Mixer' },
     { id: 'mic', label: 'Voice', icon: 'mic', title: 'Voice' },
     { id: 'studio', label: 'Studio', icon: 'record', title: 'Studio' },
-    { id: 'hardware', label: 'Interface', icon: 'interface', title: 'Audio interface' },
     { id: 'system', label: 'Setup', icon: 'system', title: 'Setup & health' },
   ];
 
@@ -227,9 +225,7 @@
             : 'Not set up'
         : tab === 'studio'
           ? 'Multitrack recording of every channel'
-          : tab === 'hardware'
-            ? 'Preamps, phantom power, monitoring'
-            : 'Devices, channels and audio health',
+          : 'Devices, channels and audio health',
   );
 </script>
 
@@ -327,7 +323,7 @@
             {#if engine.lastError}<p class="chip bad err">{engine.lastError}</p>{/if}
           </div>
         </div>
-      {:else if !engine.channelMode && tab !== 'studio' && tab !== 'hardware' && tab !== 'system'}
+      {:else if !engine.channelMode && tab !== 'studio' && tab !== 'system'}
         <div class="connect panel pad" role="status">
           <span class="warn-ico"><Icon name="alert" size={26} /></span>
           <div>
@@ -355,8 +351,6 @@
         {/key}
       {:else if tab === 'studio'}
         <div class="fill"><Studio /></div>
-      {:else if tab === 'hardware'}
-        <div class="scroll"><Hardware /></div>
       {:else}
         <div class="scroll stack">
           {#if engine.channelMode}<Setup />{/if}
