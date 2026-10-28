@@ -2,6 +2,8 @@
 //! exclusive, the Audiora ASIO driver and the R Interface native backend,
 //! all behind the same device/stream vocabulary defined here.
 
+#[cfg(windows)]
+mod endpoint;
 mod format;
 #[cfg(windows)]
 mod policy;
@@ -14,6 +16,8 @@ mod sessions;
 #[cfg(windows)]
 mod wasapi;
 
+#[cfg(windows)]
+pub use endpoint::{endpoint_level, endpoint_mute, set_endpoint_level, set_endpoint_mute};
 #[cfg(windows)]
 pub use policy::{get_app_output, set_app_output};
 #[cfg(windows)]

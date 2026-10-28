@@ -91,17 +91,20 @@ class Desktop {
     try {
       let total = 0;
       let got = 0;
-      // the engine's files are replaced too: stop it (and keep the UI from restarting it) first
-      const { invoke } = await import('@tauri-apps/api/core');
-      engine.suspend();
-      await invoke('stop_engine_now');
-      await u.downloadAndInstall((ev) => {
+      // download while the sound keeps playing; only the install itself needs the engine stopped
+      await u.download((ev) => {
         if (ev.event === 'Started') total = ev.data.contentLength ?? 0;
         else if (ev.event === 'Progress') {
           got += ev.data.chunkLength;
           this.progress = total ? got / total : 0;
-        } else if (ev.event === 'Finished') this.phase = 'installing';
+        }
       });
+      // the engine's files are replaced too: stop it (and keep the UI from restarting it) first
+      this.phase = 'installing';
+      const { invoke } = await import('@tauri-apps/api/core');
+      engine.suspend();
+      await invoke('stop_engine_now');
+      await u.install();
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (e) {

@@ -20,6 +20,15 @@ const GROW: f64 = 1.5;
 const MAX_GROWTH: f64 = 6.0;
 /// Seconds of clean playback before the target eases back toward the configured one.
 const RELAX_AFTER_S: f64 = 60.0;
+/// Catch-up trim while the ring holds more than twice its target (after the consumer stalled):
+/// +1.5 % for a moment is inaudible on speech and far better than throwing audio away.
+const CATCH_UP_TRIM: f64 = 0.015;
+/// Audio is only discarded beyond this many targets *and* this much time; until then the
+/// catch-up trim brings the fill back.
+const DROP_TARGETS: f64 = 8.0;
+const DROP_MIN_S: f64 = 0.25;
+/// Gaps (underrun, discard, priming) are faded over this many frames instead of hard-cut.
+const FADE_FRAMES: usize = 64;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FillReport {
@@ -47,6 +56,8 @@ pub struct DriftResampler {
     fill_avg: f64,
     have_avg: bool,
     primed: bool,
+    /// Frames left of the fade-in that follows a gap.
+    fade_in: usize,
 }
 
 impl DriftResampler {
@@ -70,6 +81,7 @@ impl DriftResampler {
             fill_avg: 0.0,
             have_avg: false,
             primed: false,
+            fade_in: 0,
         }
     }
 
@@ -151,17 +163,20 @@ impl DriftResampler {
                 let first = self.next_frame(cons).unwrap_or([0.0; 2]);
                 self.hist = [first; 4];
                 self.frac = 0.0;
+                self.fade_in = FADE_FRAMES;
             } else {
                 out.fill(0.0);
                 return report;
             }
         }
 
-        if buffered > self.target * 4.0 {
+        let drop_at = (self.target * DROP_TARGETS).max(self.nominal * self.out_rate * DROP_MIN_S);
+        if buffered > drop_at {
             let excess = (buffered - self.target) as usize;
             self.discard(cons, excess);
             report.dropped = true;
             self.have_avg = false;
+            self.fade_in = FADE_FRAMES;
         }
 
         let buffered = self.buffered_frames(cons) as f64;
@@ -172,7 +187,13 @@ impl DriftResampler {
             buffered
         };
         let err = (self.fill_avg - self.target) / self.target;
-        self.ratio = self.nominal * (1.0 + (err * TRIM_GAIN).clamp(-MAX_TRIM, MAX_TRIM));
+        let trim = if buffered > self.target * 2.0 {
+            // well above target right now (the consumer stalled): catch up quickly
+            CATCH_UP_TRIM
+        } else {
+            (err * TRIM_GAIN).clamp(-MAX_TRIM, MAX_TRIM)
+        };
+        self.ratio = self.nominal * (1.0 + trim);
 
         let mut i = 0;
         while i < out.len() / 2 {
@@ -184,6 +205,12 @@ impl DriftResampler {
                         + (p2 - p0) * t
                         + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t
                         + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t * t * t);
+            }
+            if self.fade_in > 0 {
+                let g = (FADE_FRAMES - self.fade_in) as f32 / FADE_FRAMES as f32;
+                out[i * 2] *= g;
+                out[i * 2 + 1] *= g;
+                self.fade_in -= 1;
             }
             i += 1;
             self.frac += self.ratio;
@@ -197,6 +224,14 @@ impl DriftResampler {
                         self.primed = false;
                         report.underrun = true;
                         self.grow();
+                        // fade the audio already written into this block, then silence: no click
+                        let k = i.min(FADE_FRAMES);
+                        for j in 0..k {
+                            let g = j as f32 / k as f32;
+                            let f = i - k + j;
+                            out[f * 2] *= 1.0 - g;
+                            out[f * 2 + 1] *= 1.0 - g;
+                        }
                         out[i * 2..].fill(0.0);
                         return report;
                     }
@@ -339,5 +374,55 @@ mod tests {
         assert!(early > 0, "the small start target should run dry at least once");
         assert_eq!(late, 0, "after growing, bursts must no longer underrun");
         assert!(rs.target_frames() <= 480 * 6);
+    }
+
+    #[test]
+    fn underrun_fades_out_instead_of_clicking() {
+        let (mut p, mut c) = ring(1 << 14);
+        let mut rs = DriftResampler::new(48_000, 48_000, 480);
+        p.push_slice(&dc_frames(0.5, 1200));
+        let mut out = vec![0f32; 480 * 2];
+        let mut last_audio = Vec::new();
+        for _ in 0..4 {
+            let r = rs.fill(&mut c, &mut out);
+            if r.underrun {
+                last_audio = out.clone();
+                break;
+            }
+        }
+        assert!(!last_audio.is_empty(), "expected an underrun");
+        // the step into silence is a ramp, never a jump from full level to zero
+        let max_step = last_audio.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0, f32::max);
+        assert!(max_step < 0.05, "click of {max_step}");
+    }
+
+    #[test]
+    fn a_stalled_consumer_catches_up_without_discarding_audio() {
+        let (mut p, mut c) = ring(1 << 16);
+        // the engine's target for two 10 ms devices: (480 + 480) * 1.5 frames
+        let target = 1440;
+        let mut rs = DriftResampler::new(48_000, 48_000, target);
+        let mut out = vec![0f32; 480 * 2];
+        let (mut drops, mut under) = (0, 0);
+        p.push_slice(&sine_frames(0, target, 48_000.0, 440.0));
+        let mut produced = target;
+        for k in 0..3000usize {
+            p.push_slice(&sine_frames(produced, 480, 48_000.0, 440.0));
+            produced += 480;
+            // the output device stalls for 120 ms once (a Bluetooth hiccup): 12 blocks pile up
+            if (100..112).contains(&k) {
+                continue;
+            }
+            let r = rs.fill(&mut c, &mut out);
+            drops += r.dropped as usize;
+            under += r.underrun as usize;
+        }
+        assert_eq!(drops, 0, "audio was thrown away");
+        assert_eq!(under, 0);
+        assert!(rs.buffered_frames(&c) < target * 2, "did not catch up: {} frames queued", rs.buffered_frames(&c));
+    }
+
+    fn dc_frames(v: f32, n: usize) -> Vec<f32> {
+        vec![v; n * 2]
     }
 }

@@ -167,6 +167,12 @@ impl Drop for Shared {
     }
 }
 
+pub(crate) fn open_device_by_id(id: &str) -> Result<IMMDevice> {
+    let e = enumerator()?;
+    let wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
+    Ok(unsafe { e.GetDevice(PCWSTR(wide.as_ptr()))? })
+}
+
 fn open_device(flow: Flow, id: Option<&str>) -> Result<IMMDevice> {
     let e = enumerator()?;
     Ok(unsafe {

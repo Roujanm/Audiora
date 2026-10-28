@@ -235,6 +235,31 @@ fn main() -> ExitCode {
         })
     };
 
+    // The Mic channel's mute is Windows' mute of the microphone. Discord, Chrome and every other
+    // program read the microphone directly, so a mute inside Audiora alone would not silence them.
+    // Audiora only ever changes it when its own button changes (or starts muted): a microphone the
+    // user muted in Windows stays muted.
+    let mic_mute = channel_mode.then(|| engine.info.strips[channels::MIC].device_id.clone()).flatten().map(|id| {
+        let (params, stop) = (engine.params.clone(), stop.clone());
+        std::thread::spawn(move || {
+            let strip = &params.strips[channels::MIC];
+            let mut applied = strip.mute.load(Ordering::Relaxed);
+            if applied {
+                let _ = audiora_hal::set_endpoint_mute(&id, true);
+            }
+            while !stop.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(80));
+                let want = strip.mute.load(Ordering::Relaxed);
+                if want != applied {
+                    if let Err(e) = audiora_hal::set_endpoint_mute(&id, want) {
+                        eprintln!("could not {} the microphone in Windows: {e}", if want { "mute" } else { "unmute" });
+                    }
+                    applied = want;
+                }
+            }
+        })
+    });
+
     let sim_r = args.iter().any(|a| a == "--sim-r") || (channel_mode && channels::Config::load(&data_dir).sim_r);
     let studio = Arc::new(studio::Studio::new(studio::default_root(), engine.rec.clone(), engine.playback.clone()));
     let api = Arc::new(Api {
@@ -294,6 +319,9 @@ fn main() -> ExitCode {
         let _ = w.join();
     }
     let _ = autosave.join();
+    if let Some(m) = mic_mute {
+        let _ = m.join();
+    }
     // finish a Studio take before the engine closes its recorder
     let _ = studio.stop();
     match presets.save(last, &engine.params) {

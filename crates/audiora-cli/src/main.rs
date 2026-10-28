@@ -19,6 +19,7 @@ fn main() -> ExitCode {
         Some("props") => props(&args[1..]),
         Some("loopcap") => loopcap(&args[1..]),
         Some("cabletest") => cabletest(&args[1..]),
+        Some("mute") => endpoint_mute(&args[1..]),
         _ => {
             eprintln!("usage: audiora devices | tone [--device ID] [--freq HZ] [--secs S] [--gain DB] [--bass DB]");
             return ExitCode::from(2);
@@ -209,6 +210,22 @@ fn loopcap(args: &[String]) -> Res {
             tick();
         }),
     )?;
+    Ok(())
+}
+
+/// `mute NAME [on|off]`: shows or sets Windows' mute of the first endpoint whose name contains NAME.
+fn endpoint_mute(args: &[String]) -> Res {
+    let words = args.first().ok_or("usage: mute NAME [on|off]")?.to_lowercase();
+    let d = list_devices()?
+        .into_iter()
+        .find(|d| d.name.to_lowercase().contains(&words))
+        .ok_or_else(|| format!("no device matching \"{words}\""))?;
+    match args.get(1).map(String::as_str) {
+        Some("on") => audiora_hal::set_endpoint_mute(&d.id, true)?,
+        Some("off") => audiora_hal::set_endpoint_mute(&d.id, false)?,
+        _ => {}
+    }
+    println!("{}: muted={} level={:.0}%", d.name, audiora_hal::endpoint_mute(&d.id)?, audiora_hal::endpoint_level(&d.id)? * 100.0);
     Ok(())
 }
 

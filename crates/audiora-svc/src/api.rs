@@ -22,7 +22,7 @@ use audiora_device::{ControlKind, HardwareInterface};
 use serde_json::{json, Map, Value};
 
 use crate::analysis::{Analysis, SPECTRUM_OFF};
-use crate::engine::{MicTest, Stats};
+use crate::engine::{Glitch, MicTest, Stats, SRC_OUTPUT, SRC_TAP};
 use crate::studio::Studio;
 use crate::channels::{channel_index, Channels};
 use crate::presets::{PresetStore, LAST, LAST_CHANNELS};
@@ -407,6 +407,35 @@ impl Api {
         json!({ "paths": paths, "values": values })
     }
 
+    /// The recent glitches, newest first, with a readable place: "Mic", "Chrome on Media" style
+    /// application captures ("apps on Media"), or an output ("output Headphones").
+    fn glitches_json(&self) -> Value {
+        let name = |kind: &str, i: u32| self.info[kind][i as usize]["name"].as_str().unwrap_or("?").to_owned();
+        let list: Vec<Value> = self
+            .stats
+            .glitches
+            .recent()
+            .into_iter()
+            .map(|(t, kind, src)| {
+                let place = if src >= SRC_OUTPUT {
+                    format!("output {}", name("buses", src - SRC_OUTPUT))
+                } else if src >= SRC_TAP {
+                    format!("apps on {}", name("strips", src - SRC_TAP))
+                } else {
+                    name("strips", src)
+                };
+                let kind = match kind {
+                    Glitch::Underrun => "underrun",
+                    Glitch::Drop => "drop",
+                    Glitch::CaptureFull => "overflow",
+                    Glitch::DeviceLost => "device lost",
+                };
+                json!({ "t": t, "kind": kind, "place": place })
+            })
+            .collect();
+        Value::Array(list)
+    }
+
     fn state(&self) -> Value {
         let params: Map<String, Value> =
             self.params.snapshot().into_iter().map(|(k, v)| (k, json!(v))).collect();
@@ -418,7 +447,8 @@ impl Api {
                 "drift_drops": self.stats.drift_drops.load(Relaxed),
                 "capture_drops": self.stats.capture_drops.load(Relaxed),
                 "device_errors": self.stats.device_errors.load(Relaxed),
-            }
+            },
+            "glitches": self.glitches_json(),
         })
     }
 

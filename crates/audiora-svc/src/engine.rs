@@ -90,6 +90,56 @@ pub struct Stats {
     pub capture_drops: AtomicU64,
     /// A device stream ended unexpectedly (unplugged, taken exclusively, driver reset).
     pub device_errors: AtomicU64,
+    /// When and where the recent glitches happened.
+    pub glitches: GlitchLog,
+}
+
+/// What went wrong in one glitch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Glitch {
+    Underrun = 1,
+    Drop = 2,
+    CaptureFull = 3,
+    DeviceLost = 4,
+}
+
+/// Where a glitch happened: an input strip, an application capture on a strip, or an output bus.
+pub const SRC_TAP: u32 = 0x100;
+pub const SRC_OUTPUT: u32 = 0xFF00;
+
+/// The last 32 glitches, written lock-free by the audio threads. Each slot packs
+/// `unix seconds << 24 | kind << 16 | source`.
+#[derive(Default)]
+pub struct GlitchLog {
+    slots: [AtomicU64; 32],
+    next: AtomicU64,
+}
+
+impl GlitchLog {
+    pub fn note(&self, kind: Glitch, source: u32) {
+        let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+        let i = self.next.fetch_add(1, Ordering::Relaxed) as usize % self.slots.len();
+        self.slots[i].store(t << 24 | (kind as u64) << 16 | (source as u64 & 0xFFFF), Ordering::Relaxed);
+    }
+
+    /// Newest first: (unix seconds, kind, source).
+    pub fn recent(&self) -> Vec<(u64, Glitch, u32)> {
+        let n = self.next.load(Ordering::Relaxed) as usize;
+        let len = self.slots.len();
+        (0..n.min(len))
+            .filter_map(|k| {
+                let v = self.slots[(n - 1 - k) % len].load(Ordering::Relaxed);
+                let kind = match (v >> 16) & 0xFF {
+                    1 => Glitch::Underrun,
+                    2 => Glitch::Drop,
+                    3 => Glitch::CaptureFull,
+                    4 => Glitch::DeviceLost,
+                    _ => return None,
+                };
+                Some((v >> 24, kind, (v & 0xFFFF) as u32))
+            })
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -222,6 +272,7 @@ impl AppTapper {
                 let block = &data[..frames * 2];
                 if prod.free() < block.len() {
                     stats.capture_drops.fetch_add(1, Ordering::Relaxed);
+                    stats.glitches.note(Glitch::CaptureFull, SRC_TAP + strip as u32);
                 } else {
                     prod.push_slice(block);
                 }
@@ -318,7 +369,8 @@ impl Engine {
             rate_txs.push(rate_tx);
             let (tx, rx) = mpsc::channel::<Result<StreamFormat, String>>();
             let (dev, stop2, stats2, ll) = (cfg.outputs[b].clone(), stop.clone(), stats.clone(), cfg.mode);
-            threads.push(std::thread::spawn(move || output_thread(dev, ll, cons, rate_rx, stop2, stats2, tx)));
+            let source = SRC_OUTPUT + b as u32;
+            threads.push(std::thread::spawn(move || output_thread(dev, ll, cons, rate_rx, stop2, stats2, tx, source)));
             match rx.recv() {
                 Ok(Ok(f)) => out_formats[b] = Some(f),
                 Ok(Err(e)) => return abort(&stop, threads, format!("output {b}: {e}")),
@@ -340,7 +392,8 @@ impl Engine {
             let (prod, cons) = ring::ring(RING_SAMPLES);
             let (tx, rx) = mpsc::channel::<Result<StreamFormat, String>>();
             let (dev, lb, raw, stop2, stats2, ll) = (spec.device.clone(), spec.loopback, spec.raw, stop.clone(), stats.clone(), cfg.mode);
-            threads.push(std::thread::spawn(move || capture_thread(dev, lb, raw, ll, prod, stop2, stats2, tx)));
+            let source = i as u32;
+            threads.push(std::thread::spawn(move || capture_thread(dev, lb, raw, ll, prod, stop2, stats2, tx, source)));
             let opened = match rx.recv() {
                 Ok(r) => r,
                 Err(_) => Err("thread died".to_string()),
@@ -590,9 +643,11 @@ fn master_thread(
             let r = rs.fill(cons, &mut in_bufs[i][..n]);
             if r.underrun && !a.in_loopback[i] {
                 stats.underruns.fetch_add(1, Ordering::Relaxed);
+                stats.glitches.note(Glitch::Underrun, i as u32);
             }
             if r.dropped {
                 stats.drift_drops.fetch_add(1, Ordering::Relaxed);
+                stats.glitches.note(Glitch::Drop, i as u32);
             }
         }
         while taps.len() < MAX_APP_TAPS {
@@ -613,10 +668,12 @@ fn master_thread(
                 let r = t.rs.fill(&mut t.cons, &mut tap_buf[..n]);
                 if r.underrun && t.playing {
                     stats.underruns.fetch_add(1, Ordering::Relaxed);
+                    stats.glitches.note(Glitch::Underrun, SRC_TAP + t.strip as u32);
                 }
                 t.playing = !r.underrun && tap_buf[..n].iter().any(|v| v.abs() > 1e-4);
                 if r.dropped {
                     stats.drift_drops.fetch_add(1, Ordering::Relaxed);
+                    stats.glitches.note(Glitch::Drop, SRC_TAP + t.strip as u32);
                 }
                 for (o, v) in in_bufs[t.strip][..n].iter_mut().zip(&tap_buf[..n]) {
                     *o += *v;
@@ -705,9 +762,10 @@ fn master_thread(
             pb.frames.fetch_add((got / 2) as u64, Ordering::Relaxed);
         }
 
-        for (prod, bus) in a.extra_prods.iter_mut().zip(&bus_bufs[1..]) {
+        for (k, (prod, bus)) in a.extra_prods.iter_mut().zip(&bus_bufs[1..]).enumerate() {
             if prod.push_slice(&bus[..n]) < n {
                 stats.capture_drops.fetch_add(1, Ordering::Relaxed);
+                stats.glitches.note(Glitch::CaptureFull, SRC_OUTPUT + 1 + k as u32);
             }
         }
 
@@ -736,6 +794,7 @@ fn master_thread(
             break;
         }
         stats.device_errors.fetch_add(1, Ordering::Relaxed);
+        stats.glitches.note(Glitch::DeviceLost, SRC_OUTPUT);
         eprintln!("master output lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
         // Give the device three tries to come back (a Bluetooth hiccup), then follow the fallback.
         let attempts = std::cell::Cell::new(0u32);
@@ -763,6 +822,7 @@ fn master_thread(
     let _ = analysis_thread.join();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn output_thread(
     device: Option<String>,
     mode: Mode,
@@ -771,6 +831,7 @@ fn output_thread(
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
     ready: mpsc::Sender<Result<StreamFormat, String>>,
+    source: u32,
 ) {
     let stream = match RenderStream::open(device.as_deref(), mode) {
         Ok(s) => s,
@@ -791,9 +852,11 @@ fn output_thread(
         let r = rs.fill(&mut cons, &mut scratch[..frames * 2]);
         if r.underrun {
             stats.underruns.fetch_add(1, Ordering::Relaxed);
+            stats.glitches.note(Glitch::Underrun, source);
         }
         if r.dropped {
             stats.drift_drops.fetch_add(1, Ordering::Relaxed);
+            stats.glitches.note(Glitch::Drop, source);
         }
         for (i, frame) in out.chunks_exact_mut(ch).enumerate() {
             frame[0] = scratch[i * 2];
@@ -810,6 +873,7 @@ fn output_thread(
             break;
         }
         stats.device_errors.fetch_add(1, Ordering::Relaxed);
+        stats.glitches.note(Glitch::DeviceLost, source);
         eprintln!("output lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
         match reopen(&stop, fmt, || RenderStream::open(device.as_deref(), mode), |s| s.format()) {
             Some(s) => stream = s,
@@ -828,6 +892,7 @@ fn capture_thread(
     stop: Arc<AtomicBool>,
     stats: Arc<Stats>,
     ready: mpsc::Sender<Result<StreamFormat, String>>,
+    source: u32,
 ) {
     let open = || {
         if loopback {
@@ -856,6 +921,7 @@ fn capture_thread(
         let mut prod = prod.borrow_mut();
         if prod.free() < block.len() {
             stats.capture_drops.fetch_add(1, Ordering::Relaxed);
+            stats.glitches.note(Glitch::CaptureFull, source);
         } else {
             prod.push_slice(block);
         }
@@ -885,10 +951,40 @@ fn capture_thread(
             break;
         }
         stats.device_errors.fetch_add(1, Ordering::Relaxed);
+        stats.glitches.note(Glitch::DeviceLost, source);
         eprintln!("capture lost ({}); retrying", result.err().map_or_else(|| "stream ended".into(), |e| e.to_string()));
         match reopen(&stop, fmt, open, |s| s.format()) {
             Some(s) => stream = s,
             None => break,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn glitch_log_keeps_the_newest_32_newest_first() {
+        let log = GlitchLog::default();
+        assert!(log.recent().is_empty());
+        for i in 0..40u32 {
+            log.note(if i % 2 == 0 { Glitch::Underrun } else { Glitch::Drop }, i);
+        }
+        let r = log.recent();
+        assert_eq!(r.len(), 32);
+        assert_eq!((r[0].1, r[0].2), (Glitch::Drop, 39));
+        assert_eq!((r[31].1, r[31].2), (Glitch::Underrun, 8));
+        assert!(r[0].0 > 1_700_000_000, "unix time");
+    }
+
+    #[test]
+    fn glitch_sources_survive_packing() {
+        let log = GlitchLog::default();
+        log.note(Glitch::DeviceLost, SRC_OUTPUT + 1);
+        log.note(Glitch::CaptureFull, SRC_TAP + 4);
+        let r = log.recent();
+        assert_eq!((r[0].1, r[0].2), (Glitch::CaptureFull, SRC_TAP + 4));
+        assert_eq!((r[1].1, r[1].2), (Glitch::DeviceLost, SRC_OUTPUT + 1));
     }
 }
