@@ -12,7 +12,7 @@ Proprietary — all rights reserved.
   compressor → fader; bus limiter; shared, low-latency and **exclusive** WASAPI (3 ms periods);
   survives devices disappearing; presets and session restore; recorder to multichannel 32-bit float
   WAV (RF64, crash-safe).
-* **Sonar-style channels**: Game, Chat, Media, Aux and Mic. Programs that make sound are detected
+* **Channels**: Game, Chat, Media, Aux, Music and Mic. Programs that make sound are detected
   automatically; drag one onto a channel and Windows plays it into that channel's virtual output while
   Audiora mixes it (per-app output routing + loopback, live, no driver of ours). Per-channel presets
   with favourites, per-game profiles that load by themselves when the game starts, per-program
@@ -94,3 +94,11 @@ audio restarted once after routing.
 
 Rust (stable, MSVC), Node 22+, Windows 10/11 with WebView2. Kernel driver work additionally needs the
 Windows Driver Kit — `scripts\check-driver-env.ps1` tells you what is missing.
+
+## License
+
+Copyright (c) 2026 Roujan Digital Agency. All rights reserved.
+
+Audiora is free to download and use. The source is published for transparency only: it may not be
+modified, redistributed or used to build other products, and outside contributions (pull requests)
+are not accepted. See [LICENSE](LICENSE).

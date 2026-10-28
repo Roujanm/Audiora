@@ -10,8 +10,7 @@ lower latency.
 ## Goal
 
 Give every application a set of named playback devices (Game, Chat, Media, Aux) and a virtual
-microphone, so the Audiora engine can mix them per channel — the model SteelSeries Sonar and
-Voicemeeter use. Everything else (EQ, dynamics, routing, recording) already lives in the engine and
+microphone, so the Audiora engine can mix them per channel. Everything else (EQ, dynamics, routing, recording) already lives in the engine and
 works today on real devices; the driver's only job is to *deliver and accept audio*.
 
 ## Endpoints
@@ -64,8 +63,8 @@ tablet-specific topology.
 
 Windows 10/11 lets users assign an output device per application (Settings → Sound → Volume mixer).
 The engine's UI will set that preference for the user's applications. There is no documented API; the
-well-known mechanism is the `AudioPolicyConfig` activation factory used by open-source tools such as
-EarTrumpet, which changes between Windows builds. Plan: wrap it behind one module with a version
+well-known mechanism is the `AudioPolicyConfig` activation factory, which changes between Windows
+builds. Plan: wrap it behind one module with a version
 guard, test on each Windows feature update, and fall back to telling the user to use Windows' own
 setting.
 
@@ -73,7 +72,7 @@ setting.
 
 * `Audiora.inf` + catalog; installed with `pnputil /add-driver Audiora.inf /install` and a
   root-enumerated device created by a small helper (`devcon install` equivalent via SetupAPI).
-* Installer detects Voicemeeter and Sonar and warns if they hold the same default device.
+* Installer detects other virtual audio software and warns if it holds the same default device.
 * Uninstall removes the device first, then the driver package; endpoints disappear cleanly.
 
 ## Verification before any release
@@ -96,5 +95,5 @@ Development builds use test-signing on the dedicated test machine only.
 ## Blockers on the current machine
 
 * The Windows Driver Kit is not installed (Visual Studio 2022 with the C++ workload is).
-* The only machine available also runs Voicemeeter and Sonar virtual drivers; testing a new audio
-  driver there risks blue screens and endpoint conflicts. Use a VM or spare PC.
+* The only machine available also runs other virtual audio drivers; testing a new audio driver there
+  risks blue screens and endpoint conflicts. Use a VM or spare PC.

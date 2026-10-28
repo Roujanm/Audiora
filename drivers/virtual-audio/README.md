@@ -9,7 +9,7 @@ program's device list) shows:
 | Audiora Mic Feed | output | The engine plays the processed microphone here. Not meant to be picked by hand. |
 | Audiora Microphone | input | Pick this in Discord, Chrome, OBS, games: it is your microphone after Audiora's voice chain. |
 
-This is the SteelSeries Sonar / Voicemeeter model, with no third-party driver.
+Everything runs on Audiora's own driver; no third-party software is involved.
 
 Status: **works on a test machine** (2026-10-26, Hyper-V Windows 11 VM, test-signed 0.1.1.0): the
 driver loads, all six endpoints appear with their names, and `audiora.exe cabletest` passes: a

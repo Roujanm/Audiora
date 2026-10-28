@@ -2,7 +2,7 @@
 //! Settings > Sound > Volume mixer > "Output device" for each app.
 //!
 //! There is no public API for this. It is the `AudioPolicyConfig` WinRT factory that the Settings
-//! app and EarTrumpet use; the interface id changed between Windows releases, so both known ids
+//! app and other per-app audio tools use; the interface id changed between Windows releases, so both known ids
 //! are tried and the result is verified by reading the setting back.
 
 use std::ffi::c_void;

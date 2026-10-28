@@ -61,8 +61,8 @@ Any third-party class-compliant device must also work (Tier 2); the R Interface 
 
 ### Why a per-user process and not a Windows service
 Services run in session 0, which does not see the signed-in user's default audio devices and is
-subject to microphone-privacy rules that apply to the user's session. Voicemeeter and Sonar both run
-their engines in the user session for the same reason. The engine therefore starts at sign-in
+subject to microphone-privacy rules that apply to the user's session; audio mixers therefore run
+their engines in the user session. The engine starts at sign-in
 (`scripts/install-user.ps1 -Autostart`) or when the app launches. A real service is only worth adding
 for driver installation/update, where administrator rights are needed.
 
@@ -132,12 +132,12 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   re-checked every 1.5 s), remembers what the user had set before so letting go restores it, and
   releases every running program when the engine exits, so closing Audiora never leaves sound going to
   a device nobody listens to. Devices are chosen automatically (a device named for the channel, then a
-  free virtual output; never one owned by a running Sonar/Voicemeeter; never the default output when it
+  free virtual output; never one owned by another running audio mixer; never the default output when it
   is virtual; never a Bluetooth hands-free microphone) or explicitly in Setup. An optional output
   receives the processed microphone for other programs to use through the cable's other end.
   Limits: programs that open a fixed device instead of the default move only after their audio is
   restarted; programs launched while Audiora is closed play to the virtual output (silent) until
-  it runs again, the same dependency Sonar has.
+  it runs again, as with any software mixer.
 - **Hardware control** (`audiora-device`): capability description + parameters + meters for any
   interface. Ships a labelled simulator; the real USB protocol is pending.
 - **Licence** (`audiora-license`): offline Ed25519-signed files, optional lock to an R Interface
@@ -155,8 +155,8 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
 ### 4.3 Control plane
 - Transports: loopback WebSocket (Origin allow-list + Host check, 16-client cap) for the app, and
   loopback TCP JSON-lines for tools. Both bind 127.0.0.1 only. Before release the TCP transport
-  becomes a named pipe with an ACL; any local process can still talk to the engine today, which
-  matches what Voicemeeter's remote API allows.
+  becomes a named pipe with an ACL; any local process can still talk to the engine today, as with
+  the remote-control interfaces of other local audio tools.
 - Schema: JSON, parameter paths like `strip/3/eq/1/gain_db` — see `CONTROL-API.md`.
 - Meters are pushed at up to 60 Hz after `subscribe`; everything else is request/response.
 - Persistence: `%APPDATA%\Roujan\Audiora\` — `presets/`, `channel-presets/<channel>.json`,
@@ -177,7 +177,7 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   one volume slider in per cent (with the live level glowing inside its track), mute, and the apps
   it holds; everything else lives on the channel's page. Pointer-driven drag and drop (not the
   browser's) so it works inside the desktop shell and with touch.
-- **Channel pages** (one per channel, like Sonar's): preset chooser with favourites and *Save as*,
+- **Channel pages** (one per channel): preset chooser with favourites and *Save as*,
   equalizer (Basic: Bass/Voice/Treble; Advanced: six bands) over a live spectrum, then one list of
   on/off rows — ClearCast noise cancellation (Chat, Mic), noise gate (Mic), volume boost, Smart Volume
   (Quiet/Balanced/Loud), compressor as a single *amount*, "hear yourself" (Mic) — followed by the
@@ -283,7 +283,7 @@ Audiora/
 1. Kernel driver quality and signing lead time → start driver work early, on a dedicated machine.
 2. R Interface firmware / USB descriptors unknown → see open questions in `R-INTERFACE.md`.
 3. Long-run clock behaviour → soak tests (1 h+) still to run.
-4. Conflicts with existing virtual audio software (Voicemeeter, Sonar) → detection and guidance in
+4. Conflicts with other virtual audio software already installed → detection and guidance in
    the installer.
 5. Undocumented Windows per-app routing API → isolated in `audiora-hal/policy.rs` with both known
    interface ids and a read-back check; if a future Windows changes it the Setup page says routing is

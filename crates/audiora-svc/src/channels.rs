@@ -1,4 +1,4 @@
-//! The Sonar-style channel model: Game, Chat, Media and Aux are application mixes, Mic is the
+//! The channel model: Game, Chat, Media and Aux are application mixes, Mic is the
 //! microphone. Each application mix is a virtual output device; Windows is told (per
 //! application) to play into it and the engine listens to it with a loopback tap, so the mix
 //! reaches the mixer without ever touching the real speakers.
