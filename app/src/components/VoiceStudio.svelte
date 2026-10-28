@@ -11,7 +11,6 @@
   import Popover from './Popover.svelte';
   import PresetPicker from './PresetPicker.svelte';
   import Segmented from './Segmented.svelte';
-  import SignalChain from './SignalChain.svelte';
   import Switch from './Switch.svelte';
 
   interface Props {
@@ -108,7 +107,6 @@
     </div>
   </header>
 
-  <SignalChain strip={ch.strip} color={meta.color} boostMax={48} />
 
   <EqEditor strip={ch.strip} />
 

@@ -12,7 +12,6 @@
   import PresetPicker from './PresetPicker.svelte';
   import Segmented from './Segmented.svelte';
   import SettingRow from './SettingRow.svelte';
-  import SignalChain from './SignalChain.svelte';
   import { dbToPercent, percentToDb } from './VolumeSlider.svelte';
 
   interface Props {
@@ -158,10 +157,7 @@
     </Popover>
   </div>
 
-  {#if isMic}
-    <SignalChain strip={ch.strip} color={meta.color} {boostMax} />
-    <MicCheck />
-  {/if}
+  {#if isMic}<MicCheck />{/if}
 
   <ChannelEq strip={ch.strip} color={meta.color} />
 
