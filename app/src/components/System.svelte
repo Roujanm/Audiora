@@ -17,8 +17,6 @@
     n.sample_rate && n.period_frames ? (n.period_frames / n.sample_rate) * 1000 : 0;
   const maxMs = $derived(Math.max(20, ...nodes.map(ms)));
 
-  const renders = $derived(engine.devices.filter((d) => d.flow === 'render'));
-  const captures = $derived(engine.devices.filter((d) => d.flow === 'capture'));
 
   const stat = $derived([
     { label: 'Underruns', value: s.underruns, hint: 'A device ran out of audio' },
@@ -90,28 +88,6 @@
         <p><span class="chip bad">Invalid</span> {lic.error}</p>
       {/if}
     {/if}
-  </section>
-
-  <section class="panel pad wide">
-    <h2 class="eyebrow">Windows audio devices</h2>
-    <div class="cols">
-      <div>
-        <h3>Playback <span class="chip">{renders.length}</span></h3>
-        <ul>
-          {#each renders as d (d.id)}
-            <li><Icon name="speaker" size={13} /><span class="n" title={d.name}>{d.name}</span><span class="num muted">{d.sample_rate / 1000} kHz · {d.channels} ch</span>{#if d.default}<span class="chip accent">default</span>{/if}</li>
-          {/each}
-        </ul>
-      </div>
-      <div>
-        <h3>Recording <span class="chip">{captures.length}</span></h3>
-        <ul>
-          {#each captures as d (d.id)}
-            <li><Icon name="mic" size={13} /><span class="n" title={d.name}>{d.name}</span><span class="num muted">{d.sample_rate / 1000} kHz · {d.channels} ch</span>{#if d.default}<span class="chip accent">default</span>{/if}</li>
-          {/each}
-        </ul>
-      </div>
-    </div>
   </section>
 </div>
 
@@ -293,63 +269,7 @@
     flex-wrap: wrap;
   }
 
-  .wide {
-    grid-column: 1 / -1;
-  }
-
-  .cols {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 26px;
-    margin-top: 10px;
-  }
-
-  h3 {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 8px;
-    font-size: 12px;
-    font-weight: 650;
-  }
-
-  ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    max-height: 300px;
-    overflow: auto;
-  }
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 6px 4px;
-    border-top: 1px solid var(--line);
-    font-size: 12px;
-    min-width: 0;
-    color: var(--text-2);
-  }
-
-  li:first-child {
-    border-top: 0;
-  }
-
-  li .n {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   @media (max-width: 1100px) {
-    .sys {
-      grid-template-columns: 1fr;
-    }
     .dev {
       grid-template-columns: 96px 1fr 60px 100px;
     }

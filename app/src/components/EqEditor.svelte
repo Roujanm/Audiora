@@ -47,7 +47,7 @@
   $effect(() => {
     const ro = new ResizeObserver(([e]) => {
       width = Math.max(320, Math.floor(e.contentRect.width));
-      height = Math.max(200, Math.floor(e.contentRect.height));
+      height = Math.max(160, Math.floor(e.contentRect.height));
     });
     ro.observe(box);
     return () => ro.disconnect();
@@ -354,8 +354,10 @@
     margin-top: 3px;
   }
 
+  /* 300 px where there is room; in a height-limited page it gives up space first */
   .canvas {
-    height: 300px;
+    flex: 1 1 300px;
+    min-height: 160px;
     overflow: hidden;
   }
 

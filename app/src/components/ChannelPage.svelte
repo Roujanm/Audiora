@@ -62,7 +62,14 @@
   const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
   let saveName = $state('');
   let addApp = $state('');
-  let advanced = $state(false);
+  /** One part of the channel at a time, at full size, so the page never needs scrolling. */
+  let view = $state<'eq' | 'sound' | 'dynamics' | 'apps'>('eq');
+  const VIEWS = [
+    { id: 'eq', label: 'Equalizer' },
+    { id: 'sound', label: 'Sound' },
+    { id: 'dynamics', label: 'Dynamics' },
+    { id: 'apps', label: 'Apps' },
+  ];
 
   async function guard(fn: () => Promise<unknown>, ok?: string) {
     try {
@@ -130,6 +137,7 @@
         {/each}
       {/if}
     </div>
+    {#if !isMic}<Segmented label="Channel view" value={view} options={VIEWS} onchange={(id) => (view = id as typeof view)} />{/if}
     <PresetPicker channel={ch.key} color={meta.color} />
     <Popover width={260}>
       {#snippet trigger({ open, toggle })}
@@ -159,8 +167,11 @@
 
   {#if isMic}<MicCheck />{/if}
 
+  {#if isMic || view === 'eq'}
   <ChannelEq strip={ch.strip} color={meta.color} />
+  {/if}
 
+  {#if isMic || view === 'sound'}
   <section class="panel list" aria-label="Sound settings">
     {#if isMic}
       <SettingRow icon="wave" title="Low cut" description="Removes rumble, desk bumps and breath pops." on={on('lowcut/enabled')} ontoggle={(v) => engine.set(p('lowcut/enabled'), v)}>
@@ -286,8 +297,9 @@
       />
     {/if}
   </section>
+  {/if}
 
-  {#if !isMic}
+  {#if !isMic && view === 'apps'}
     <section class="panel block" aria-label="Apps in {meta.name}">
       <h3>Apps in {meta.name}</h3>
       {#if apps.length}
@@ -346,22 +358,18 @@
     </section>
   {/if}
 
-  <section class="adv">
-    <button class="disclose" aria-expanded={advanced} onclick={() => (advanced = !advanced)}>
-      <span class="chev" class:open={advanced}><Icon name="arrow" size={14} /></span> Advanced: gate and compressor details
-    </button>
-    {#if advanced}<DynamicsPanel strip={ch.strip} showNoise={false} />{/if}
-  </section>
+  {#if isMic || view === 'dynamics'}
+    <DynamicsPanel strip={ch.strip} showNoise={false} />
+  {/if}
 </div>
 
 <style>
   .page {
-    max-width: 980px;
+    max-width: 1240px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding-bottom: 12px;
+    gap: 12px;
     /* controls on this page wear the channel's colour */
     --accent: var(--c);
     --accent-hi: color-mix(in oklab, var(--c) 70%, white);
@@ -376,7 +384,7 @@
     grid-template-columns: auto minmax(0, 1fr) minmax(240px, 320px);
     align-items: center;
     gap: 20px;
-    padding: 20px 22px;
+    padding: 16px 22px;
     overflow: hidden;
     background:
       radial-gradient(420px 180px at 0% 0%, color-mix(in oklab, var(--c) 22%, transparent), transparent 70%),
@@ -672,33 +680,4 @@
     max-width: 320px;
   }
 
-  .disclose {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 0;
-    background: none;
-    color: var(--muted);
-    font-weight: 600;
-    padding: 6px 4px;
-  }
-
-  .disclose:hover {
-    color: var(--text);
-  }
-
-  .chev {
-    display: grid;
-    transition: transform 0.15s;
-  }
-
-  .chev.open {
-    transform: rotate(90deg);
-  }
-
-  .adv {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
 </style>

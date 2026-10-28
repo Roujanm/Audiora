@@ -8,6 +8,12 @@
   import Icon, { type IconName } from './Icon.svelte';
   import Switch from './Switch.svelte';
 
+  interface Props {
+    /** Which part of the settings to show: each fits the window on its own. */
+    view?: 'devices' | 'routing' | 'app';
+  }
+  let { view = 'devices' }: Props = $props();
+
   const cfg = $derived(engine.channels?.config);
   const renders = $derived(engine.devices.filter((d) => d.flow === 'render'));
   const captures = $derived(engine.devices.filter((d) => d.flow === 'capture'));
@@ -15,7 +21,6 @@
   type Draft = { master_out: string; mic_in: string; mic_out: string; parking: string; mic_raw: boolean; devices: Record<string, string> };
   let draft = $state<Draft | null>(null);
   let busy = $state(false);
-  let advanced = $state(false);
 
   // (re)load the form from the engine whenever its saved settings change
   $effect(() => {
@@ -92,7 +97,8 @@
 </script>
 
 {#if draft}
-  <div class="settings">
+  <div class="settings" class:one={view !== 'devices'}>
+    {#if view === 'devices'}
     <!-- where you listen -->
     <section class="panel card" aria-labelledby="out-h">
       <header>
@@ -146,8 +152,10 @@
       </div>
     </section>
 
+    {/if}
+
     <!-- the app itself -->
-    {#if desktop.available}
+    {#if view === 'app' && desktop.available}
       <section class="panel card" aria-labelledby="app-h">
         <header>
           <span class="h-ico"><Icon name="system" size={18} /></span>
@@ -174,22 +182,22 @@
     {/if}
 
     <!-- advanced routing -->
+    {#if view === 'routing'}
     <section class="panel card" aria-labelledby="adv-h">
-      <button class="fold" aria-expanded={advanced} onclick={() => (advanced = !advanced)}>
+      <header>
         <span class="h-ico"><Icon name="routing" size={18} /></span>
         <div>
-          <h2 id="adv-h">Advanced routing</h2>
-          <p class="muted">How apps reach the Game, Chat, Media and Aux channels.</p>
+          <h2 id="adv-h">Routing</h2>
+          <p class="muted">How apps reach the Game, Chat, Media, Aux and Music channels. Automatic is right for most setups.</p>
         </div>
-        <span class="chev" class:open={advanced}><Icon name="chevron" size={16} /></span>
-      </button>
+      </header>
 
       {#if noCapture}
         <p class="note warn"><Icon name="alert" size={14} /> No output to capture apps through: Audiora needs one output you do not listen to (a digital/optical port or a monitor's HDMI audio).</p>
       {/if}
 
-      {#if advanced}
         <div class="adv">
+          <div class="fields">
           <label class="field">
             <span>Capture apps through <small>an output you do not listen to</small></span>
             <select bind:value={draft.parking}>
@@ -204,6 +212,8 @@
               {#each renders as d (d.id)}<option value={d.id}>{label(d)}</option>{/each}
             </select>
           </label>
+          </div>
+          <div class="chans">
           <p class="sub">Virtual outputs per channel <small>(optional)</small></p>
           {#each APP_CHANNEL_KEYS as k (k)}
             {@const m = channelMeta(k)!}
@@ -221,9 +231,10 @@
             {#if chosen && crowded(chosen.name)}<p class="note warn"><Icon name="alert" size={12} /> {label(chosen)} belongs to another mixer: close it first or you may hear sound twice.</p>{/if}
           {/each}
           {#if duplicate}<p class="note warn"><Icon name="alert" size={12} /> Two channels (or the speakers) share a device. Each needs its own.</p>{/if}
+          </div>
         </div>
-      {/if}
     </section>
+    {/if}
   </div>
 
   {#if dirty}
@@ -243,6 +254,10 @@
     align-items: start;
   }
 
+  .settings.one {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .card {
     display: flex;
     flex-direction: column;
@@ -251,20 +266,10 @@
     min-width: 0;
   }
 
-  header,
-  .fold {
+  header {
     display: flex;
     align-items: center;
     gap: 12px;
-  }
-
-  .fold {
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    text-align: left;
   }
 
   .h-ico {
@@ -286,19 +291,8 @@
     text-transform: none;
   }
 
-  header p,
-  .fold p {
+  header p {
     font-size: 12.5px;
-  }
-
-  .chev {
-    margin-left: auto;
-    color: var(--muted);
-    transition: transform 0.2s var(--ease);
-  }
-
-  .chev.open {
-    transform: rotate(180deg);
   }
 
   .tiles {
@@ -395,7 +389,16 @@
     font-size: 12px;
   }
 
+  /* the two device fields on the left, the per-channel outputs on the right */
   .adv {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .fields,
+  .chans {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -409,7 +412,6 @@
   }
 
   .sub {
-    margin-top: 6px;
     font-size: 12px;
     font-weight: 650;
     color: var(--text-2);
@@ -468,14 +470,17 @@
     margin-top: 2px;
   }
 
+  /* floats above the page: nothing has to scroll to reach it */
   .apply {
-    position: sticky;
-    bottom: 0;
+    position: fixed;
+    left: 50%;
+    bottom: 44px;
+    translate: -50% 0;
+    width: min(720px, calc(100vw - 40px));
     z-index: 10;
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: 14px;
     padding: 12px 14px 12px 18px;
     border-radius: 16px;
     background: color-mix(in oklab, var(--bg-2) 85%, transparent);
@@ -501,9 +506,4 @@
     }
   }
 
-  @media (max-width: 1100px) {
-    .settings {
-      grid-template-columns: 1fr;
-    }
-  }
 </style>

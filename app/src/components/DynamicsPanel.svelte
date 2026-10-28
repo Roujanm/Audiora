@@ -76,7 +76,7 @@
     </div>
   </section>
 
-  <section class="card panel wide" class:off={!compOn}>
+  <section class="card panel" class:wide={isInput && showNoise} class:off={!compOn}>
     <header>
       <span class="ico warn"><Icon name="wave" size={16} /></span>
       <h2 class="eyebrow">Compressor</h2>

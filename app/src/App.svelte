@@ -14,6 +14,7 @@
   import System from './components/System.svelte';
   import Icon, { type IconName } from './components/Icon.svelte';
   import Popover from './components/Popover.svelte';
+  import Segmented from './components/Segmented.svelte';
   import CommandPalette, { type Command } from './components/CommandPalette.svelte';
   import Toasts from './components/Toasts.svelte';
   import Logo from './components/Logo.svelte';
@@ -212,6 +213,14 @@
   );
   const routedCount = $derived(engine.appGroups.filter((a) => a.route).length);
   const ready = $derived(channelList.filter((c) => c.kind === 'apps' && c.online).length);
+  /** Setup is three short views instead of one long page, so it never needs scrolling. */
+  let setupView = $state<'devices' | 'routing' | 'health'>('devices');
+  const SETUP_VIEWS = [
+    { id: 'devices', label: 'Devices' },
+    { id: 'routing', label: 'Routing' },
+    { id: 'health', label: 'App & health' },
+  ];
+
   const subtitle = $derived(
     tab === 'mixer'
       ? `${ready} of ${APP_CHANNEL_KEYS.length} app channels ready · ${routedCount} app${routedCount === 1 ? '' : 's'} routed`
@@ -306,8 +315,13 @@
       </nav>
     {:else if !inMixer && tab !== 'mic'}
       <div class="title">
-        <h1>{current.title}</h1>
-        <p class="muted">{subtitle}</p>
+        <div>
+          <h1>{current.title}</h1>
+          <p class="muted">{subtitle}</p>
+        </div>
+        {#if tab === 'system' && engine.connected}
+          <Segmented label="Setup view" value={setupView} options={SETUP_VIEWS} onchange={(id) => (setupView = id as typeof setupView)} />
+        {/if}
       </div>
     {/if}
 
@@ -344,7 +358,7 @@
           </div>
         </div>
       {:else if currentChannel?.kind === 'mic'}
-        <div class="scroll"><VoiceStudio ch={currentChannel} /></div>
+        <div class="fill"><VoiceStudio ch={currentChannel} /></div>
       {:else if currentChannel}
         {#key currentChannel.key}
           <div class="scroll"><ChannelPage ch={currentChannel} onsetup={() => (tab = 'system')} /></div>
@@ -352,9 +366,15 @@
       {:else if tab === 'studio'}
         <div class="fill"><Studio /></div>
       {:else}
-        <div class="scroll stack">
-          {#if engine.channelMode}<Setup />{/if}
-          <System />
+        <div class="fill stack">
+          {#if setupView === 'health'}
+            <Setup view="app" />
+            <System />
+          {:else if engine.channelMode}
+            <Setup view={setupView} />
+          {:else}
+            <System />
+          {/if}
         </div>
       {/if}
     </main>
@@ -486,6 +506,15 @@
     min-height: 0;
   }
 
+  /* fixed rows: pages without a title bar (Voice) still give the page all the height */
+  .shell > main {
+    grid-row: 3;
+  }
+
+  .shell > .foot {
+    grid-row: 4;
+  }
+
   .top {
     position: relative;
     z-index: 20; /* popovers open over the page below */
@@ -563,6 +592,14 @@
   .title {
     margin: 16px 26px 0;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .title > div {
+    min-width: 0;
   }
 
   .title p {
@@ -631,14 +668,12 @@
     gap: 14px;
     height: 100%;
     min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
-  /* faders never shrink to a sliver: below this the page scrolls instead */
+  /* the faders take whatever height the window leaves: the page never scrolls */
   .overview .mixer {
-    flex: 1 0 auto;
-    min-height: 470px;
+    flex: 1 1 0;
   }
 
   .side {

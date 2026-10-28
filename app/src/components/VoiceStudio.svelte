@@ -13,6 +13,14 @@
   import Segmented from './Segmented.svelte';
   import Switch from './Switch.svelte';
 
+  /** The Voice page shows one group at a time, at full size, so it never needs scrolling. */
+  let view = $state<'clean' | 'dynamics' | 'eq'>('clean');
+  const VIEWS = [
+    { id: 'clean', label: 'Clean-up' },
+    { id: 'dynamics', label: 'Dynamics' },
+    { id: 'eq', label: 'Equalizer' },
+  ];
+
   interface Props {
     ch: ChannelEntry;
   }
@@ -81,6 +89,7 @@
         <h1 title={ch.device_name ?? ''}>{ch.online ? shortName(ch.device_name ?? 'Microphone') : 'No microphone found'}</h1>
       </div>
     </div>
+    <Segmented label="Voice view" value={view} options={VIEWS} onchange={(id) => (view = id as typeof view)} />
     <div class="actions">
       <PresetPicker channel="mic" color={meta.color} />
       <Popover width={260}>
@@ -108,9 +117,11 @@
   </header>
 
 
-  <EqEditor strip={ch.strip} />
-
-  <div class="rack">
+  <div class="body">
+    {#if view === 'eq'}
+      <EqEditor strip={ch.strip} />
+    {:else if view === 'clean'}
+      <div class="rack">
     <!-- 1. input: Windows' analogue gain, then Audiora's digital gain -->
     <section class="panel mod" aria-label="Input">
       <div class="mod-head">
@@ -124,7 +135,6 @@
       </div>
       <p class="note">Mic level is Windows' own input gain; Gain is added in Audiora.</p>
     </section>
-
     <section class="panel mod" class:off={!on('lowcut/enabled')} aria-label="Low cut">
       <div class="mod-head">
         <span class="mod-title"><Icon name="wave" size={15} />Low cut</span>
@@ -133,7 +143,6 @@
       <Segmented size="sm" label="Low cut frequency" value={String(lowcut)} options={LOWCUTS.map((f) => ({ id: String(f), label: `${f}` }))} onchange={(id) => engine.set(p('lowcut/freq'), +id)} />
       <p class="note">Hz · removes rumble, desk bumps and breath pops.</p>
     </section>
-
     <section class="panel mod" class:off={!on('denoise')} aria-label="ClearCast">
       <div class="mod-head">
         <span class="mod-title"><Icon name="bolt" size={15} />ClearCast</span>
@@ -144,8 +153,17 @@
       </div>
       <p class="note">AI noise removal: keyboard, fans, room hiss.</p>
     </section>
-
-    <section class="panel mod" class:off={!on('gate/enabled')} aria-label="Noise gate">
+    <section class="panel mod" class:off={!on('deess/enabled')} aria-label="De-esser">
+      <div class="mod-head">
+        <span class="mod-title"><Icon name="chat" size={15} />De-esser</span>
+        <Switch label="De-esser" checked={on('deess/enabled')} onchange={set('deess/enabled')} />
+      </div>
+      <div class="knobs">
+        <Knob label="Thresh" min={-60} max={0} step={0.5} reset={-30} size={64} color="var(--warn)" disabled={!on('deess/enabled')} value={g('deess/threshold_db', -30)} format={db} onchange={set('deess/threshold_db')} />
+      </div>
+      <div class="gr" aria-label="De-esser reduction"><i style:width={grBar(deessGr)}></i><span class="num">{deessGr > 0.3 ? `−${deessGr.toFixed(1)} dB` : 'idle'}</span></div>
+    </section>
+    <section class="panel mod wide" class:off={!on('gate/enabled')} aria-label="Noise gate">
       <div class="mod-head">
         <span class="mod-title"><span class="led" class:lit={on('gate/enabled') && gateOpen}></span>Gate</span>
         <Switch label="Noise gate" checked={on('gate/enabled')} onchange={set('gate/enabled')} />
@@ -157,18 +175,16 @@
         <Knob label="Release" min={5} max={1500} scale="log" step={1} reset={200} size={52} color="var(--ok)" disabled={!on('gate/enabled')} value={g('gate/release_ms', 200)} format={ms} onchange={set('gate/release_ms')} />
       </div>
     </section>
-
-    <section class="panel mod" class:off={!on('deess/enabled')} aria-label="De-esser">
+    <section class="panel mod wide" aria-label="Monitoring">
       <div class="mod-head">
-        <span class="mod-title"><Icon name="chat" size={15} />De-esser</span>
-        <Switch label="De-esser" checked={on('deess/enabled')} onchange={set('deess/enabled')} />
+        <span class="mod-title"><Icon name="headphones" size={15} />Hear yourself</span>
+        <Switch label="Hear yourself" checked={monitoring} onchange={(v) => engine.set(p('bus_mask'), (g('bus_mask') & ~1) | (v ? 1 : 0))} />
       </div>
-      <div class="knobs">
-        <Knob label="Thresh" min={-60} max={0} step={0.5} reset={-30} size={64} color="var(--warn)" disabled={!on('deess/enabled')} value={g('deess/threshold_db', -30)} format={db} onchange={set('deess/threshold_db')} />
-      </div>
-      <div class="gr" aria-label="De-esser reduction"><i style:width={grBar(deessGr)}></i><span class="num">{deessGr > 0.3 ? `−${deessGr.toFixed(1)} dB` : 'idle'}</span></div>
+      <p class="note">Your processed voice in your headphones. Use headphones: speakers feed back.</p>
     </section>
-
+      </div>
+    {:else}
+      <div class="rack">
     <section class="panel mod" class:off={!on('smart/enabled')} aria-label="Smart Volume">
       <div class="mod-head">
         <span class="mod-title"><Icon name="sliders" size={15} />Smart Volume</span>
@@ -179,7 +195,6 @@
       </div>
       <p class="note num">Riding {db(smartGain)}</p>
     </section>
-
     <section class="panel mod wide" class:off={!on('comp/enabled')} aria-label="Compressor">
       <div class="mod-head">
         <span class="mod-title"><Icon name="sliders" size={15} />Compressor</span>
@@ -194,7 +209,6 @@
       </div>
       <div class="gr" aria-label="Compressor reduction"><i style:width={grBar(compGr)}></i><span class="num">{compGr > 0.3 ? `−${compGr.toFixed(1)} dB` : 'idle'}</span></div>
     </section>
-
     <section class="panel mod" class:off={!on('limiter/enabled')} aria-label="Limiter">
       <div class="mod-head">
         <span class="mod-title"><Icon name="alert" size={15} />Limiter</span>
@@ -206,14 +220,8 @@
       </div>
       <div class="gr" aria-label="Limiter reduction"><i style:width={grBar(limitGr)}></i><span class="num">{limitGr > 0.3 ? `−${limitGr.toFixed(1)} dB` : 'idle'}</span></div>
     </section>
-
-    <section class="panel mod" aria-label="Monitoring">
-      <div class="mod-head">
-        <span class="mod-title"><Icon name="headphones" size={15} />Hear yourself</span>
-        <Switch label="Hear yourself" checked={monitoring} onchange={(v) => engine.set(p('bus_mask'), (g('bus_mask') & ~1) | (v ? 1 : 0))} />
       </div>
-      <p class="note">Your processed voice in your headphones. Use headphones: speakers feed back.</p>
-    </section>
+    {/if}
   </div>
 
   <MicCheck />
@@ -224,9 +232,25 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+    height: 100%;
     max-width: 1240px;
     margin: 0 auto;
-    padding-bottom: 12px;
+  }
+
+  .body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .body > :global(.eq) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .hero :global(.seg) {
+    flex: none;
   }
 
   .hero {
@@ -391,9 +415,4 @@
     color: var(--text-2);
   }
 
-  @media (max-width: 1180px) {
-    .rack {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
 </style>
