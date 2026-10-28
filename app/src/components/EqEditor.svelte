@@ -9,6 +9,10 @@
   let { strip }: Props = $props();
 
   const RANGE_DB = 18;
+  /** Points of the softened spectrum curve (third-octave spaced, 25 Hz .. 18 kHz). */
+  const SOFT_POINTS = 30;
+  /** The softened spectrum, eased frame to frame (not reactive: only the canvas reads it). */
+  let soft: number[] = [];
   const NAMES = ['Sub bass', 'Bass', 'Low mids', 'Mid range', 'Upper mids', 'Highs'];
   const COLORS = ['#ff8a65', '#ffb74d', '#ffd54f', '#5eead4', '#7aa7ff', '#b39dff'];
   const DEFAULT_FREQ = [60, 160, 500, 1800, 5000, 10000];
@@ -88,24 +92,56 @@
       }
     }
 
-    // live spectrum of the incoming signal (dBFS, -90 .. 0 mapped onto 85 % of the height)
+    // live spectrum of the incoming signal, drawn soft: averaged over a third of an octave,
+    // eased over time and traced as a smooth curve (dBFS -90 .. 0 onto 80 % of the height)
     const spec = engine.spectrum;
     const hz = engine.bandHz;
-    if (spec && hz.length === spec.length) {
-      const sy = (db: number) => height - Math.min(Math.max((db + 90) / 90, 0), 1) * height * 0.85;
+    if (spec && hz.length === spec.length && spec.length > 2) {
+      const N = SOFT_POINTS;
+      if (soft.length !== N) soft = new Array(N).fill(-90);
+      for (let k = 0; k < N; k++) {
+        const fc = 10 ** (Math.log10(25) + ((Math.log10(18000) - Math.log10(25)) * k) / (N - 1));
+        const lo = fc / 2 ** (1 / 6);
+        const hi = fc * 2 ** (1 / 6);
+        let sum = 0;
+        let n = 0;
+        for (let i = 0; i < hz.length; i++) {
+          if (hz[i] >= lo && hz[i] <= hi) {
+            sum += 10 ** (spec[i] / 10);
+            n++;
+          }
+        }
+        if (!n) {
+          // narrower than one analyser band at the low end: take the nearest band
+          let best = 0;
+          for (let i = 1; i < hz.length; i++) if (Math.abs(hz[i] - fc) < Math.abs(hz[best] - fc)) best = i;
+          sum = 10 ** (spec[best] / 10);
+          n = 1;
+        }
+        const db = 10 * Math.log10(sum / n + 1e-12);
+        soft[k] += (db - soft[k]) * 0.25;
+      }
+      const sy = (db: number) => height - Math.min(Math.max((db + 90) / 90, 0), 1) * height * 0.8;
+      const px = (k: number) => x(10 ** (Math.log10(25) + ((Math.log10(18000) - Math.log10(25)) * k) / (N - 1)));
       const sp = new Path2D();
-      spec.forEach((db, i) => (i ? sp.lineTo(x(hz[i]), sy(db)) : sp.moveTo(x(hz[i]), sy(db))));
+      sp.moveTo(px(0), sy(soft[0]));
+      for (let k = 1; k < N - 1; k++) {
+        const mx = (px(k) + px(k + 1)) / 2;
+        const my = (sy(soft[k]) + sy(soft[k + 1])) / 2;
+        sp.quadraticCurveTo(px(k), sy(soft[k]), mx, my);
+      }
+      sp.lineTo(px(N - 1), sy(soft[N - 1]));
       const sa = new Path2D(sp);
-      sa.lineTo(x(hz[hz.length - 1]), height);
-      sa.lineTo(x(hz[0]), height);
+      sa.lineTo(px(N - 1), height);
+      sa.lineTo(px(0), height);
       sa.closePath();
-      const g = ctx.createLinearGradient(0, height * 0.15, 0, height);
-      g.addColorStop(0, 'rgba(160,180,210,0.30)');
-      g.addColorStop(1, 'rgba(160,180,210,0.02)');
+      const g = ctx.createLinearGradient(0, height * 0.2, 0, height);
+      g.addColorStop(0, 'rgba(170,190,220,0.16)');
+      g.addColorStop(1, 'rgba(170,190,220,0)');
       ctx.fillStyle = g;
       ctx.fill(sa);
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = 'rgba(190,205,228,0.45)';
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(200,214,236,0.22)';
       ctx.stroke(sp);
     }
 
@@ -243,7 +279,7 @@
   <header>
     <div>
       <h2 class="eyebrow">Equalizer</h2>
-      <p class="hint muted">Drag a point to set frequency and gain · scroll over it to change Q · double-click to reset · grey: live input spectrum</p>
+      <p class="hint muted">Drag a point · scroll to change its width · double-click to reset</p>
     </div>
     <button class="btn sm" disabled={flat} onclick={() => Array.from({ length: EQ_BANDS }, (_, b) => b).forEach((b) => engine.set(`strip/${strip}/eq/${b}/gain_db`, 0))}>
       Flatten
