@@ -196,10 +196,19 @@ fn main() -> ExitCode {
         }
         engine.params.strips[channels::MIC].bus_mask.store(if engine.info.buses.len() > 1 { 0b10 } else { 0 }, Ordering::Relaxed);
     }
-    if !args.iter().any(|a| a == "--fresh") && presets.exists(last) {
-        match presets.load(last, &engine.params) {
-            Ok((applied, skipped)) => println!("restored last session ({applied} settings, {skipped} skipped)"),
-            Err(e) => eprintln!("could not restore last session: {e}"),
+    if !args.iter().any(|a| a == "--fresh") {
+        let restored = if presets.exists(last) {
+            Some(presets.load(last, &engine.params))
+        } else if channel_mode && presets.exists(presets::LEGACY_CHANNELS) {
+            // first start after the Music channel arrived: carry the old session over
+            Some(presets.load_mapped(presets::LEGACY_CHANNELS, &engine.params, presets::legacy_channel_path))
+        } else {
+            None
+        };
+        match restored {
+            Some(Ok((applied, skipped))) => println!("restored last session ({applied} settings, {skipped} skipped)"),
+            Some(Err(e)) => eprintln!("could not restore last session: {e}"),
+            None => {}
         }
     }
 

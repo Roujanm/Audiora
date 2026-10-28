@@ -21,11 +21,11 @@ use serde_json::{json, Map, Value};
 use crate::cpresets::CPresets;
 use crate::engine::AppTapper;
 
-/// Channel key and display name, in mixer order. The first four are application mixes.
-pub const CHANNELS: [(&str, &str); 5] =
-    [("game", "Game"), ("chat", "Chat"), ("media", "Media"), ("aux", "Aux"), ("mic", "Mic")];
-pub const APP_CHANNELS: usize = 4;
-pub const MIC: usize = 4;
+/// Channel key and display name, in mixer order. The first five are application mixes.
+pub const CHANNELS: [(&str, &str); 6] =
+    [("game", "Game"), ("chat", "Chat"), ("media", "Media"), ("aux", "Aux"), ("music", "Music"), ("mic", "Mic")];
+pub const APP_CHANNELS: usize = 5;
+pub const MIC: usize = 5;
 
 pub fn channel_index(key: &str) -> Option<usize> {
     CHANNELS.iter().position(|(k, _)| *k == key)
@@ -736,6 +736,7 @@ mod tests {
             dev("Audiora Chat (Audiora Virtual Audio)", Flow::Render, "chat", false),
             dev("Audiora Media (Audiora Virtual Audio)", Flow::Render, "media", false),
             dev("Audiora Aux (Audiora Virtual Audio)", Flow::Render, "aux", false),
+            dev("Audiora Music (Audiora Virtual Audio)", Flow::Render, "music", false),
             dev("Audiora Mic Feed (Audiora Virtual Audio)", Flow::Render, "feed", false),
             dev("Audiora Microphone (Audiora Virtual Audio)", Flow::Capture, "amic", true),
             dev("Microphone (Realtek)", Flow::Capture, "mic", false),
@@ -743,7 +744,7 @@ mod tests {
         let r = resolve(&Config::default(), &devs, &[]);
         assert_eq!(r.master_out.as_deref(), Some("jbl"));
         let ch: Vec<_> = r.devices.iter().map(|d| d.as_deref()).collect();
-        assert_eq!(ch, [Some("game"), Some("chat"), Some("media"), Some("aux")]);
+        assert_eq!(ch, [Some("game"), Some("chat"), Some("media"), Some("aux"), Some("music")]);
         assert_eq!(r.mic_out.as_deref(), Some("feed"));
         // even as the Windows default, Audiora's own microphone is never the engine's input (a loop)
         assert_eq!(r.mic_in.as_deref(), Some("mic"));

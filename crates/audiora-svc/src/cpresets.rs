@@ -133,6 +133,14 @@ fn factory(channel: &str) -> Vec<(&'static str, Settings)> {
             ("Vocal boost", eq([-3.0, -1.0, 0.0, 4.0, 3.0, 0.0])),
             ("Late night", with(eq([-3.0, -1.0, 0.0, 0.0, 0.0, -1.0]), &[(SMART, 1.0), ("smart/target_db", -28.0)])),
         ],
+        "music" => vec![
+            ("Flat", vec![]),
+            ("Warm", eq([3.0, 2.0, 0.0, -1.0, 0.0, 1.0])),
+            ("Bass boost", eq([7.0, 4.0, 0.0, 0.0, 0.0, 1.0])),
+            ("Bright", eq([0.0, 0.0, -1.0, 1.0, 3.0, 4.0])),
+            ("Vocal", eq([-2.0, -1.0, 1.0, 3.0, 2.0, 0.0])),
+            ("Even volume", with(eq([1.0, 1.0, 0.0, 0.0, 0.0, 1.0]), &[(SMART, 1.0), ("smart/target_db", -22.0)])),
+        ],
         "aux" => vec![
             ("Flat", vec![]),
             ("Warm", eq([3.0, 2.0, 1.0, 0.0, -1.0, -3.0])),
@@ -319,7 +327,7 @@ mod tests {
     #[test]
     fn every_factory_preset_loads_cleanly() {
         let (s, dir) = store();
-        let p = MixerParams::new(5, 1);
+        let p = MixerParams::new(crate::channels::CHANNELS.len(), 1);
         for (i, (key, _)) in crate::channels::CHANNELS.iter().enumerate() {
             for (name, settings) in factory(key) {
                 let r = s.load(key, name, i, &p).unwrap();

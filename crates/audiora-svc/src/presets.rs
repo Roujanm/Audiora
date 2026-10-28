@@ -9,11 +9,25 @@ use serde_json::{json, Map, Value};
 
 /// Name used for the automatic save on exit; hidden from `list`.
 pub const LAST: &str = "_last";
-/// Same for the channel layout (Game/Chat/Media/Aux/Mic), whose strip numbers mean something else.
-pub const LAST_CHANNELS: &str = "_last_ch";
+/// Same for the channel layout (Game/Chat/Media/Aux/Music/Mic), whose strip numbers mean
+/// something else.
+pub const LAST_CHANNELS: &str = "_last_ch2";
+/// The channel session from before the Music channel: strip 4 was the microphone, 5 the tone.
+pub const LEGACY_CHANNELS: &str = "_last_ch";
 
 fn reserved(name: &str) -> bool {
-    name == LAST || name == LAST_CHANNELS
+    name == LAST || name == LAST_CHANNELS || name == LEGACY_CHANNELS
+}
+
+/// Moves a setting from the old five-channel layout to the six-channel one: Music took strip 4,
+/// so the microphone moved 4 -> 5 and the test tone 5 -> 6. The new Music strip starts fresh.
+pub fn legacy_channel_path(path: &str) -> String {
+    for (from, to) in [("strip/5/", "strip/6/"), ("strip/4/", "strip/5/")] {
+        if let Some(rest) = path.strip_prefix(from) {
+            return format!("{to}{rest}");
+        }
+    }
+    path.to_owned()
 }
 
 pub struct PresetStore {
@@ -61,13 +75,18 @@ impl PresetStore {
     /// Applies a preset; returns (applied, skipped) where skipped paths do not
     /// exist in this engine layout (for example a different number of strips).
     pub fn load(&self, name: &str, params: &MixerParams) -> Result<(usize, usize), String> {
+        self.load_mapped(name, params, str::to_owned)
+    }
+
+    /// Like `load`, with each stored path translated first (layout migrations).
+    pub fn load_mapped(&self, name: &str, params: &MixerParams, map_path: impl Fn(&str) -> String) -> Result<(usize, usize), String> {
         let path = self.path(name)?;
         let text = fs::read_to_string(&path).map_err(|_| format!("no preset named \"{name}\""))?;
         let v: Value = serde_json::from_str(&text).map_err(|e| format!("corrupt preset: {e}"))?;
         let map = v.get("params").and_then(Value::as_object).ok_or("corrupt preset: no params")?;
         let (mut applied, mut skipped) = (0, 0);
         for (k, val) in map {
-            match val.as_f64().map(|n| params.set(k, n)) {
+            match val.as_f64().map(|n| params.set(&map_path(k), n)) {
                 Some(Ok(())) => applied += 1,
                 _ => skipped += 1,
             }
@@ -152,5 +171,25 @@ mod tests {
             assert!(s.save(bad, &p).is_err(), "{bad:?}");
             assert!(s.load(bad, &p).is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn the_old_channel_session_keeps_the_microphone_on_the_microphone() {
+        let (s, dir) = store();
+        // old layout: 4 app strips, mic = strip 4, tone = strip 5
+        let old = MixerParams::new(6, 1);
+        old.set("strip/4/boost_db", 12.0).unwrap();
+        old.set("strip/4/denoise", 1.0).unwrap();
+        old.set("strip/2/gain_db", -6.0).unwrap();
+        s.save(LEGACY_CHANNELS, &old).unwrap();
+        // new layout: Music is strip 4, the mic strip 5, the tone strip 6
+        let new = MixerParams::new(7, 1);
+        s.load_mapped(LEGACY_CHANNELS, &new, legacy_channel_path).unwrap();
+        assert_eq!(new.get("strip/5/boost_db").unwrap(), 12.0);
+        assert_eq!(new.get("strip/5/denoise").unwrap(), 1.0);
+        assert_eq!(new.get("strip/2/gain_db").unwrap(), -6.0, "Media stays where it was");
+        assert_eq!(new.get("strip/4/boost_db").unwrap(), 0.0, "Music starts fresh");
+        assert_eq!(new.get("strip/4/denoise").unwrap(), 0.0);
+        std::fs::remove_dir_all(dir).ok();
     }
 }

@@ -240,7 +240,7 @@ class EngineClient {
       if (this.info?.hardware) await this.refreshHardware();
       if (this.channelMode) {
         await Promise.all([this.refreshChannels(), this.refreshRoutes(), this.refreshProfiles(), this.refreshApps().catch(() => {})]);
-        for (const c of ['game', 'chat', 'media', 'aux', 'mic']) await this.refreshChannelPresets(c);
+        for (const c of ['game', 'chat', 'media', 'aux', 'music', 'mic']) await this.refreshChannelPresets(c);
         this.#timers.push(window.setInterval(() => void this.refreshApps().catch(() => {}), 1500));
         // headphones plugged in a moment ago show up in every device list within two seconds
         this.#timers.push(window.setInterval(() => void this.refreshDevices().catch(() => {}), 2000));

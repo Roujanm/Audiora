@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appColor, appLabel, CHANNELS, channelMeta } from './lib/channels.ts';
+  import { APP_CHANNEL_KEYS, appColor, appLabel, CHANNELS, channelMeta } from './lib/channels.ts';
   import { dnd } from './lib/dnd.svelte.ts';
   import { engine } from './lib/engine.svelte.ts';
   import { ACCENTS, periodLabel, rateLabel, shortName, type AccentId } from './lib/theme.ts';
@@ -48,7 +48,7 @@
   }
   let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'mono'));
   let splash = $state(true);
-  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'mic', 'studio', 'system'];
+  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'music', 'mic', 'studio', 'system'];
   let tab = $state<Tab>(remembered('audiora.tab', TABS, 'mixer'));
 
   $effect(() => {
@@ -214,7 +214,7 @@
   const ready = $derived(channelList.filter((c) => c.kind === 'apps' && c.online).length);
   const subtitle = $derived(
     tab === 'mixer'
-      ? `${ready} of 4 app channels ready · ${routedCount} app${routedCount === 1 ? '' : 's'} routed`
+      ? `${ready} of ${APP_CHANNEL_KEYS.length} app channels ready · ${routedCount} app${routedCount === 1 ? '' : 's'} routed`
       : currentChannel
         ? currentChannel.kind === 'mic'
           ? currentChannel.online

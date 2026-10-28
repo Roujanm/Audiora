@@ -27,7 +27,7 @@ export interface EngineInfo {
   channel_mode?: boolean;
 }
 
-export type ChannelKey = 'game' | 'chat' | 'media' | 'aux' | 'mic';
+export type ChannelKey = 'game' | 'chat' | 'media' | 'aux' | 'music' | 'mic';
 
 export interface ChannelEntry {
   key: ChannelKey;

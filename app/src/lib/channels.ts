@@ -14,12 +14,13 @@ export interface ChannelMeta {
 export const CHANNELS: ChannelMeta[] = [
   { key: 'game', name: 'Game', icon: 'gamepad', color: '#4d9bff', blurb: 'Games and anything that needs positional clarity.' },
   { key: 'chat', name: 'Chat', icon: 'chat', color: '#35e0a1', blurb: 'Discord, Teams, TeamSpeak — the voices of the people you talk to.' },
-  { key: 'media', name: 'Media', icon: 'music', color: '#ff7a9c', blurb: 'Music, browsers, video and streaming.' },
+  { key: 'media', name: 'Media', icon: 'play', color: '#ff7a9c', blurb: 'Browsers, video and streaming.' },
   { key: 'aux', name: 'Aux', icon: 'aux', color: '#a58bff', blurb: 'Anything else you want on its own fader.' },
+  { key: 'music', name: 'Music', icon: 'music', color: '#ffb347', blurb: 'Spotify, Apple Music, YouTube Music — your playlists on their own fader.' },
   { key: 'mic', name: 'Mic', icon: 'mic', color: '#2ed3e6', blurb: 'Your microphone, cleaned up before it reaches anyone.' },
 ];
 
-export const APP_CHANNEL_KEYS: ChannelKey[] = ['game', 'chat', 'media', 'aux'];
+export const APP_CHANNEL_KEYS: ChannelKey[] = ['game', 'chat', 'media', 'aux', 'music'];
 
 export function channelMeta(key: string | null | undefined): ChannelMeta | undefined {
   return CHANNELS.find((c) => c.key === key);
