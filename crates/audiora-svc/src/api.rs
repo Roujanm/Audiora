@@ -77,6 +77,7 @@ impl Api {
             "apps" => self.apps(),
             "channels" => self.channels_cmd(),
             "mic_test" => self.mic_test_cmd(&req),
+            "mic_input" => self.mic_input_cmd(&req),
             "studio_list" => self.st().map(|s| s.list()),
             "studio_load" => self.st().and_then(|s| s.load(str_arg(&req, "name")?)),
             "studio_save" => self.st().and_then(|s| s.save(str_arg(&req, "name")?, &req["project"])),
@@ -277,6 +278,22 @@ impl Api {
 
     fn ch(&self) -> Result<&Arc<Channels>, String> {
         self.channels.as_ref().ok_or_else(|| "this engine runs in the flat layout (no channels)".to_string())
+    }
+
+    /// The microphone's Windows input level (its analogue gain, before Audiora) and mute.
+    /// `{"cmd":"mic_input"}` reads it, `{"cmd":"mic_input","level":0.8}` sets the level.
+    fn mic_input_cmd(&self, req: &Value) -> Result<Value, String> {
+        let id = self
+            .channels
+            .as_ref()
+            .and_then(|c| c.resolved.mic_in.clone())
+            .ok_or("no microphone in use")?;
+        if let Some(level) = req.get("level").and_then(Value::as_f64) {
+            audiora_hal::set_endpoint_level(&id, level as f32).map_err(|e| e.to_string())?;
+        }
+        let level = audiora_hal::endpoint_level(&id).map_err(|e| e.to_string())?;
+        let muted = audiora_hal::endpoint_mute(&id).map_err(|e| e.to_string())?;
+        Ok(json!({ "level": level, "muted": muted }))
     }
 
     fn channels_cmd(&self) -> Result<Value, String> {

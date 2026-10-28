@@ -13,6 +13,7 @@
   import Segmented from './Segmented.svelte';
   import SettingRow from './SettingRow.svelte';
   import SignalChain from './SignalChain.svelte';
+  import { dbToPercent, percentToDb } from './VolumeSlider.svelte';
 
   interface Props {
     ch: ChannelEntry;
@@ -80,6 +81,42 @@
 </script>
 
 <div class="page" style:--c={meta.color}>
+  {#if !isMic}
+    <header class="hero panel">
+      <span class="badge"><Icon name={meta.icon} size={24} /></span>
+      <div class="who">
+        <p class="eyebrow">Channel</p>
+        <h1>{meta.name}</h1>
+        <p class="muted blurb">{meta.blurb}</p>
+        <div class="routed">
+          {#each apps as a (a.name)}
+            <span class="app">{a.name}</span>
+          {:else}
+            <span class="muted none">No apps yet: drag one here from the overview</span>
+          {/each}
+        </div>
+      </div>
+      <div class="live">
+        <div class="lvl" aria-hidden="true"><i style:width="{Math.max(0, Math.min(100, ((Math.max(engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))) + 60) / 60) * 100))}%"></i></div>
+        <div class="vol">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={Math.round(dbToPercent(g('gain_db')))}
+            style:--fill="{Math.round(dbToPercent(g('gain_db')))}%"
+            aria-label="{meta.name} volume"
+            oninput={(e) => engine.set(p('gain_db'), percentToDb(+e.currentTarget.value))}
+          />
+          <span class="num">{Math.round(dbToPercent(g('gain_db')))}%</span>
+          <button class="btn sm" class:muted-on={on('mute')} aria-pressed={on('mute')} onclick={() => engine.set(p('mute'), !on('mute'))}>
+            <Icon name={on('mute') ? 'mute' : 'volume'} size={14} />{on('mute') ? 'Muted' : 'Mute'}
+          </button>
+        </div>
+      </div>
+    </header>
+  {/if}
   <div class="bar">
     <div class="favs" role="group" aria-label="Favorite presets">
       {#if !ch.online && !isMic}
@@ -336,6 +373,103 @@
     --on-accent: #06101c;
     --accent-soft: color-mix(in oklab, var(--c) 15%, transparent);
     --accent-glow: color-mix(in oklab, var(--c) 50%, transparent);
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(240px, 320px);
+    align-items: center;
+    gap: 20px;
+    padding: 20px 22px;
+    overflow: hidden;
+    background:
+      radial-gradient(420px 180px at 0% 0%, color-mix(in oklab, var(--c) 22%, transparent), transparent 70%),
+      var(--glass),
+      color-mix(in oklab, var(--bg-1) 72%, transparent);
+  }
+
+  .hero .badge {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    color: var(--c);
+    background: radial-gradient(circle at 30% 20%, color-mix(in oklab, var(--c) 40%, transparent), color-mix(in oklab, var(--c) 10%, transparent));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--c) 45%, transparent), 0 10px 30px -10px var(--c);
+  }
+
+  .hero h1 {
+    font-size: 28px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+  }
+
+  .blurb {
+    font-size: 12.5px;
+  }
+
+  .routed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .routed .app {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+    background: color-mix(in oklab, var(--c) 16%, transparent);
+    border: 1px solid color-mix(in oklab, var(--c) 40%, transparent);
+  }
+
+  .routed .none {
+    font-size: 12px;
+  }
+
+  .live {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .lvl {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bg-0);
+    overflow: hidden;
+  }
+
+  .lvl i {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, color-mix(in oklab, var(--c) 60%, transparent), var(--c));
+    box-shadow: 0 0 12px var(--c);
+    transition: width 60ms linear;
+  }
+
+  .vol {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .vol input {
+    flex: 1;
+  }
+
+  .vol .num {
+    width: 40px;
+    text-align: right;
+    font-weight: 650;
+  }
+
+  .muted-on {
+    color: var(--bad);
   }
 
   .bar {

@@ -8,6 +8,7 @@
   import ChannelPage from './components/ChannelPage.svelte';
   import AppsDock from './components/AppsDock.svelte';
   import MasterStage from './components/MasterStage.svelte';
+  import VoiceStudio from './components/VoiceStudio.svelte';
   import Studio from './components/Studio.svelte';
   import Hardware from './components/Hardware.svelte';
   import Setup from './components/Setup.svelte';
@@ -74,6 +75,7 @@
   /** Left rail: the big areas of the product. */
   const RAIL: NavItem[] = [
     { id: 'mixer', label: 'Mixer', icon: 'mixer', title: 'Mixer' },
+    { id: 'mic', label: 'Voice', icon: 'mic', title: 'Voice' },
     { id: 'studio', label: 'Studio', icon: 'record', title: 'Studio' },
     { id: 'hardware', label: 'Interface', icon: 'interface', title: 'Audio interface' },
     { id: 'system', label: 'Setup', icon: 'system', title: 'Setup & health' },
@@ -82,11 +84,12 @@
   /** Header tabs of the mixer area: the overview and one page per channel. */
   const CHANNEL_TABS: NavItem[] = [
     { id: 'mixer', label: 'Overview', icon: 'mixer', title: 'Mixer' },
-    ...CHANNELS.map((c) => ({ id: c.key as Tab, label: c.name, icon: c.icon, title: c.name, color: c.color })),
+    // the microphone has its own section (Voice); these are the application channels
+    ...CHANNELS.filter((c) => c.key !== 'mic').map((c) => ({ id: c.key as Tab, label: c.name, icon: c.icon, title: c.name, color: c.color })),
   ];
 
   const NAV: NavItem[] = [...CHANNEL_TABS, ...RAIL.slice(1)];
-  const inMixer = $derived(tab === 'mixer' || CHANNELS.some((c) => c.key === tab));
+  const inMixer = $derived(tab === 'mixer' || CHANNELS.some((c) => c.key === tab && c.key !== 'mic'));
 
   const channelList = $derived(engine.channels?.channels ?? []);
   const buses = $derived(engine.info?.buses ?? []);
@@ -305,7 +308,7 @@
           </button>
         {/each}
       </nav>
-    {:else if !inMixer}
+    {:else if !inMixer && tab !== 'mic'}
       <div class="title">
         <h1>{current.title}</h1>
         <p class="muted">{subtitle}</p>
@@ -344,6 +347,8 @@
           </div>
           </div>
         </div>
+      {:else if currentChannel?.kind === 'mic'}
+        <div class="scroll"><VoiceStudio ch={currentChannel} /></div>
       {:else if currentChannel}
         {#key currentChannel.key}
           <div class="scroll"><ChannelPage ch={currentChannel} onsetup={() => (tab = 'system')} /></div>
