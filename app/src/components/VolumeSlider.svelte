@@ -138,9 +138,9 @@
   /* a full-height capsule that fills with the channel colour up to the volume */
   .track {
     position: relative;
-    width: 30px;
+    width: var(--track-w, 30px);
     height: 100%;
-    border-radius: 15px;
+    border-radius: calc(var(--track-w, 30px) / 2);
     overflow: hidden;
     background: linear-gradient(180deg, #0a0d12, #11151c);
     box-shadow:

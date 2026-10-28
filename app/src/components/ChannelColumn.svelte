@@ -37,7 +37,7 @@
   );
 </script>
 
-<section class="col panel" class:over class:offline={!ch.online} style:--c={meta.color} data-drop={isMic ? undefined : ch.key} aria-label="{meta.name} channel">
+<section class="col panel" class:over class:offline={!ch.online} style:--c={meta.color} style:--track-w="44px" data-drop={isMic ? undefined : ch.key} aria-label="{meta.name} channel">
   <button class="head" onclick={onopen} title="Open {meta.name} settings">
     <span class="badge"><Icon name={meta.icon} size={17} /></span>
     <span class="txt">
@@ -95,7 +95,6 @@
   .col {
     flex: 1 1 0;
     min-width: 150px;
-    max-width: 230px;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -224,7 +223,7 @@
 
   .apps {
     flex: none;
-    height: 104px;
+    height: 72px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -280,7 +279,7 @@
     }
 
     .apps {
-      height: 80px;
+      height: 56px;
     }
 
     .round {

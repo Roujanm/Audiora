@@ -637,10 +637,14 @@
     gap: 14px;
     height: 100%;
     min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
+  /* faders never shrink to a sliver: below this the page scrolls instead */
   .overview .mixer {
-    flex: 1;
+    flex: 1 0 auto;
+    min-height: 470px;
   }
 
   .side {
