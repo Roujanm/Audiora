@@ -144,10 +144,46 @@ fn node_json(index: usize, n: &NodeInfo) -> Value {
     })
 }
 
+/// One engine per control port. Two engines on the same devices play everything twice, fight over
+/// the microphone and leave one of them without a control connection, so neither mute nor any
+/// other button reaches it. The lock is a file opened without sharing: Windows releases it the
+/// moment the process ends, however it ends. A starting engine waits for an older one that is
+/// still shutting down (it restarts itself when the output changes) instead of joining it.
+fn instance_lock(port: u16) -> Option<std::fs::File> {
+    let path = std::env::temp_dir().join(format!("audiora-engine-{port}.lock"));
+    let deadline = Instant::now() + INSTANCE_WAIT;
+    loop {
+        let mut opts = std::fs::OpenOptions::new();
+        opts.create(true).truncate(false).write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            opts.share_mode(0);
+        }
+        match opts.open(&path) {
+            Ok(f) => return Some(f),
+            Err(_) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(100)),
+            Err(e) => {
+                eprintln!("another Audiora engine is running on port {port} ({e}); not starting a second one");
+                return None;
+            }
+        }
+    }
+}
+
+/// How long a starting engine waits for an older one to finish (longer than SHUTDOWN_LIMIT).
+const INSTANCE_WAIT: Duration = Duration::from_secs(10);
+/// A shutdown that has not finished by then is ended by force: a device driver stuck in a call
+/// must never leave an engine running audio with no control connection.
+const SHUTDOWN_LIMIT: Duration = Duration::from_secs(5);
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let port: u16 = arg(&args, "--port").unwrap_or(7878);
     let run_for: Option<f32> = arg(&args, "--secs");
+    let Some(_instance) = instance_lock(port) else {
+        return ExitCode::FAILURE;
+    };
 
     let data_dir = arg::<std::path::PathBuf>(&args, "--data-dir").unwrap_or_else(presets::default_data_dir);
     // Channel layout unless devices were spelled out for the flat per-device layout.
@@ -269,9 +305,12 @@ fn main() -> ExitCode {
         })
     });
 
-    // An automatic output follows Windows: plug in headphones (Windows makes them the default
-    // output) and the engine moves onto them. It restarts itself for that; the desktop app starts
-    // it again within a second. Only when nothing was chosen in Setup and no --out was given.
+    // The output follows what is plugged in. Automatic: plug in headphones (Windows makes them the
+    // default output) and the engine moves onto them. Chosen in Setup: if that device was missing
+    // when the engine started (a wireless headset asleep or switched off), the engine played on
+    // another output; when the chosen one comes back it moves onto it, and if it disappears it
+    // moves to another output instead of going silent. It restarts itself for that; the desktop
+    // app starts it again within a second. Not when --out was given.
     let follow = (channel_mode && !args.iter().any(|a| a == "--out")).then(|| {
         let (stop, dir, current) = (stop.clone(), data_dir.clone(), engine.info.buses[0].device_id.clone());
         std::thread::spawn(move || {
@@ -284,10 +323,6 @@ fn main() -> ExitCode {
                     std::thread::sleep(Duration::from_millis(100));
                 }
                 let cfg = channels::Config::load(&dir);
-                if cfg.master_out.is_some() {
-                    seen = 0;
-                    continue;
-                }
                 let devs = audiora_hal::list_devices().unwrap_or_default();
                 let pick = channels::resolve(&cfg, &devs, &audiora_hal::running_process_names()).master_out;
                 // two readings in a row: Windows settles the default a moment after a device arrives
@@ -351,7 +386,18 @@ fn main() -> ExitCode {
         });
     }
     println!("control API: tcp 127.0.0.1:{port} (JSON lines), websocket 127.0.0.1:{ws_port}");
-    let result = server::serve(api.clone(), port, stop);
+    let result = server::serve(api.clone(), port, stop.clone());
+    // the control port is closed from here on: whatever hangs below, the process ends in time
+    stop.store(true, Ordering::Relaxed);
+    std::thread::spawn(|| {
+        std::thread::sleep(SHUTDOWN_LIMIT);
+        eprintln!("shutdown did not finish within {} s; ending the engine", SHUTDOWN_LIMIT.as_secs());
+        std::process::exit(1);
+    });
+    // settings first, before anything that talks to devices
+    if let Err(e) = presets.save(last, &engine.params) {
+        eprintln!("could not save session: {e}");
+    }
     if let Some(c) = &channel_state {
         c.release_all();
     }

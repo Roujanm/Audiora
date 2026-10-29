@@ -46,10 +46,17 @@ fn engine_path() -> Option<PathBuf> {
         .map(|(_, p)| p)
 }
 
+/// Async so the wait for the engine runs off the window's thread and never freezes the UI.
 #[tauri::command]
-fn ensure_engine(state: tauri::State<'_, OwnedEngine>) -> Result<String, String> {
+async fn ensure_engine(state: tauri::State<'_, OwnedEngine>) -> Result<String, String> {
     if reachable(WS_PORT) {
         return Ok("running".into());
+    }
+    // The engine this app started may still be busy: starting up, or restarting itself onto a new
+    // output. Wait for it instead of starting a second one next to it.
+    let alive = state.0.lock().unwrap().as_mut().is_some_and(|c| matches!(c.try_wait(), Ok(None)));
+    if alive {
+        return wait_for_engine("running");
     }
     let path = engine_path().ok_or("audiora-svc.exe was not found next to the app")?;
     let mut cmd = Command::new(&path);
@@ -61,11 +68,16 @@ fn ensure_engine(state: tauri::State<'_, OwnedEngine>) -> Result<String, String>
     }
     let child = cmd.spawn().map_err(|e| format!("could not start {}: {e}", path.display()))?;
     *state.0.lock().unwrap() = Some(child);
+    wait_for_engine("started")
+}
 
-    let deadline = Instant::now() + Duration::from_secs(8);
+/// Waits until the engine answers. A new engine first waits for an old one that is still shutting
+/// down (up to its 5 s limit), so this allows more than that.
+fn wait_for_engine(done: &str) -> Result<String, String> {
+    let deadline = Instant::now() + Duration::from_secs(14);
     while Instant::now() < deadline {
         if reachable(WS_PORT) {
-            return Ok("started".into());
+            return Ok(done.into());
         }
         std::thread::sleep(Duration::from_millis(100));
     }
