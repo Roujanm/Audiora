@@ -33,6 +33,12 @@ Write-Host "Building Audiora $version" -ForegroundColor Cyan
 cargo build --release -p audiora-svc -p audiora-cli
 if ($LASTEXITCODE -ne 0) { throw "engine build failed" }
 
+# the installer also carries Audiora's virtual audio driver (installed when the PC can load it)
+if (-not (Test-Path dist\driver\AudioraVA.sys)) {
+    powershell -ExecutionPolicy Bypass -File scripts\driver-build.ps1
+    if ($LASTEXITCODE -ne 0) { throw "driver build failed" }
+}
+
 # the installer carries the engine next to the app (Tauri "external binary")
 New-Item -ItemType Directory -Force app\src-tauri\binaries | Out-Null
 Copy-Item target\release\audiora-svc.exe app\src-tauri\binaries\audiora-svc-x86_64-pc-windows-msvc.exe -Force

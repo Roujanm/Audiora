@@ -110,6 +110,68 @@ public static class AudioraDevice
 }
 "@
 
+# Windows makes a newly added output the default one, which would send every program's sound into
+# Audiora Mic Feed (you would hear nothing and others would hear your PC). The default output is
+# read before the install and put back afterwards.
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class AudioraDefaults
+{
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator {}
+
+    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceEnumerator
+    {
+        int EnumAudioEndpoints(int flow, int mask, out IntPtr devices);
+        int GetDefaultAudioEndpoint(int flow, int role, out IMMDevice device);
+    }
+
+    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDevice
+    {
+        int Activate(ref Guid iid, int ctx, IntPtr p, out IntPtr iface);
+        int OpenPropertyStore(int access, out IntPtr store);
+        int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+    }
+
+    [ComImport, Guid("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9")] class PolicyConfigClient {}
+
+    // IPolicyConfig (Windows 7 and later): only SetDefaultEndpoint is used; the methods before it keep the order
+    [ComImport, Guid("F8679F50-850A-41CF-9C72-430F290290C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IPolicyConfig
+    {
+        int GetMixFormat(IntPtr a, IntPtr b);
+        int GetDeviceFormat(IntPtr a, int b, IntPtr c);
+        int ResetDeviceFormat(IntPtr a);
+        int SetDeviceFormat(IntPtr a, IntPtr b, IntPtr c);
+        int GetProcessingPeriod(IntPtr a, int b, IntPtr c, IntPtr d);
+        int SetProcessingPeriod(IntPtr a, IntPtr b);
+        int GetShareMode(IntPtr a, IntPtr b);
+        int SetShareMode(IntPtr a, IntPtr b);
+        int GetPropertyValue(IntPtr a, int b, IntPtr c, IntPtr d);
+        int SetPropertyValue(IntPtr a, int b, IntPtr c, IntPtr d);
+        int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string id, int role);
+    }
+
+    /// The default output for a role (0 console, 1 multimedia, 2 communications), or null.
+    public static string GetOutput(int role)
+    {
+        IMMDevice d;
+        var e = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+        if (e.GetDefaultAudioEndpoint(0, role, out d) != 0 || d == null) return null;
+        string id;
+        return d.GetId(out id) == 0 ? id : null;
+    }
+
+    public static void SetOutput(string id, int role)
+    {
+        ((IPolicyConfig)new PolicyConfigClient()).SetDefaultEndpoint(id, role);
+    }
+}
+"@
+
 function Get-AudioraPackages {
     # "Published Name : oemNN.inf" blocks whose original name is audiorava.inf
     $out = pnputil /enum-drivers
@@ -158,10 +220,23 @@ if (Test-Path $cer) {
     Write-Host "Trusted the Audiora test certificate."
 }
 
+# remember where the user listens (never an Audiora device: that is what this protects against)
+$defaults = @{}
+foreach ($role in 0, 1, 2) {
+    $id = [AudioraDefaults]::GetOutput($role)
+    $dev = Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like "*$id*" } | Select-Object -First 1
+    if ($id -and -not ($dev.FriendlyName -like "*Audiora*")) { $defaults[$role] = $id }
+}
+
 # a reinstall replaces the old device instead of adding a second one
 [AudioraDevice]::Remove($hwid) | Out-Null
 pnputil /add-driver $inf | Out-Null
 $reboot = [AudioraDevice]::Install($inf, $hwid)
+# Windows switches the default output to a new endpoint a moment after it appears: put it back
+Start-Sleep -Seconds 3
+foreach ($role in $defaults.Keys) {
+    try { [AudioraDefaults]::SetOutput($defaults[$role], $role) } catch { Write-Host "could not restore the default output: $_" }
+}
 Write-Host "Audiora Virtual Audio installed." -ForegroundColor Green
 if ($reboot) { Write-Host "Windows asks for a restart to finish." -ForegroundColor Yellow }
 Write-Host "Check Settings > System > Sound: Audiora Game, Chat, Media, Aux, Mic Feed and Audiora Microphone."
