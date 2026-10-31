@@ -34,10 +34,19 @@ pub struct PresetStore {
     dir: PathBuf,
 }
 
+/// %APPDATA%\Audiora. Settings from before 0.3.8 (%APPDATA%\Roujan\Audiora) are moved there the
+/// first time, so nothing is lost and no folder carries the company name.
 pub fn default_data_dir() -> PathBuf {
-    std::env::var_os("APPDATA")
-        .map(|p| PathBuf::from(p).join("Roujan").join("Audiora"))
-        .unwrap_or_else(|| std::env::temp_dir().join("Audiora"))
+    let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) else {
+        return std::env::temp_dir().join("Audiora");
+    };
+    let dir = appdata.join("Audiora");
+    let old = appdata.join("Roujan").join("Audiora");
+    if !dir.exists() && old.is_dir() && std::fs::rename(&old, &dir).is_ok() {
+        // the now empty company folder goes too (only if nothing else is in it)
+        let _ = std::fs::remove_dir(appdata.join("Roujan"));
+    }
+    dir
 }
 
 fn valid_name(name: &str) -> bool {

@@ -31,7 +31,7 @@
       <MicAppChip {app} />
     {:else}
       <p class="empty muted">
-        {engine.hasAudioraMic ? 'HiNekst, Discord and games appear here while they use a microphone: drop them on Mic.' : 'Needs Audiora Microphone (installed with the driver).'}
+        {engine.hasAudioraMic ? 'HiNekst, Discord and games appear here while they use a microphone: drop them on Mic.' : 'Needs Audiora Microphone or a virtual cable (see Setup).'}
       </p>
     {/each}
   </div>

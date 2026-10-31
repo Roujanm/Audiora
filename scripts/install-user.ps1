@@ -5,7 +5,7 @@
 .DESCRIPTION
   The engine runs in the user's session, not as a Windows service: services live in session 0
   and do not see the user's default audio devices or microphone permission. Installing needs
-  no administrator rights. Nothing is changed outside %LOCALAPPDATA%\Roujan\Audiora and the
+  no administrator rights. Nothing is changed outside %LOCALAPPDATA%\Audiora and the
   current user's Run key.
 .EXAMPLE
   .\install-user.ps1 -Shortcuts
@@ -18,9 +18,9 @@ param(
     [switch]$Uninstall,
     # Folder holding audiora-svc.exe, audiora.exe and audiora-app.exe (default: next to this script).
     [string]$Source = $PSScriptRoot,
-    # Where to install (default %LOCALAPPDATA%\Roujan\Audiora). Use a folder outside AppData when
+    # Where to install (default %LOCALAPPDATA%\Audiora). Use a folder outside AppData when
     # installing from a sandboxed (packaged) terminal, whose AppData writes are redirected.
-    [string]$Target = (Join-Path $env:LOCALAPPDATA "Roujan\Audiora")
+    [string]$Target = (Join-Path $env:LOCALAPPDATA "Audiora")
 )
 $ErrorActionPreference = "Stop"
 $target = $Target
@@ -37,7 +37,7 @@ if ($Uninstall) {
     Remove-ItemProperty -Path $runKey -Name $valueName -ErrorAction SilentlyContinue
     $links | Where-Object { Test-Path $_ } | Remove-Item -Force
     if (Test-Path $target) { Remove-Item $target -Recurse -Force }
-    Write-Host "Audiora removed. Presets in $env:APPDATA\Roujan\Audiora and recordings were kept."
+    Write-Host "Audiora removed. Presets in $env:APPDATA\Audiora and recordings were kept."
     return
 }
 

@@ -485,13 +485,16 @@ class EngineClient {
   // ---- programs using the microphone ----------------------------------------
 
   micApps = $state<MicApp[]>([]);
-  /** Audiora's driver is installed: programs can be given the processed voice. */
+  /** A processed microphone exists (Audiora's driver or a virtual cable): programs can be given the processed voice. */
   hasAudioraMic = $state(false);
+  /** What programs pick to hear it: "Audiora Microphone" or "CABLE Output". */
+  processedMicName = $state('Audiora Microphone');
 
   async refreshMicApps() {
     const r = await this.call('mic_apps');
     this.micApps = (r.apps as MicApp[]).filter((a) => !IGNORED_APPS.has(a.name.toLowerCase()));
     this.hasAudioraMic = !!r.audiora_microphone;
+    if (typeof r.processed_mic === 'string') this.processedMicName = r.processed_mic;
   }
 
   /** Gives a program the processed voice (`on`) or its own microphone back. */

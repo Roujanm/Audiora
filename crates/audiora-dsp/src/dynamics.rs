@@ -37,6 +37,12 @@ impl Default for GateSettings {
 /// 1 dB per second), so a pause in speech does not let the room back in at once.
 const VOICE_RISE_MS: f32 = 30.0;
 const VOICE_FALL_MS: f32 = 8000.0;
+/// With voice focus the gate also learns the room: the steady noise floor (fans, hum, traffic) is
+/// the quietest level of the last two seconds (eight blocks of 250 ms). Speech always has short
+/// gaps between words, so it never lifts the floor. The gate stays closed below floor + margin.
+const FLOOR_BLOCK_MS: f32 = 250.0;
+const FLOOR_BLOCKS: usize = 8;
+const FLOOR_MARGIN_DB: f32 = 10.0;
 
 /// The gate opens at the threshold but only closes this far below it, so a voice hovering at the
 /// threshold does not make it chatter.
@@ -51,11 +57,38 @@ pub struct Gate {
     hold_left: u32,
     /// Learned level of the close voice (linear), for voice focus.
     voice: f32,
+    /// Quietest level of each recent block, newest at `floor_at`, for voice focus.
+    floor_mins: [f32; FLOOR_BLOCKS],
+    floor_at: usize,
+    floor_filled: usize,
+    block_min: f32,
+    block_left: u32,
 }
 
 impl Gate {
     pub fn new(sample_rate: f32) -> Self {
-        Self { fs: sample_rate, env: 0.0, gain: 1.0, open: true, hold_left: 0, voice: 0.0 }
+        Self {
+            fs: sample_rate,
+            env: 0.0,
+            gain: 1.0,
+            open: true,
+            hold_left: 0,
+            voice: 0.0,
+            floor_mins: [0.0; FLOOR_BLOCKS],
+            floor_at: 0,
+            floor_filled: 0,
+            block_min: f32::MAX,
+            block_left: 0,
+        }
+    }
+
+    /// The room's noise floor (linear), or 0 before the first block is complete.
+    fn floor(&self) -> f32 {
+        if self.floor_filled == 0 {
+            0.0
+        } else {
+            self.floor_mins[..self.floor_filled].iter().copied().fold(f32::MAX, f32::min)
+        }
     }
 
     /// Returns true when the gate is (mostly) open at the end of the block.
@@ -69,6 +102,9 @@ impl Gate {
         let env_rel = time_coeff(20.0, self.fs); // detector decay
         let focus = (s.focus_db > 0.0).then(|| db_to_lin(-s.focus_db));
         let (v_rise, v_fall) = (time_coeff(VOICE_RISE_MS, self.fs), time_coeff(VOICE_FALL_MS, self.fs));
+        let block = (FLOOR_BLOCK_MS * 0.001 * self.fs) as u32;
+        let margin = db_to_lin(FLOOR_MARGIN_DB);
+        let mut room = self.floor();
         for f in buf.chunks_exact_mut(2) {
             let level = f[0].abs().max(f[1].abs());
             self.env = if level > self.env { level } else { level + (self.env - level) * env_rel };
@@ -76,7 +112,19 @@ impl Gate {
             let (open_at, close_at) = match focus {
                 Some(k) => {
                     self.voice = if self.env > self.voice { self.env + (self.voice - self.env) * v_rise } else { self.voice * v_fall };
-                    let t = (self.voice * k).max(open_at);
+                    if self.block_left == 0 {
+                        self.block_left = block;
+                    }
+                    self.block_min = self.block_min.min(self.env);
+                    self.block_left -= 1;
+                    if self.block_left == 0 {
+                        self.floor_mins[self.floor_at] = self.block_min;
+                        self.floor_at = (self.floor_at + 1) % FLOOR_BLOCKS;
+                        self.floor_filled = (self.floor_filled + 1).min(FLOOR_BLOCKS);
+                        self.block_min = f32::MAX;
+                        room = self.floor();
+                    }
+                    let t = (self.voice * k).max(open_at).max(room * margin);
                     (t, t * (close_at / open_at))
                 }
                 None => (open_at, close_at),
@@ -106,6 +154,9 @@ impl Gate {
         self.open = true;
         self.hold_left = 0;
         self.voice = 0.0;
+        self.floor_filled = 0;
+        self.block_min = f32::MAX;
+        self.block_left = 0;
     }
 }
 
@@ -324,6 +375,21 @@ mod tests {
         let mut far = sine(48_000, 0.01, 300.0);
         g.process(&mut far, &off);
         assert!(peak(&far[far.len() - 24_000..]) > 0.009);
+    }
+
+    #[test]
+    fn voice_focus_learns_steady_room_noise_and_keeps_it_out() {
+        // a fan at -40 dBFS: above the fixed threshold, and nothing louder to learn a voice from
+        let s = GateSettings { threshold_db: -55.0, focus_db: 18.0, ..Default::default() };
+        let mut g = Gate::new(FS);
+        // three seconds: the first two-second window still holds the silence before the fan
+        let mut fan = sine(144_000, 0.01, 120.0);
+        g.process(&mut fan, &s);
+        assert!(peak(&fan[fan.len() - 24_000..]) < 0.0005, "steady noise must be gated once learned");
+        // speech over the fan still opens it at once
+        let mut voice = sine(9_600, 0.3, 300.0);
+        g.process(&mut voice, &s);
+        assert!(peak(&voice[2_400..]) > 0.28);
     }
 
     #[test]

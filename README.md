@@ -71,7 +71,7 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1          # builds d
 powershell -ExecutionPolicy Bypass -File dist\Audiora-0.1.0-win-x64\install-user.ps1 -Shortcuts
 ```
 
-Installs to `%LOCALAPPDATA%\Roujan\Audiora` (no administrator rights) and puts an **Audiora**
+Installs to `%LOCALAPPDATA%\Audiora` (no administrator rights) and puts an **Audiora**
 shortcut on the desktop and in the Start menu. `-Uninstall` removes both.
 
 ### Package a portable build

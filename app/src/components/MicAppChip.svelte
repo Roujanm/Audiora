@@ -41,7 +41,7 @@
   style:--c={color}
   onpointerdown={(e) => dnd.begin(e, app.name, drop)}
   role="listitem"
-  title={app.routed ? `${label} records Audiora Microphone` : `${label} records ${app.device_name ?? 'a microphone'}`}
+  title={app.routed ? `${label} records ${engine.processedMicName}` : `${label} records ${app.device_name ?? 'a microphone'}`}
 >
   <span class="avatar" aria-hidden="true">{label.charAt(0)}<i><Icon name="mic" size={9} /></i></span>
   <span class="body">

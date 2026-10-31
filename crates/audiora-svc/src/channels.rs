@@ -204,13 +204,17 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
     }
     // Processed microphone: Audiora's own driver has a "Mic Feed" output wired to the
     // "Audiora Microphone" every program can pick, so with the driver installed this just works.
+    // Where that driver cannot load (Secure Boot on), a signed virtual cable does the same job:
+    // the engine plays into "CABLE Input" and programs pick "CABLE Output".
     if r.mic_out.is_none() {
+        let named = |d: &&DeviceInfo, a: &str, b: &str| {
+            let n = d.name.to_lowercase();
+            d.flow == Flow::Render && n.contains(a) && n.contains(b)
+        };
         r.mic_out = devs
             .iter()
-            .find(|d| {
-                let n = d.name.to_lowercase();
-                d.flow == Flow::Render && n.contains("audiora") && n.contains("mic feed")
-            })
+            .find(|d| named(d, "audiora", "mic feed"))
+            .or_else(|| devs.iter().find(|d| named(d, "cable input", "vb-audio")))
             .map(|d| d.id.clone());
     }
     let mut used: HashSet<String> = HashSet::new();
@@ -332,11 +336,10 @@ impl MicRoutes {
 }
 
 /// The capture endpoint every program can pick to hear the processed microphone: Audiora's own
-/// driver's "Audiora Microphone".
+/// driver's "Audiora Microphone", else the signed virtual cable's "CABLE Output".
 pub fn audiora_microphone(devs: &[DeviceInfo]) -> Option<String> {
-    devs.iter()
-        .find(|d| d.flow == Flow::Capture && d.name.to_lowercase().starts_with("audiora microphone"))
-        .map(|d| d.id.clone())
+    let capture = |prefix: &str| devs.iter().find(|d| d.flow == Flow::Capture && d.name.to_lowercase().starts_with(prefix));
+    capture("audiora microphone").or_else(|| capture("cable output")).map(|d| d.id.clone())
 }
 
 /// Per-game profiles: application → channel → preset name.
@@ -608,7 +611,8 @@ impl Channels {
         for app in routed.keys() {
             apps.entry(app.clone()).or_insert_with(|| json!({ "name": app, "routed": true, "active": false, "peak": 0.0, "device_name": null, "on_audiora": false }));
         }
-        json!({ "apps": apps.into_values().collect::<Vec<_>>(), "audiora_microphone": ours.is_some() })
+        let name = ours.as_ref().and_then(|id| devs.iter().find(|d| &d.id == id)).map(|d| d.name.split(" (").next().unwrap_or(&d.name).to_owned());
+        json!({ "apps": apps.into_values().collect::<Vec<_>>(), "audiora_microphone": ours.is_some(), "processed_mic": name })
     }
 
     /// Makes a program record the processed voice (`on`), or gives it back the microphone it had.
@@ -627,7 +631,7 @@ impl Channels {
             .collect();
         let mut routes = self.mic_routes.lock().map_err(|_| "mic routes lock poisoned")?;
         if on {
-            let dev = ours.ok_or("Audiora Microphone is not installed: the installer sets it up when test signing is on")?;
+            let dev = ours.ok_or("no processed microphone: install Audiora's driver (test signing) or a signed virtual cable")?;
             let prev = routes.map.get(&key).cloned().unwrap_or_else(|| pids.first().and_then(|p| audiora_hal::get_app_input(*p).ok().flatten()).filter(|d| *d != dev));
             let mut err = None;
             for pid in &pids {
@@ -890,6 +894,16 @@ mod tests {
         ];
         assert_eq!(audiora_microphone(&devs).as_deref(), Some("amic"));
         assert_eq!(audiora_microphone(&devs[..2]), None);
+        // without Audiora's driver (Secure Boot on) the signed virtual cable stands in
+        let cable = [
+            dev("Microphone (Realtek)", Flow::Capture, "mic", true),
+            dev("CABLE Input (VB-Audio Virtual Cable)", Flow::Render, "cin", false),
+            dev("CABLE Output (VB-Audio Virtual Cable)", Flow::Capture, "cout", false),
+        ];
+        assert_eq!(audiora_microphone(&cable).as_deref(), Some("cout"));
+        let r = resolve(&Config::default(), &cable, &[]);
+        assert_eq!(r.mic_out.as_deref(), Some("cin"));
+        assert!(r.devices.iter().all(|d| d.as_deref() != Some("cin")), "the cable is never a channel device too");
 
         let dir = std::env::temp_dir().join(format!("audiora-microutes-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();

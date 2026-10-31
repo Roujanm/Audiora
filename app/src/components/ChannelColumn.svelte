@@ -88,7 +88,7 @@
       {#each micApps as app (app.name)}
         <MicAppChip {app} compact />
       {:else}
-        <span class="hint">{engine.hasAudioraMic ? 'Drop mic apps here' : 'No Audiora Microphone'}</span>
+        <span class="hint">{engine.hasAudioraMic ? 'Drop mic apps here' : 'No processed mic yet'}</span>
       {/each}
     </div>
   {:else}

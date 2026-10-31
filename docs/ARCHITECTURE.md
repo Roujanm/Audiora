@@ -159,7 +159,7 @@ WinDbg on every build. `windows-drivers-rs` is not production-ready; revisit lat
   the remote-control interfaces of other local audio tools.
 - Schema: JSON, parameter paths like `strip/3/eq/1/gain_db` — see `CONTROL-API.md`.
 - Meters are pushed at up to 60 Hz after `subscribe`; everything else is request/response.
-- Persistence: `%APPDATA%\Roujan\Audiora\` — `presets/`, `channel-presets/<channel>.json`,
+- Persistence: `%APPDATA%\Audiora\` — `presets/`, `channel-presets/<channel>.json`,
   `channels.json` (devices), `routes.json` (program → channel), `app-profiles.json`, `license.json`.
 
 ### 4.4 Application (`app/`)
