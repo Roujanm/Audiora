@@ -116,6 +116,13 @@
     </div>
   </header>
 
+  {#if !engine.channels?.mic_out.device_id}
+    <div class="route-warn" role="status">
+      <Icon name="alert" size={16} />
+      <span><b>Other programs hear your raw microphone.</b> HiNekst, Discord, games and browsers read the microphone directly, so this page only changes what you hear yourself and Mic check. They get this cleaned-up voice once it has a way out: Setup → Routing → Processed microphone.</span>
+    </div>
+  {/if}
+
 
   <div class="body">
     {#if view === 'eq'}
@@ -169,11 +176,12 @@
         <Switch label="Noise gate" checked={on('gate/enabled')} onchange={set('gate/enabled')} />
       </div>
       <div class="knobs">
+        <Knob label="Focus" min={0} max={30} step={1} reset={18} size={52} color="var(--ok)" disabled={!on('gate/enabled')} value={g('gate/focus_db', 18)} format={(v) => (v < 0.5 ? 'off' : `${Math.round(v)} dB`)} onchange={set('gate/focus_db')} />
         <Knob label="Thresh" min={-90} max={0} step={0.5} reset={-50} size={52} color="var(--ok)" disabled={!on('gate/enabled')} value={g('gate/threshold_db', -50)} format={db} onchange={set('gate/threshold_db')} />
         <Knob label="Range" min={6} max={90} step={1} reset={15} size={52} color="var(--ok)" disabled={!on('gate/enabled')} value={g('gate/range_db', 15)} format={(v) => `${Math.round(v)} dB`} onchange={set('gate/range_db')} />
-        <Knob label="Hold" min={0} max={1000} step={5} reset={200} size={52} color="var(--ok)" disabled={!on('gate/enabled')} value={g('gate/hold_ms', 200)} format={ms} onchange={set('gate/hold_ms')} />
         <Knob label="Release" min={5} max={1500} scale="log" step={1} reset={200} size={52} color="var(--ok)" disabled={!on('gate/enabled')} value={g('gate/release_ms', 200)} format={ms} onchange={set('gate/release_ms')} />
       </div>
+      <p class="note">Focus: sounds this much quieter than your own voice stay out — people in other rooms, the TV.</p>
     </section>
     <section class="panel mod wide" aria-label="Monitoring">
       <div class="mod-head">
@@ -312,6 +320,28 @@
     border-color: color-mix(in oklab, var(--bad) 60%, transparent);
     background: color-mix(in oklab, var(--bad) 18%, transparent);
     box-shadow: 0 0 24px -8px var(--bad);
+  }
+
+  .route-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    background: color-mix(in oklab, var(--warn) 10%, transparent);
+    border: 1px solid color-mix(in oklab, var(--warn) 40%, transparent);
+  }
+
+  .route-warn :global(svg) {
+    flex: none;
+    margin-top: 1px;
+    color: var(--warn);
+  }
+
+  .route-warn b {
+    color: var(--text);
   }
 
   .save {

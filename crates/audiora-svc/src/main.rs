@@ -171,6 +171,54 @@ fn instance_lock(port: u16) -> Option<std::fs::File> {
     }
 }
 
+/// Default voice focus for the microphone (dB under the learned voice level).
+const MIC_FOCUS_DB: f32 = 18.0;
+
+/// Local time for log lines.
+fn stamp() -> String {
+    chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+/// Writes every glitch to the log as it happens, and restarts the engine when the master output
+/// stopped asking for audio: a device whose driver hung (wireless dongles do) leaves the engine
+/// silent without an error. A restart reopens everything; the desktop app starts it again.
+fn health(stats: Arc<engine::Stats>, stop: Arc<std::sync::atomic::AtomicBool>, names: Vec<String>) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let mut logged = stats.glitches.count();
+        let mut last_callbacks = stats.callbacks.load(Ordering::Relaxed);
+        let mut still = 0u32;
+        while !stop.load(Ordering::Relaxed) {
+            std::thread::sleep(Duration::from_secs(1));
+            let count = stats.glitches.count();
+            if count > logged {
+                let new = (count - logged).min(32) as usize;
+                for (t, kind, src) in stats.glitches.recent().into_iter().take(new).rev() {
+                    let when = chrono::DateTime::from_timestamp(t as i64, 0).map(|d| d.with_timezone(&chrono::Local).format("%H:%M:%S").to_string()).unwrap_or_default();
+                    let place = if src >= engine::SRC_OUTPUT {
+                        format!("output {}", src - engine::SRC_OUTPUT)
+                    } else if src >= engine::SRC_TAP {
+                        format!("apps on {}", names.get((src - engine::SRC_TAP) as usize).map_or("?", |s| s.as_str()))
+                    } else {
+                        names.get(src as usize).map_or("?", |s| s.as_str()).to_owned()
+                    };
+                    println!("{} glitch {kind:?} at {place} ({when})", stamp());
+                }
+                logged = count;
+            }
+            let callbacks = stats.callbacks.load(Ordering::Relaxed);
+            still = if callbacks == last_callbacks && callbacks > 0 { still + 1 } else { 0 };
+            last_callbacks = callbacks;
+            if still >= STALL_LIMIT_S {
+                println!("{} the master output stopped for {STALL_LIMIT_S} s; restarting the engine", stamp());
+                stop.store(true, Ordering::Relaxed);
+            }
+        }
+    })
+}
+
+/// Seconds without a single output callback before the engine restarts itself.
+const STALL_LIMIT_S: u32 = 6;
+
 /// How long a starting engine waits for an older one to finish (longer than SHUTDOWN_LIMIT).
 const INSTANCE_WAIT: Duration = Duration::from_secs(10);
 /// A shutdown that has not finished by then is ended by force: a device driver stuck in a call
@@ -184,6 +232,15 @@ fn main() -> ExitCode {
     let Some(_instance) = instance_lock(port) else {
         return ExitCode::FAILURE;
     };
+    // A panic in any thread (an audio thread included) ends the whole engine at once, written to
+    // the log. Left alone, the rest would keep running with that part dead: silence or a frozen
+    // channel until someone restarts it. The desktop app restarts a stopped engine within a second.
+    std::panic::set_hook(Box::new(|info| {
+        let thread = std::thread::current().name().unwrap_or("unnamed").to_owned();
+        eprintln!("{} PANIC in thread {thread}: {info}", stamp());
+        std::process::exit(101);
+    }));
+    println!("{} Audiora engine {} starting (pid {})", stamp(), env!("CARGO_PKG_VERSION"), std::process::id());
 
     let data_dir = arg::<std::path::PathBuf>(&args, "--data-dir").unwrap_or_else(presets::default_data_dir);
     // Channel layout unless devices were spelled out for the flat per-device layout.
@@ -197,7 +254,7 @@ fn main() -> ExitCode {
     let engine = match Engine::start(cfg) {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("{} engine could not start: {e}", stamp());
             return ExitCode::FAILURE;
         }
     };
@@ -231,6 +288,9 @@ fn main() -> ExitCode {
             strip.bus_mask.store(1, Ordering::Relaxed);
         }
         engine.params.strips[channels::MIC].bus_mask.store(if engine.info.buses.len() > 1 { 0b10 } else { 0 }, Ordering::Relaxed);
+        // Voice focus is on for the microphone unless a session or preset says otherwise: other
+        // voices in the house and the room stay out of the gate.
+        engine.params.strips[channels::MIC].gate.focus_db.set(MIC_FOCUS_DB);
     }
     if !args.iter().any(|a| a == "--fresh") {
         let restored = if presets.exists(last) {
@@ -328,12 +388,14 @@ fn main() -> ExitCode {
                 // two readings in a row: Windows settles the default a moment after a device arrives
                 seen = if pick.is_some() && pick != current { seen + 1 } else { 0 };
                 if seen >= 2 {
-                    println!("output changed to {}; restarting onto it", pick.unwrap_or_default());
+                    println!("{} output changed to {}; restarting onto it", stamp(), pick.unwrap_or_default());
                     stop.store(true, Ordering::Relaxed);
                 }
             }
         })
     });
+
+    let _health = health(engine.stats.clone(), stop.clone(), engine.info.strips.iter().map(|s| s.name.clone()).collect());
 
     let sim_r = args.iter().any(|a| a == "--sim-r") || (channel_mode && channels::Config::load(&data_dir).sim_r);
     let studio = Arc::new(studio::Studio::new(studio::default_root(), engine.rec.clone(), engine.playback.clone()));
@@ -414,7 +476,7 @@ fn main() -> ExitCode {
     // finish a Studio take before the engine closes its recorder
     let _ = studio.stop();
     match presets.save(last, &engine.params) {
-        Ok(n) => println!("session saved ({n} settings)"),
+        Ok(n) => println!("{} session saved ({n} settings), engine stopped", stamp()),
         Err(e) => eprintln!("could not save session: {e}"),
     }
 

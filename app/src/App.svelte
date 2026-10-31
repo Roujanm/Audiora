@@ -7,9 +7,8 @@
   import ChannelColumn from './components/ChannelColumn.svelte';
   import ChannelPage from './components/ChannelPage.svelte';
   import AppsDock from './components/AppsDock.svelte';
-  import MasterStage from './components/MasterStage.svelte';
+  import MasterPanel from './components/MasterPanel.svelte';
   import VoiceStudio from './components/VoiceStudio.svelte';
-  import Studio from './components/Studio.svelte';
   import Setup from './components/Setup.svelte';
   import System from './components/System.svelte';
   import Icon, { type IconName } from './components/Icon.svelte';
@@ -26,7 +25,7 @@
   engine.start();
   void desktop.start();
 
-  type Tab = 'mixer' | ChannelKey | 'studio' | 'system';
+  type Tab = 'mixer' | ChannelKey | 'system';
 
   function remembered<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
     try {
@@ -49,7 +48,7 @@
   }
   let accent = $state<AccentId>(remembered('audiora.accent', accentIds, 'mono'));
   let splash = $state(true);
-  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'music', 'mic', 'studio', 'system'];
+  const TABS: Tab[] = ['mixer', 'game', 'chat', 'media', 'aux', 'music', 'mic', 'system'];
   let tab = $state<Tab>(remembered('audiora.tab', TABS, 'mixer'));
 
   $effect(() => {
@@ -76,7 +75,6 @@
   const RAIL: NavItem[] = [
     { id: 'mixer', label: 'Mixer', icon: 'mixer', title: 'Mixer' },
     { id: 'mic', label: 'Voice', icon: 'mic', title: 'Voice' },
-    { id: 'studio', label: 'Studio', icon: 'record', title: 'Studio' },
     { id: 'system', label: 'Setup', icon: 'system', title: 'Setup & health' },
   ];
 
@@ -199,7 +197,7 @@
   const current = $derived(NAV.find((n) => n.id === tab)!);
   // the aurora breathes with the master output (0 = silence, 1 = loud)
   const auroraLevel = $derived(
-    Math.max(0, Math.min(1, (Math.max(engine.peakDb('bus/0/peak_l'), engine.peakDb('bus/0/peak_r')) + 50) / 44)).toFixed(2),
+    Math.max(0, Math.min(1, (Math.max(engine.peakDb('bus/0/peak_l'), engine.peakDb('bus/0/peak_r')) + 50) / 44)).toFixed(1),
   );
   const master = $derived(buses[0]);
   const s = $derived(engine.stats);
@@ -232,9 +230,7 @@
           : currentChannel.online
             ? `${engine.appGroups.filter((a) => a.route === currentChannel.key).length} apps · ${currentChannel.mode === 'direct' ? 'direct capture' : shortName(currentChannel.device_name ?? '')}`
             : 'Not set up'
-        : tab === 'studio'
-          ? 'Multitrack recording of every channel'
-          : 'Devices, channels and audio health',
+        : 'Devices, channels and audio health',
   );
 </script>
 
@@ -242,8 +238,8 @@
 
 {#if splash}<Splash ondone={() => (splash = false)} />{/if}
 
-<div class="app" style:--lvl={auroraLevel}>
-  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="app">
+  <div class="aurora" aria-hidden="true" style:--lvl={auroraLevel}><i></i><i></i><i></i><i></i><b class="sheen"></b><b class="dust"></b><b class="pulse"></b></div>
 
   <div class="shell">
     <header class="top">
@@ -258,7 +254,6 @@
           <button class="item" class:active aria-current={active ? 'page' : undefined} onclick={() => (tab = n.id)}>
             <Icon name={n.icon} size={16} />
             <span>{n.label}</span>
-            {#if n.id === 'studio' && engine.rec.recording}<i class="recdot" aria-label="recording"></i>{/if}
           </button>
         {/each}
       </nav>
@@ -337,7 +332,7 @@
             {#if engine.lastError}<p class="chip bad err">{engine.lastError}</p>{/if}
           </div>
         </div>
-      {:else if !engine.channelMode && tab !== 'studio' && tab !== 'system'}
+      {:else if !engine.channelMode && tab !== 'system'}
         <div class="connect panel pad" role="status">
           <span class="warn-ico"><Icon name="alert" size={26} /></span>
           <div>
@@ -347,14 +342,14 @@
         </div>
       {:else if tab === 'mixer'}
         <div class="overview">
-          <MasterStage />
-          <div class="mixer">
-          <div class="side"><AppsDock /></div>
           <div class="channels">
             {#each channelList as c (c.key)}
               <ChannelColumn ch={c} onopen={() => (tab = c.key)} onsetup={() => (tab = 'system')} />
             {/each}
           </div>
+          <div class="side">
+            <MasterPanel />
+            <AppsDock />
           </div>
         </div>
       {:else if currentChannel?.kind === 'mic'}
@@ -363,8 +358,6 @@
         {#key currentChannel.key}
           <div class="scroll"><ChannelPage ch={currentChannel} onsetup={() => (tab = 'system')} /></div>
         {/key}
-      {:else if tab === 'studio'}
-        <div class="fill"><Studio /></div>
       {:else}
         <div class="fill stack">
           {#if setupView === 'health'}
@@ -415,85 +408,141 @@
     isolation: isolate;
   }
 
-  /* ----- aurora: three slow light fields behind everything, brighter while sound plays */
+  /* ----- aurora: soft light fields, a slow sheen and drifting dust behind everything, brighter
+     while sound plays. Only transform and opacity animate (no blur filter, no repaint): the
+     compositor moves ready-made layers, so it costs next to nothing on the CPU and the GPU. */
   .aurora {
     position: fixed;
-    inset: -20%;
+    inset: 0;
     z-index: -1;
+    overflow: hidden;
     pointer-events: none;
-    filter: blur(70px) saturate(130%);
-    opacity: calc(0.45 + var(--lvl, 0) * 0.45);
-    transition: opacity 0.35s linear;
+    contain: strict;
+  }
+
+  .aurora i,
+  .aurora b {
+    position: absolute;
+    will-change: transform;
   }
 
   .aurora i {
-    position: absolute;
-    width: 46vw;
-    height: 46vw;
+    width: 70vmax;
+    height: 70vmax;
     border-radius: 50%;
-    mix-blend-mode: screen;
+    opacity: 0.5;
   }
 
   .aurora i:nth-child(1) {
-    left: 8%;
-    top: 4%;
-    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 30%, #3a6bff 30%), transparent 65%);
-    animation: drift-a 26s ease-in-out infinite alternate;
+    left: -18vmax;
+    top: -26vmax;
+    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 22%, #2f5bff 16%) 0%, transparent 62%);
+    animation: drift-a 34s ease-in-out infinite alternate;
   }
 
   .aurora i:nth-child(2) {
-    right: 4%;
-    top: 18%;
-    background: radial-gradient(circle, color-mix(in oklab, #2ed3e6 40%, transparent), transparent 65%);
-    animation: drift-b 32s ease-in-out infinite alternate;
+    right: -24vmax;
+    top: -10vmax;
+    background: radial-gradient(circle, rgba(46, 211, 230, 0.2) 0%, transparent 60%);
+    animation: drift-b 41s ease-in-out infinite alternate;
   }
 
   .aurora i:nth-child(3) {
-    left: 32%;
-    bottom: -6%;
-    background: radial-gradient(circle, color-mix(in oklab, #a58bff 38%, transparent), transparent 65%);
-    animation: drift-c 38s ease-in-out infinite alternate;
+    left: 18vw;
+    bottom: -40vmax;
+    background: radial-gradient(circle, rgba(165, 139, 255, 0.2) 0%, transparent 60%);
+    animation: drift-c 47s ease-in-out infinite alternate;
+  }
+
+  .aurora i:nth-child(4) {
+    left: 40vw;
+    top: 10vh;
+    width: 46vmax;
+    height: 46vmax;
+    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 14%, transparent) 0%, transparent 62%);
+    animation: drift-d 29s ease-in-out infinite alternate;
+  }
+
+  /* a wide, faint light that turns once every two minutes */
+  .aurora .sheen {
+    left: 50%;
+    top: 50%;
+    width: 160vmax;
+    height: 160vmax;
+    margin: -80vmax 0 0 -80vmax;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 255, 255, 0.035) 40deg, transparent 90deg, transparent 180deg, rgba(120, 170, 255, 0.03) 230deg, transparent 280deg);
+    animation: spin 120s linear infinite;
+  }
+
+  /* fine dust drifting upwards, drawn once as a tile and only moved */
+  .aurora .dust {
+    inset: -200px 0 0 0;
+    height: calc(100% + 400px);
+    opacity: 0.55;
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.5), transparent),
+      radial-gradient(1px 1px at 120px 160px, rgba(190, 215, 255, 0.45), transparent),
+      radial-gradient(1.5px 1.5px at 210px 80px, rgba(255, 255, 255, 0.35), transparent),
+      radial-gradient(1px 1px at 300px 240px, rgba(170, 240, 255, 0.4), transparent),
+      radial-gradient(1px 1px at 60px 300px, rgba(255, 255, 255, 0.3), transparent);
+    background-size: 340px 340px;
+    animation: rise 60s linear infinite;
+  }
+
+  /* breathes with the music: only its opacity follows the level */
+  .aurora .pulse {
+    left: 50%;
+    bottom: -30vmax;
+    width: 90vmax;
+    height: 60vmax;
+    margin-left: -45vmax;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, color-mix(in oklab, var(--accent) 22%, transparent) 0%, transparent 65%);
+    opacity: calc(var(--lvl, 0) * 0.9);
+    transition: opacity 0.3s linear;
+    will-change: opacity;
   }
 
   @keyframes drift-a {
     to {
-      transform: translate(14vw, 8vh) scale(1.15);
+      transform: translate(16vw, 10vh) scale(1.12);
     }
   }
 
   @keyframes drift-b {
     to {
-      transform: translate(-16vw, 12vh) scale(0.9);
+      transform: translate(-18vw, 14vh) scale(0.9);
     }
   }
 
   @keyframes drift-c {
     to {
-      transform: translate(10vw, -14vh) scale(1.2);
+      transform: translate(12vw, -16vh) scale(1.18);
+    }
+  }
+
+  @keyframes drift-d {
+    to {
+      transform: translate(-20vw, 18vh) scale(1.25);
+    }
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes rise {
+    to {
+      transform: translateY(-340px);
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .aurora i {
+    .aurora i,
+    .aurora b {
       animation: none;
-    }
-  }
-
-  .recdot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--rec);
-    box-shadow: 0 0 8px var(--rec);
-    animation: pulse 1.2s infinite;
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.3;
     }
   }
 
@@ -662,34 +711,52 @@
     box-shadow: 0 0 22px -6px var(--c);
   }
 
+  /* a console: full-height channel strips on the left, master and apps on the right */
   .overview {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px;
     height: 100%;
     min-height: 0;
     overflow: hidden;
+    animation: view-in 0.24s var(--ease) both;
   }
 
-  /* the faders take whatever height the window leaves: the page never scrolls */
-  .overview .mixer {
-    flex: 1 1 0;
-  }
-
-  .side {
-    width: 248px;
-    flex: none;
+  .channels {
     display: flex;
-    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
     min-height: 0;
   }
 
-  .side > :global(*) {
+  /* six strips share whatever width is left; none pushes into the master column */
+  .channels > :global(.col) {
+    min-width: 0;
+  }
+
+  @media (max-width: 1400px) {
+    .overview {
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 12px;
+    }
+
+    .channels {
+      gap: 10px;
+    }
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .side > :global(.dock) {
     flex: 1;
   }
 
   /* every view fades and rises in when it is opened */
-  .mixer,
   .scroll,
   .connect {
     animation: view-in 0.24s var(--ease) both;
@@ -775,28 +842,6 @@
     min-width: 0;
     padding: 14px 18px 10px;
     overflow: hidden;
-  }
-
-  .mixer {
-    display: flex;
-    gap: 16px;
-    height: 100%;
-    min-height: 0;
-  }
-
-  .channels {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    gap: 12px;
-    min-height: 0;
-    overflow-x: auto;
-    padding: 2px 4px 8px 2px;
-    margin: 0 -4px 0 -2px;
-  }
-
-  .channels > :global(.col) {
-    max-height: 760px;
   }
 
   .scroll {

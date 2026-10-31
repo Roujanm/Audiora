@@ -122,6 +122,11 @@ impl GlitchLog {
         self.slots[i].store(t << 24 | (kind as u64) << 16 | (source as u64 & 0xFFFF), Ordering::Relaxed);
     }
 
+    /// How many glitches were noted since start (the log keeps only the latest).
+    pub fn count(&self) -> u64 {
+        self.next.load(Ordering::Relaxed)
+    }
+
     /// Newest first: (unix seconds, kind, source).
     pub fn recent(&self) -> Vec<(u64, Glitch, u32)> {
         let n = self.next.load(Ordering::Relaxed) as usize;

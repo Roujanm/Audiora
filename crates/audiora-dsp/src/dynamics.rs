@@ -21,13 +21,22 @@ pub struct GateSettings {
     /// How long the gate stays open after the level falls below the threshold, so word endings and
     /// short pauses are not chopped.
     pub hold_ms: f32,
+    /// Voice focus (dB, 0 = off): the gate learns how loud the voice right at the microphone is
+    /// and stays closed for anything more than this much quieter (a voice across the room, a TV,
+    /// the next room), whatever the fixed threshold says.
+    pub focus_db: f32,
 }
 
 impl Default for GateSettings {
     fn default() -> Self {
-        Self { threshold_db: -50.0, attack_ms: 2.0, release_ms: 120.0, range_db: 60.0, hold_ms: 80.0 }
+        Self { threshold_db: -50.0, attack_ms: 2.0, release_ms: 120.0, range_db: 60.0, hold_ms: 80.0, focus_db: 0.0 }
     }
 }
+
+/// How the learned voice level follows: it rises within a syllable and sinks slowly (about
+/// 1 dB per second), so a pause in speech does not let the room back in at once.
+const VOICE_RISE_MS: f32 = 30.0;
+const VOICE_FALL_MS: f32 = 8000.0;
 
 /// The gate opens at the threshold but only closes this far below it, so a voice hovering at the
 /// threshold does not make it chatter.
@@ -40,11 +49,13 @@ pub struct Gate {
     gain: f32,
     open: bool,
     hold_left: u32,
+    /// Learned level of the close voice (linear), for voice focus.
+    voice: f32,
 }
 
 impl Gate {
     pub fn new(sample_rate: f32) -> Self {
-        Self { fs: sample_rate, env: 0.0, gain: 1.0, open: true, hold_left: 0 }
+        Self { fs: sample_rate, env: 0.0, gain: 1.0, open: true, hold_left: 0, voice: 0.0 }
     }
 
     /// Returns true when the gate is (mostly) open at the end of the block.
@@ -56,9 +67,20 @@ impl Gate {
         let att = time_coeff(s.attack_ms, self.fs);
         let rel = time_coeff(s.release_ms, self.fs);
         let env_rel = time_coeff(20.0, self.fs); // detector decay
+        let focus = (s.focus_db > 0.0).then(|| db_to_lin(-s.focus_db));
+        let (v_rise, v_fall) = (time_coeff(VOICE_RISE_MS, self.fs), time_coeff(VOICE_FALL_MS, self.fs));
         for f in buf.chunks_exact_mut(2) {
             let level = f[0].abs().max(f[1].abs());
             self.env = if level > self.env { level } else { level + (self.env - level) * env_rel };
+            // with focus on, the threshold rides `focus_db` under the learned voice level
+            let (open_at, close_at) = match focus {
+                Some(k) => {
+                    self.voice = if self.env > self.voice { self.env + (self.voice - self.env) * v_rise } else { self.voice * v_fall };
+                    let t = (self.voice * k).max(open_at);
+                    (t, t * (close_at / open_at))
+                }
+                None => (open_at, close_at),
+            };
             if self.env >= open_at {
                 self.open = true;
                 self.hold_left = hold;
@@ -83,6 +105,7 @@ impl Gate {
         self.gain = 1.0;
         self.open = true;
         self.hold_left = 0;
+        self.voice = 0.0;
     }
 }
 
@@ -278,6 +301,29 @@ mod tests {
         let open = g.process(&mut quiet, &s);
         assert!(!open);
         assert!(peak(&quiet[quiet.len() - 2000..]) < 0.0002, "should be ~60 dB down");
+    }
+
+    #[test]
+    fn voice_focus_keeps_a_distant_voice_out_but_lets_the_close_voice_in() {
+        // a low fixed threshold that a voice across the room (-40 dBFS) clears easily
+        let s = GateSettings { threshold_db: -55.0, focus_db: 18.0, ..Default::default() };
+        let mut g = Gate::new(FS);
+        let mut close = sine(24_000, 0.3, 300.0); // -10 dBFS: talking right at the microphone
+        g.process(&mut close, &s);
+        assert!(peak(&close[12_000..]) > 0.28, "the close voice must pass");
+        let mut far = sine(48_000, 0.01, 300.0); // -40 dBFS, 30 dB quieter
+        g.process(&mut far, &s);
+        assert!(peak(&far[far.len() - 24_000..]) < 0.0005, "the distant voice must stay out");
+        let mut close = sine(9_600, 0.3, 300.0);
+        g.process(&mut close, &s);
+        assert!(peak(&close[2_400..]) > 0.28, "the close voice opens it again at once");
+
+        // the same distant voice passes with focus off (only the fixed threshold applies)
+        let mut g = Gate::new(FS);
+        let off = GateSettings { focus_db: 0.0, ..s };
+        let mut far = sine(48_000, 0.01, 300.0);
+        g.process(&mut far, &off);
+        assert!(peak(&far[far.len() - 24_000..]) > 0.009);
     }
 
     #[test]

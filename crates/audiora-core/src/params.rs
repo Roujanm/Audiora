@@ -27,6 +27,8 @@ pub struct GateParams {
     pub release_ms: AtomicF32,
     pub range_db: AtomicF32,
     pub hold_ms: AtomicF32,
+    /// Voice focus in dB, 0 = off (see `GateSettings::focus_db`).
+    pub focus_db: AtomicF32,
     /// Meter: 1.0 while open.
     pub open: AtomicF32,
 }
@@ -41,6 +43,7 @@ impl GateParams {
             release_ms: AtomicF32::new(d.release_ms),
             range_db: AtomicF32::new(d.range_db),
             hold_ms: AtomicF32::new(d.hold_ms),
+            focus_db: AtomicF32::new(d.focus_db),
             open: AtomicF32::new(1.0),
         }
     }
@@ -52,6 +55,7 @@ impl GateParams {
             release_ms: self.release_ms.get(),
             range_db: self.range_db.get(),
             hold_ms: self.hold_ms.get(),
+            focus_db: self.focus_db.get(),
         }
     }
 }

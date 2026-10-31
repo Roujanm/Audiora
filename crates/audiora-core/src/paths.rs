@@ -37,8 +37,8 @@ const STRIP_LEAVES: [&str; 11] =
 const LOWCUT_LEAVES: [&str; 2] = ["enabled", "freq"];
 const DEESS_LEAVES: [&str; 3] = ["enabled", "threshold_db", "gr_db"];
 const SMART_LEAVES: [&str; 3] = ["enabled", "target_db", "gain_db"];
-const GATE_LEAVES: [&str; 7] =
-    ["enabled", "threshold_db", "attack_ms", "release_ms", "range_db", "hold_ms", "open"];
+const GATE_LEAVES: [&str; 8] =
+    ["enabled", "threshold_db", "attack_ms", "release_ms", "range_db", "hold_ms", "focus_db", "open"];
 const COMP_LEAVES: [&str; 8] =
     ["enabled", "threshold_db", "ratio", "attack_ms", "release_ms", "makeup_db", "knee_db", "gr_db"];
 const EQ_LEAVES: [&str; 3] = ["freq", "gain_db", "q"];
@@ -105,6 +105,7 @@ impl MixerParams {
                         "release_ms" => Ok(Target::Float(&s.gate.release_ms, 1.0, 5000.0)),
                         "range_db" => Ok(Target::Float(&s.gate.range_db, 0.0, 100.0)),
                         "hold_ms" => Ok(Target::Float(&s.gate.hold_ms, 0.0, 1000.0)),
+                        "focus_db" => Ok(Target::Float(&s.gate.focus_db, 0.0, 40.0)),
                         "open" => Ok(Target::Meter(&s.gate.open)),
                         _ => Err(UnknownPath),
                     },
@@ -253,7 +254,7 @@ mod tests {
     fn every_listed_path_resolves() {
         let p = MixerParams::new(3, 2);
         let paths = p.paths();
-        assert_eq!(paths.len(), 3 * (11 + 7 + 18 + 3 + 8 + 2 + 3 + 4) + 2 * (4 + 4));
+        assert_eq!(paths.len(), 3 * (11 + 8 + 18 + 3 + 8 + 2 + 3 + 4) + 2 * (4 + 4));
         for path in &paths {
             assert!(p.get(path).is_ok(), "{path}");
         }

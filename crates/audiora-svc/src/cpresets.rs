@@ -67,6 +67,8 @@ struct Voice {
     denoise: f64,
     gate_db: Option<f64>,
     gate_range: f64,
+    /// Voice focus in dB (0 = off): keeps voices and noise from further away out of the gate.
+    focus: f64,
     eq: [f64; 6],
     deess_db: Option<f64>,
     comp: (f64, f64, f64),
@@ -86,6 +88,7 @@ fn voice(v: Voice) -> Settings {
         add("gate/attack_ms", 2.0);
         add("gate/release_ms", 180.0);
         add("gate/hold_ms", 140.0);
+        add("gate/focus_db", v.focus);
     }
     if let Some(t) = v.deess_db {
         add("deess/enabled", 1.0);
@@ -124,6 +127,7 @@ fn factory(channel: &str) -> Vec<(&'static str, Settings)> {
             ("Voice clarity", eq([-8.0, -3.0, 0.0, 3.0, 4.0, 1.0])),
             ("Warm voice", eq([2.0, 3.0, 1.0, 0.0, -1.0, -2.0])),
             ("Loud & clear", with(eq([-6.0, -2.0, 0.0, 3.0, 3.0, 0.0]), &[(SMART, 1.0), ("smart/target_db", -20.0), ("boost_db", 3.0)])),
+            ("HiNekst", with(eq([-6.0, -2.0, 0.0, 2.0, 3.0, 1.0]), &[(SMART, 1.0), ("smart/target_db", -22.0)])),
         ],
         "media" => vec![
             ("Flat", vec![]),
@@ -151,27 +155,27 @@ fn factory(channel: &str) -> Vec<(&'static str, Settings)> {
             ("Flat", vec![]),
             (
                 "Studio voice",
-                voice(Voice { lowcut_hz: 80.0, denoise: 0.85, gate_db: Some(-50.0), gate_range: 18.0, eq: [-2.0, 1.5, -2.0, 1.0, 2.5, 2.0], deess_db: Some(-32.0), comp: (-20.0, 3.0, 4.0) }),
+                voice(Voice { lowcut_hz: 80.0, denoise: 1.0, gate_db: Some(-50.0), gate_range: 30.0, focus: 18.0, eq: [-2.0, 1.5, -2.0, 1.0, 2.5, 2.0], deess_db: Some(-32.0), comp: (-20.0, 3.0, 4.0) }),
             ),
             (
                 "Broadcast",
-                voice(Voice { lowcut_hz: 100.0, denoise: 0.9, gate_db: Some(-46.0), gate_range: 24.0, eq: [-3.0, 3.0, -3.0, 0.0, 3.0, 2.5], deess_db: Some(-30.0), comp: (-24.0, 4.0, 6.0) }),
+                voice(Voice { lowcut_hz: 100.0, denoise: 1.0, gate_db: Some(-46.0), gate_range: 30.0, focus: 20.0, eq: [-3.0, 3.0, -3.0, 0.0, 3.0, 2.5], deess_db: Some(-30.0), comp: (-24.0, 4.0, 6.0) }),
             ),
             (
                 "Podcast",
-                voice(Voice { lowcut_hz: 80.0, denoise: 0.8, gate_db: Some(-52.0), gate_range: 15.0, eq: [0.0, 2.0, -2.0, 1.0, 2.0, 1.0], deess_db: Some(-32.0), comp: (-20.0, 3.0, 4.0) }),
+                voice(Voice { lowcut_hz: 80.0, denoise: 0.9, gate_db: Some(-52.0), gate_range: 24.0, focus: 16.0, eq: [0.0, 2.0, -2.0, 1.0, 2.0, 1.0], deess_db: Some(-32.0), comp: (-20.0, 3.0, 4.0) }),
             ),
             (
                 "Gaming clear",
-                voice(Voice { lowcut_hz: 120.0, denoise: 1.0, gate_db: Some(-44.0), gate_range: 30.0, eq: [-6.0, -2.0, -1.0, 2.0, 3.0, 0.0], deess_db: Some(-30.0), comp: (-22.0, 4.0, 5.0) }),
+                voice(Voice { lowcut_hz: 120.0, denoise: 1.0, gate_db: Some(-44.0), gate_range: 36.0, focus: 20.0, eq: [-6.0, -2.0, -1.0, 2.0, 3.0, 0.0], deess_db: Some(-30.0), comp: (-22.0, 4.0, 5.0) }),
             ),
             (
                 "Noisy room",
-                voice(Voice { lowcut_hz: 120.0, denoise: 1.0, gate_db: Some(-38.0), gate_range: 40.0, eq: [-8.0, -3.0, 0.0, 2.0, 3.0, 0.0], deess_db: Some(-28.0), comp: (-22.0, 4.0, 4.0) }),
+                voice(Voice { lowcut_hz: 120.0, denoise: 1.0, gate_db: Some(-38.0), gate_range: 45.0, focus: 14.0, eq: [-8.0, -3.0, 0.0, 2.0, 3.0, 0.0], deess_db: Some(-28.0), comp: (-22.0, 4.0, 4.0) }),
             ),
             (
                 "Natural",
-                voice(Voice { lowcut_hz: 70.0, denoise: 0.6, gate_db: None, gate_range: 0.0, eq: [0.0; 6], deess_db: None, comp: (-16.0, 2.0, 2.0) }),
+                voice(Voice { lowcut_hz: 70.0, denoise: 0.6, gate_db: None, gate_range: 0.0, focus: 0.0, eq: [0.0; 6], deess_db: None, comp: (-16.0, 2.0, 2.0) }),
             ),
         ],
         _ => vec![],

@@ -13,7 +13,7 @@ export interface ChannelMeta {
 /** Display order of the mixer, left to right after the master. */
 export const CHANNELS: ChannelMeta[] = [
   { key: 'game', name: 'Game', icon: 'gamepad', color: '#4d9bff', blurb: 'Games and anything that needs positional clarity.' },
-  { key: 'chat', name: 'Chat', icon: 'chat', color: '#35e0a1', blurb: 'Discord, Teams, TeamSpeak — the voices of the people you talk to.' },
+  { key: 'chat', name: 'Chat', icon: 'chat', color: '#35e0a1', blurb: 'HiNekst, Teams, TeamSpeak — the voices of the people you talk to.' },
   { key: 'media', name: 'Media', icon: 'play', color: '#ff7a9c', blurb: 'Browsers, video and streaming.' },
   { key: 'aux', name: 'Aux', icon: 'aux', color: '#a58bff', blurb: 'Anything else you want on its own fader.' },
   { key: 'music', name: 'Music', icon: 'music', color: '#ffb347', blurb: 'Spotify, Apple Music, YouTube Music — your playlists on their own fader.' },

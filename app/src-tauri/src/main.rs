@@ -60,7 +60,11 @@ async fn ensure_engine(state: tauri::State<'_, OwnedEngine>) -> Result<String, S
     }
     let path = engine_path().ok_or("audiora-svc.exe was not found next to the app")?;
     let mut cmd = Command::new(&path);
-    cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.stdin(Stdio::null());
+    match engine_log() {
+        Some((out, err)) => cmd.stdout(out).stderr(err),
+        None => cmd.stdout(Stdio::null()).stderr(Stdio::null()),
+    };
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -69,6 +73,20 @@ async fn ensure_engine(state: tauri::State<'_, OwnedEngine>) -> Result<String, S
     let child = cmd.spawn().map_err(|e| format!("could not start {}: {e}", path.display()))?;
     *state.0.lock().unwrap() = Some(child);
     wait_for_engine("started")
+}
+
+/// The engine's log: %LOCALAPPDATA%\Audiora\logs\engine.log, appended across restarts and moved
+/// to engine.old.log once it passes 2 MB. It is how a crash or a glitch can be traced afterwards.
+fn engine_log() -> Option<(std::fs::File, std::fs::File)> {
+    let dir = PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Audiora").join("logs");
+    std::fs::create_dir_all(&dir).ok()?;
+    let log = dir.join("engine.log");
+    if std::fs::metadata(&log).is_ok_and(|m| m.len() > 2 * 1024 * 1024) {
+        let _ = std::fs::rename(&log, dir.join("engine.old.log"));
+    }
+    let out = std::fs::OpenOptions::new().create(true).append(true).open(&log).ok()?;
+    let err = out.try_clone().ok()?;
+    Some((out, err))
 }
 
 /// Waits until the engine answers. A new engine first waits for an old one that is still shutting
