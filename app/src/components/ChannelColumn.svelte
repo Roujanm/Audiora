@@ -285,9 +285,17 @@
     background: color-mix(in oklab, var(--c) 14%, transparent);
   }
 
+  /* a fader of a comfortable length, centred in whatever height the strip has */
+  .col > :global(.vol) {
+    flex: 1 1 auto;
+    max-height: 340px;
+    margin-block: auto;
+  }
+
   .apps {
     flex: none;
-    height: 72px;
+    min-height: 56px;
+    max-height: 30%;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -343,7 +351,7 @@
     }
 
     .apps {
-      height: 56px;
+      min-height: 48px;
     }
 
     .round {

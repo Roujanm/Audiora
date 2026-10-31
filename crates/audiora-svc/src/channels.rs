@@ -226,6 +226,11 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
     }
     // Automatic picks: a device literally named for the channel first, then any free virtual
     // output nobody else is using.
+    // The cable that carries the processed microphone is off limits as a whole: VB-Audio's cable
+    // has two inputs ("CABLE Input" and "CABLE In 16ch") into the same output, so a channel on the
+    // second one would hear the microphone (and play your voice back to you), and apps routed to
+    // that channel would be heard by everyone in the call.
+    let mic_cable = r.mic_out.as_ref().and_then(|id| devs.iter().find(|d| &d.id == id)).and_then(|d| driver_of(&d.name));
     let mut pool: Vec<&DeviceInfo> = devs
         .iter()
         .filter(|d| {
@@ -235,6 +240,7 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
                 && !owned_by_running_mixer(&d.name, running)
                 && !n.contains("microphone")
                 && !n.contains("mic")
+                && (mic_cable.is_none() || driver_of(&d.name) != mic_cable)
         })
         .collect();
     pool.sort_by_key(|d| d.name.to_lowercase());
@@ -333,6 +339,15 @@ impl MicRoutes {
         let apps: Map<String, Value> = self.map.iter().map(|(a, p)| (a.clone(), json!({ "prev": p }))).collect();
         write_json(&dir.join("mic-routes.json"), &json!({ "version": 1, "apps": apps }))
     }
+}
+
+/// The driver part of an endpoint name, "VB-Audio Virtual Cable" in "CABLE Input (2- VB-Audio
+/// Virtual Cable)", without Windows' "2- " instance prefix. `None` for Audiora's own endpoints:
+/// they are separate devices on one driver.
+fn driver_of(name: &str) -> Option<String> {
+    let inner = name.rsplit_once('(')?.1.trim_end_matches(')').trim();
+    let inner = inner.split_once("- ").filter(|(n, _)| n.chars().all(|c| c.is_ascii_digit())).map_or(inner, |(_, rest)| rest);
+    (!inner.to_lowercase().contains("audiora")).then(|| inner.to_lowercase())
 }
 
 /// The capture endpoint every program can pick to hear the processed microphone: Audiora's own
@@ -904,6 +919,18 @@ mod tests {
         let r = resolve(&Config::default(), &cable, &[]);
         assert_eq!(r.mic_out.as_deref(), Some("cin"));
         assert!(r.devices.iter().all(|d| d.as_deref() != Some("cin")), "the cable is never a channel device too");
+        // VB-Audio's second input feeds the same cable: never a channel either
+        let two = [
+            dev("Headphones (JBL Quantum 360)", Flow::Render, "jbl", true),
+            dev("CABLE Input (2- VB-Audio Virtual Cable)", Flow::Render, "cin", false),
+            dev("CABLE In 16ch (2- VB-Audio Virtual Cable)", Flow::Render, "c16", false),
+            dev("CABLE Output (2- VB-Audio Virtual Cable)", Flow::Capture, "cout", false),
+        ];
+        let r = resolve(&Config::default(), &two, &[]);
+        assert_eq!(r.mic_out.as_deref(), Some("cin"));
+        assert!(r.devices.iter().all(|d| d.is_none()), "{:?}", r.devices);
+        assert_eq!(driver_of("CABLE In 16ch (2- VB-Audio Virtual Cable)").as_deref(), Some("vb-audio virtual cable"));
+        assert_eq!(driver_of("Audiora Game (Audiora Virtual Audio)"), None);
 
         let dir = std::env::temp_dir().join(format!("audiora-microutes-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
