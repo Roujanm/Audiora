@@ -307,6 +307,12 @@ fn main() -> ExitCode {
             None => {}
         }
     }
+    // The processed microphone always reaches its output (Audiora Mic Feed or a cable) when there is
+    // one. A session saved while there was none would otherwise keep it switched off; only the
+    // "hear yourself" bit belongs to the session.
+    if channel_mode && engine.info.buses.len() > 1 {
+        engine.params.strips[channels::MIC].bus_mask.fetch_or(0b10, Ordering::Relaxed);
+    }
 
     let channel_state = resolved.map(|r| {
         let online: [Option<String>; APP_CHANNELS] =
