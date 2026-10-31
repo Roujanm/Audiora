@@ -99,6 +99,8 @@ impl Api {
             "config_set" => self.ch().and_then(|c| c.config_set(&req)),
             "routes" => self.ch().map(|c| c.routes_json()),
             "app_route" => self.app_route(&req),
+            "mic_apps" => self.ch().map(|c| c.mic_apps_json()),
+            "mic_route" => self.mic_route(&req),
             "app_profiles" => self.ch().map(|c| c.profiles_json()),
             "app_profile_set" => self.app_profile_set(&req),
             "cpreset_list" => self.cpreset(&req, |c, ch, _, _| c.presets.list(ch)),
@@ -309,6 +311,12 @@ impl Api {
             Some(_) => return Err("\"channel\" must be a channel key or null".into()),
         };
         self.ch()?.route_app(app, channel)
+    }
+
+    fn mic_route(&self, req: &Value) -> Result<Value, String> {
+        let app = req.get("app").and_then(Value::as_str).ok_or("missing \"app\"")?;
+        let on = req.get("on").and_then(Value::as_bool).ok_or("\"on\" must be true or false")?;
+        self.ch()?.mic_route(app, on)
     }
 
     fn app_profile_set(&self, req: &Value) -> Result<Value, String> {

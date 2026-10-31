@@ -5,15 +5,22 @@ import sys
 import os
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Source", "Main", "AudioraVA.inx")
 
-# (KS name suffix, shown name, render?)
+# (KS name suffix, shown name, render?, look in Windows)
 ENDPOINTS = [
-    ("Game", "Audiora Game", True),
-    ("Chat", "Audiora Chat", True),
-    ("Media", "Audiora Media", True),
-    ("Aux", "Audiora Aux", True),
-    ("MicFeed", "Audiora Mic Feed", True),
-    ("Mic", "Audiora Microphone", False),
+    ("Game", "Audiora Game", True, "headphones"),
+    ("Chat", "Audiora Chat", True, "headphones"),
+    ("Media", "Audiora Media", True, "headphones"),
+    ("Aux", "Audiora Aux", True, "headphones"),
+    ("MicFeed", "Audiora Mic Feed", True, "microphone"),
+    ("Mic", "Audiora Microphone", False, "microphone"),
 ]
+# How each endpoint looks in Settings > Sound: the form factor (EndpointFormFactor) and the icon
+# Windows uses for real headphones and microphones. Without them the outputs, which are
+# line-connector pins, show a cable.
+LOOKS = {
+    "headphones": (3, "-3011"),
+    "microphone": (4, "-3014"),
+}
 # must match the GUIDs in Filters/speakertoptable.h and Filters/micarray1toptable.h
 NAME_GUIDS = {
     "Game": "{EC7886EF-060A-488F-927D-2B523F5F75D2}",
@@ -94,13 +101,14 @@ HKR,Drivers\\mixer\\wdmaud.drv,Description,,%AUDIORA_SA.DeviceDesc%
 ; Endpoint names: the topology bridge pin of each endpoint carries one of these name GUIDs.
 [AUDIORA_SA.MediaCategories]
 """)
-for key, shown, _ in ENDPOINTS:
+for key, shown, _, _ in ENDPOINTS:
     w(f"HKLM,%MediaCategories%\\%NameGuid.{key}%,Name,,%Name.{key}%")
     w(f"HKLM,%MediaCategories%\\%NameGuid.{key}%,Display,1,00,00,00,00")
 w("")
 
-for key, shown, render in ENDPOINTS:
+for key, shown, render, look in ENDPOINTS:
     kind = "render" if render else "capture"
+    form, icon = LOOKS[look]
     w(";======================================================")
     w(f"; {kind} interfaces: {shown}")
     w(";======================================================")
@@ -117,6 +125,8 @@ for key, shown, render in ENDPOINTS:
     w(f"HKR,,FriendlyName,,%AUDIORA.Topology{key}.szPname%")
     w("HKR,EP\\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%")
     w("HKR,EP\\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1")
+    w(f"HKR,EP\\0,%PKEY_AudioEndpoint_FormFactor%,0x00010001,{form}")
+    w(f'HKR,EP\\0,%PKEY_DeviceClass_IconPath%,,"%%SystemRoot%%\\System32\\mmres.dll,{icon}"')
     w("")
 
 w(""";======================================================
@@ -129,7 +139,7 @@ CopyFiles = AUDIORA_SA.CopyList
 AddReg = AUDIORA_SA.AddReg, AUDIORA_SA.MediaCategories
 
 [AUDIORA_SA.NT.Interfaces]""")
-for key, shown, render in ENDPOINTS:
+for key, shown, render, _ in ENDPOINTS:
     flow = "KSCATEGORY_RENDER" if render else "KSCATEGORY_CAPTURE"
     w(f"; {shown}")
     w(f"AddInterface = %KSCATEGORY_AUDIO%,    %KSNAME_Wave{key}%,     AUDIORA.I.Wave{key}")
@@ -172,10 +182,10 @@ KmdfLibraryVersion = $KMDFVERSION$
 
 ;Non-localizable
 """)
-for key, _, _ in ENDPOINTS:
+for key, _, _, _ in ENDPOINTS:
     w(f'KSNAME_Wave{key} = "Wave{key}"')
     w(f'KSNAME_Topology{key} = "Topology{key}"')
-for key, _, _ in ENDPOINTS:
+for key, _, _, _ in ENDPOINTS:
     w(f'NameGuid.{key} = "{NAME_GUIDS[key]}"')
 w('''
 MediaCategories = "SYSTEM\\CurrentControlSet\\Control\\MediaCategories"
@@ -191,6 +201,8 @@ KSNODETYPE_ANY = "{00000000-0000-0000-0000-000000000000}"
 
 PKEY_AudioEndpoint_Association               = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},2"
 PKEY_AudioEndpoint_Supports_EventDriven_Mode = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},7"
+PKEY_AudioEndpoint_FormFactor                = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},0"
+PKEY_DeviceClass_IconPath                    = "{259ABFFC-50A7-47CE-AF08-68C9A7D73366},12"
 
 ;Localizable
 
@@ -200,7 +212,7 @@ MfgName      = "Roujan Digital Agency"
 AUDIORA_SA.DeviceDesc = "Audiora Virtual Audio"
 AudioraVA.SvcDesc     = "Audiora Virtual Audio Driver"
 ''')
-for key, shown, _ in ENDPOINTS:
+for key, shown, _, _ in ENDPOINTS:
     w(f'Name.{key} = "{shown}"')
     w(f'AUDIORA.Wave{key}.szPname = "{shown}"')
     w(f'AUDIORA.Topology{key}.szPname = "{shown}"')

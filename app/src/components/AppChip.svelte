@@ -31,6 +31,10 @@
   }
 
   function drop(name: string, target: string) {
+    if (target === 'mic') {
+      toast(`${appLabel(name)} plays sound: drop it on Game, Chat, Media, Aux or Music`, 'error');
+      return;
+    }
     void engine.routeApp(name, target === 'none' ? null : (target as ChannelKey)).then(
       () => toast(`${appLabel(name)} → ${target === 'none' ? 'not routed' : channelMeta(target)?.name}`, 'ok'),
       (e) => toast(String(e instanceof Error ? e.message : e), 'error'),

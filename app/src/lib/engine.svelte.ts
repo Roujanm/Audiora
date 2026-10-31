@@ -64,6 +64,18 @@ export interface AppGroup {
   muted: boolean;
 }
 
+/** A program using a microphone, and whether it records the processed voice. */
+export interface MicApp {
+  name: string;
+  /** Assigned to the Mic channel: Windows gives it Audiora Microphone. */
+  routed: boolean;
+  active: boolean;
+  peak: number;
+  device_name: string | null;
+  /** Recording from Audiora Microphone right now. */
+  on_audiora: boolean;
+}
+
 function inTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -241,7 +253,9 @@ class EngineClient {
       if (this.channelMode) {
         await Promise.all([this.refreshChannels(), this.refreshRoutes(), this.refreshProfiles(), this.refreshApps().catch(() => {})]);
         for (const c of ['game', 'chat', 'media', 'aux', 'music', 'mic']) await this.refreshChannelPresets(c);
+        void this.refreshMicApps().catch(() => {});
         this.#timers.push(window.setInterval(() => void this.refreshApps().catch(() => {}), 1500));
+        this.#timers.push(window.setInterval(() => void this.refreshMicApps().catch(() => {}), 2000));
         // headphones plugged in a moment ago show up in every device list within two seconds
         this.#timers.push(window.setInterval(() => void this.refreshDevices().catch(() => {}), 2000));
       }
@@ -466,6 +480,31 @@ class EngineClient {
 
   get canReveal(): boolean {
     return inTauri();
+  }
+
+  // ---- programs using the microphone ----------------------------------------
+
+  micApps = $state<MicApp[]>([]);
+  /** Audiora's driver is installed: programs can be given the processed voice. */
+  hasAudioraMic = $state(false);
+
+  async refreshMicApps() {
+    const r = await this.call('mic_apps');
+    this.micApps = (r.apps as MicApp[]).filter((a) => !IGNORED_APPS.has(a.name.toLowerCase()));
+    this.hasAudioraMic = !!r.audiora_microphone;
+  }
+
+  /** Gives a program the processed voice (`on`) or its own microphone back. */
+  async routeMic(name: string, on: boolean) {
+    const before = this.micApps;
+    this.micApps = this.micApps.map((a) => (a.name.toLowerCase() === name.toLowerCase() ? { ...a, routed: on } : a));
+    try {
+      await this.call('mic_route', { app: name, on });
+      await this.refreshMicApps();
+    } catch (e) {
+      this.micApps = before;
+      throw e;
+    }
   }
 
   // ---- application volumes (Windows audio sessions) ------------------------

@@ -3,8 +3,10 @@
   import { engine } from '../lib/engine.svelte.ts';
   import AppChip from './AppChip.svelte';
   import Icon from './Icon.svelte';
+  import MicAppChip from './MicAppChip.svelte';
 
   const unrouted = $derived(engine.appGroups.filter((a) => a.route === null));
+  const mics = $derived(engine.micApps.filter((a) => !a.routed));
   const over = $derived(dnd.over === 'none' && dnd.drag !== null);
 </script>
 
@@ -14,21 +16,25 @@
       <h2>Apps</h2>
       <p class="muted">Drag one onto a channel</p>
     </div>
-    <span class="count num">{unrouted.length}</span>
   </header>
 
   <div class="list" role="list">
+    <p class="group"><Icon name="volume" size={12} /> Playing sound <span class="count num">{unrouted.length}</span></p>
     {#each unrouted as app (app.name)}
       <AppChip {app} />
     {:else}
-      <div class="empty">
-        <span class="ico"><Icon name="wave" size={22} /></span>
-        <p><strong>Waiting for sound</strong></p>
-        <p class="muted">Programs that play audio show up here by themselves.</p>
-      </div>
+      <p class="empty muted">Programs that play audio show up here by themselves.</p>
+    {/each}
+
+    <p class="group mic"><Icon name="mic" size={12} /> Using a microphone <span class="count num">{mics.length}</span></p>
+    {#each mics as app (app.name)}
+      <MicAppChip {app} />
+    {:else}
+      <p class="empty muted">
+        {engine.hasAudioraMic ? 'HiNekst, Discord and games appear here while they use a microphone: drop them on Mic.' : 'Needs Audiora Microphone (installed with the driver).'}
+      </p>
     {/each}
   </div>
-
 </section>
 
 <style>
@@ -53,19 +59,6 @@
     justify-content: space-between;
   }
 
-  .count {
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 10px;
-    display: grid;
-    place-items: center;
-    font-size: 11px;
-    color: var(--text-2);
-    background: var(--bg-0);
-    border: 1px solid var(--line);
-  }
-
   .list {
     flex: 1;
     min-height: 0;
@@ -77,26 +70,40 @@
     margin-right: -3px;
   }
 
-  .empty {
-    margin: auto 0;
-    text-align: center;
+  .group {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 12px 6px;
-    font-size: 12px;
+    gap: 6px;
+    margin: 4px 2px 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
-  .empty .ico {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
+  .group.mic {
+    margin-top: 10px;
+  }
+
+  .count {
+    margin-left: auto;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
     display: grid;
     place-items: center;
-    color: var(--accent-hi);
-    background: var(--accent-soft);
-    margin-bottom: 6px;
+    font-size: 10.5px;
+    color: var(--text-2);
+    background: var(--bg-0);
+    border: 1px solid var(--line);
+    letter-spacing: 0;
+  }
+
+  .empty {
+    font-size: 11.5px;
+    padding: 2px 4px 4px;
   }
 
   h2 {

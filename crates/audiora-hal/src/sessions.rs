@@ -9,7 +9,7 @@ use windows::core::{Interface, PWSTR};
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::Media::Audio::Endpoints::IAudioMeterInformation;
 use windows::Win32::Media::Audio::{
-    eRender, AudioSessionStateActive, AudioSessionStateExpired, IAudioSessionControl2,
+    eCapture, eRender, EDataFlow, AudioSessionStateActive, AudioSessionStateExpired, IAudioSessionControl2,
     IAudioSessionManager2, ISimpleAudioVolume, DEVICE_STATE_ACTIVE,
 };
 use windows::Win32::System::Com::{CoTaskMemFree, CLSCTX_ALL};
@@ -99,9 +99,18 @@ fn read_session(
 
 /// Every non-expired session on every active playback device.
 pub fn list_sessions() -> Result<Vec<AppSession>> {
+    list_flow(eRender)
+}
+
+/// Every non-expired session on every active recording device: the programs using a microphone.
+pub fn list_capture_sessions() -> Result<Vec<AppSession>> {
+    list_flow(eCapture)
+}
+
+fn list_flow(flow: EDataFlow) -> Result<Vec<AppSession>> {
     let e = enumerator()?;
     let mut out = Vec::new();
-    let coll = unsafe { e.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
+    let coll = unsafe { e.EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE)? };
     for i in 0..unsafe { coll.GetCount()? } {
         let dev = unsafe { coll.Item(i)? };
         let (id, name) = (device_id(&dev)?, device_name(&dev));

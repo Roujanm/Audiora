@@ -311,6 +311,34 @@ impl Routes {
     }
 }
 
+/// Programs whose microphone is Audiora Microphone (the processed voice). `prev` remembers the
+/// input the user had set in Windows for that program, so letting go restores it.
+#[derive(Default)]
+pub struct MicRoutes {
+    map: BTreeMap<String, Option<String>>,
+}
+
+impl MicRoutes {
+    fn load(dir: &Path) -> Self {
+        let v: Value = fs::read_to_string(dir.join("mic-routes.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+        let map = v["apps"].as_object().map(|o| o.iter().map(|(a, r)| (a.clone(), opt(&r["prev"]))).collect()).unwrap_or_default();
+        Self { map }
+    }
+
+    fn save(&self, dir: &Path) -> Result<(), String> {
+        let apps: Map<String, Value> = self.map.iter().map(|(a, p)| (a.clone(), json!({ "prev": p }))).collect();
+        write_json(&dir.join("mic-routes.json"), &json!({ "version": 1, "apps": apps }))
+    }
+}
+
+/// The capture endpoint every program can pick to hear the processed microphone: Audiora's own
+/// driver's "Audiora Microphone".
+pub fn audiora_microphone(devs: &[DeviceInfo]) -> Option<String> {
+    devs.iter()
+        .find(|d| d.flow == Flow::Capture && d.name.to_lowercase().starts_with("audiora microphone"))
+        .map(|d| d.id.clone())
+}
+
 /// Per-game profiles: application → channel → preset name.
 #[derive(Default)]
 pub struct Profiles {
@@ -347,6 +375,7 @@ pub struct Channels {
     online: [Option<String>; APP_CHANNELS],
     errors: Vec<Option<String>>,
     routes: Mutex<Routes>,
+    mic_routes: Mutex<MicRoutes>,
     profiles: Mutex<Profiles>,
     pub presets: CPresets,
     /// Starts direct captures of applications (channels without a virtual device).
@@ -371,6 +400,7 @@ impl Channels {
             presets: CPresets::new(dir),
             config: Mutex::new(Config::load(dir)),
             routes: Mutex::new(Routes::load(dir)),
+            mic_routes: Mutex::new(MicRoutes::load(dir)),
             profiles: Mutex::new(Profiles::load(dir)),
             params,
             resolved,
@@ -547,6 +577,77 @@ impl Channels {
         }
     }
 
+    /// Programs using a microphone right now, one entry per program, and whether each records
+    /// the processed voice (Audiora Microphone).
+    pub fn mic_apps_json(&self) -> Value {
+        let devs = audiora_hal::list_devices().unwrap_or_default();
+        let ours = audiora_microphone(&devs);
+        let routed = self.mic_routes.lock().map(|m| m.map.clone()).unwrap_or_default();
+        let own = std::process::id();
+        let mut apps: BTreeMap<String, Value> = BTreeMap::new();
+        for s in audiora_hal::list_capture_sessions().unwrap_or_default() {
+            if s.system_sounds || s.pid == own || s.pid == 0 {
+                continue;
+            }
+            let key = s.name.to_lowercase();
+            let entry = apps.entry(key.clone()).or_insert_with(|| {
+                json!({ "name": s.name, "routed": routed.contains_key(&key), "active": false, "peak": 0.0, "device_name": s.device_name, "on_audiora": false })
+            });
+            if s.active {
+                entry["active"] = json!(true);
+            }
+            if s.peak > entry["peak"].as_f64().unwrap_or(0.0) as f32 {
+                entry["peak"] = json!(s.peak);
+            }
+            if ours.as_deref() == Some(s.device_id.as_str()) {
+                entry["on_audiora"] = json!(true);
+                entry["device_name"] = json!(s.device_name);
+            }
+        }
+        // routed programs that are not recording right now still show, so they can be let go
+        for app in routed.keys() {
+            apps.entry(app.clone()).or_insert_with(|| json!({ "name": app, "routed": true, "active": false, "peak": 0.0, "device_name": null, "on_audiora": false }));
+        }
+        json!({ "apps": apps.into_values().collect::<Vec<_>>(), "audiora_microphone": ours.is_some() })
+    }
+
+    /// Makes a program record the processed voice (`on`), or gives it back the microphone it had.
+    pub fn mic_route(&self, app: &str, on: bool) -> Result<Value, String> {
+        let key = app.to_lowercase();
+        if key.is_empty() {
+            return Err("missing application name".into());
+        }
+        let devs = audiora_hal::list_devices().unwrap_or_default();
+        let ours = audiora_microphone(&devs);
+        let pids: Vec<u32> = audiora_hal::list_capture_sessions()
+            .unwrap_or_default()
+            .iter()
+            .filter(|s| !s.system_sounds && s.name.to_lowercase() == key)
+            .map(|s| s.pid)
+            .collect();
+        let mut routes = self.mic_routes.lock().map_err(|_| "mic routes lock poisoned")?;
+        if on {
+            let dev = ours.ok_or("Audiora Microphone is not installed: the installer sets it up when test signing is on")?;
+            let prev = routes.map.get(&key).cloned().unwrap_or_else(|| pids.first().and_then(|p| audiora_hal::get_app_input(*p).ok().flatten()).filter(|d| *d != dev));
+            let mut err = None;
+            for pid in &pids {
+                if let Err(e) = audiora_hal::set_app_input(*pid, Some(&dev)) {
+                    err = Some(e.to_string());
+                }
+            }
+            routes.map.insert(key, prev);
+            routes.save(&self.dir)?;
+            err.map_or(Ok(json!({ "app": app, "routed": true, "live": !pids.is_empty() })), Err)
+        } else {
+            let prev = routes.map.remove(&key).flatten();
+            for pid in &pids {
+                let _ = audiora_hal::set_app_input(*pid, prev.as_deref());
+            }
+            routes.save(&self.dir)?;
+            Ok(json!({ "app": app, "routed": false, "live": !pids.is_empty() }))
+        }
+    }
+
     /// Sends every running routed application back to where it was. Called on shutdown so that
     /// closing Audiora never leaves programs playing into a device nobody is listening to.
     pub fn release_all(&self) {
@@ -555,11 +656,39 @@ impl Channels {
                 stop.store(true, Ordering::Relaxed);
             }
         }
+        // programs recording the processed voice get their own microphone back: without the engine
+        // Audiora Microphone is silent
+        if let Ok(mic) = self.mic_routes.lock() {
+            let sessions = audiora_hal::list_capture_sessions().unwrap_or_default();
+            for (app, prev) in &mic.map {
+                for s in sessions.iter().filter(|s| !s.system_sounds && &s.name.to_lowercase() == app) {
+                    let _ = audiora_hal::set_app_input(s.pid, prev.as_deref());
+                }
+            }
+        }
         let Ok(routes) = self.routes.lock() else { return };
         let sessions = audiora_hal::list_sessions().unwrap_or_default();
         for (app, (_, prev)) in &routes.map {
             for s in sessions.iter().filter(|s| !s.system_sounds && &s.name.to_lowercase() == app) {
                 let _ = audiora_hal::set_app_output(s.pid, prev.as_deref());
+            }
+        }
+    }
+
+    /// Keeps programs that record the processed voice on Audiora Microphone (they open their
+    /// microphone again on every launch).
+    fn sync_mic_routes(&self, own: u32) {
+        let routed: Vec<String> = match self.mic_routes.lock() {
+            Ok(m) if !m.map.is_empty() => m.map.keys().cloned().collect(),
+            _ => return,
+        };
+        let Some(dev) = audiora_microphone(&audiora_hal::list_devices().unwrap_or_default()) else { return };
+        for s in audiora_hal::list_capture_sessions().unwrap_or_default() {
+            if s.system_sounds || s.pid == own || !routed.contains(&s.name.to_lowercase()) {
+                continue;
+            }
+            if audiora_hal::get_app_input(s.pid).ok().flatten().as_ref() != Some(&dev) {
+                let _ = audiora_hal::set_app_input(s.pid, Some(&dev));
             }
         }
     }
@@ -669,6 +798,7 @@ impl Channels {
                     seen.retain(|p| now.contains_key(p));
                 }
                 me.sync_taps();
+                me.sync_mic_routes(own);
                 for _ in 0..15 {
                     if stop.load(Ordering::Relaxed) {
                         return;
@@ -749,6 +879,27 @@ mod tests {
         // even as the Windows default, Audiora's own microphone is never the engine's input (a loop)
         assert_eq!(r.mic_in.as_deref(), Some("mic"));
         assert!(r.parking.is_none(), "no parking needed when every channel has its device");
+    }
+
+    #[test]
+    fn mic_routes_find_audiora_microphone_and_survive_a_restart() {
+        let devs = [
+            dev("Microphone (Realtek)", Flow::Capture, "mic", true),
+            dev("Audiora Mic Feed (Audiora Virtual Audio)", Flow::Render, "feed", false),
+            dev("Audiora Microphone (Audiora Virtual Audio)", Flow::Capture, "amic", false),
+        ];
+        assert_eq!(audiora_microphone(&devs).as_deref(), Some("amic"));
+        assert_eq!(audiora_microphone(&devs[..2]), None);
+
+        let dir = std::env::temp_dir().join(format!("audiora-microutes-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut m = MicRoutes::default();
+        m.map.insert("hinekst".into(), Some("mic".into()));
+        m.map.insert("discord".into(), None);
+        m.save(&dir).unwrap();
+        let back = MicRoutes::load(&dir);
+        assert_eq!(back.map, m.map);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

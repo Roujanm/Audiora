@@ -6,6 +6,7 @@
   import { shortName } from '../lib/theme.ts';
   import AppChip from './AppChip.svelte';
   import Icon from './Icon.svelte';
+  import MicAppChip from './MicAppChip.svelte';
   import VolumeSlider from './VolumeSlider.svelte';
 
   interface Props {
@@ -20,9 +21,12 @@
   const p = (leaf: string) => `strip/${ch.strip}/${leaf}`;
   const muted = $derived(engine.get(p('mute')) > 0.5);
   const apps = $derived(engine.appGroups.filter((a) => a.route === ch.key));
+  const micApps = $derived(isMic ? engine.micApps.filter((a) => a.routed) : []);
   const over = $derived(dnd.over === ch.key && dnd.drag !== null);
   const levels = $derived([engine.peakDb(p('peak_l')), engine.peakDb(p('peak_r'))]);
   const holds = $derived([engine.holdDb(p('peak_l')), engine.holdDb(p('peak_r'))]);
+  // 0 (silence) .. 1 (loud): drives the strip's glow, so a channel that is playing stands out
+  const live = $derived(Math.max(0, Math.min(1, (Math.max(levels[0], levels[1]) + 54) / 48)));
   const monitoring = $derived((engine.get(p('bus_mask')) & 1) === 1);
   const status = $derived(
     !ch.online
@@ -30,16 +34,19 @@
         ? 'No microphone'
         : 'Not set up'
       : isMic
-        ? shortName(ch.device_name ?? 'Microphone')
+        ? micApps.length
+          ? `${micApps.length} ${micApps.length === 1 ? 'app hears' : 'apps hear'} your voice`
+          : shortName(ch.device_name ?? 'Microphone')
         : apps.length
           ? `${apps.length} ${apps.length === 1 ? 'app' : 'apps'}`
           : 'No apps yet',
   );
 </script>
 
-<section class="col panel" class:over class:offline={!ch.online} style:--c={meta.color} style:--track-w="44px" data-drop={isMic ? undefined : ch.key} aria-label="{meta.name} channel">
+<section class="col panel" class:over class:offline={!ch.online} class:playing={live > 0.15 && !muted} style:--c={meta.color} style:--live={live.toFixed(2)} style:--track-w="44px" data-drop={ch.key} aria-label="{meta.name} channel">
+  <i class="aura" aria-hidden="true"></i>
   <button class="head" onclick={onopen} title="Open {meta.name} settings">
-    <span class="badge"><Icon name={meta.icon} size={17} /></span>
+    <span class="badge"><Icon name={meta.icon} size={17} /><i class="ring" aria-hidden="true"></i></span>
     <span class="txt">
       <strong>{meta.name}</strong>
       <small>{status}</small>
@@ -76,7 +83,15 @@
     {/if}
   </div>
 
-  {#if !isMic}
+  {#if isMic}
+    <div class="apps" role="list" aria-label="Apps that hear your processed voice">
+      {#each micApps as app (app.name)}
+        <MicAppChip {app} compact />
+      {:else}
+        <span class="hint">{engine.hasAudioraMic ? 'Drop mic apps here' : 'No Audiora Microphone'}</span>
+      {/each}
+    </div>
+  {:else}
     <div class="apps" role="list" aria-label="Apps in {meta.name}">
       {#each apps as app (app.name)}
         <AppChip {app} compact />
@@ -114,6 +129,24 @@
     pointer-events: none;
   }
 
+  /* a soft light from the top that grows with the channel's level */
+  .aura {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--c) 26%, transparent), transparent 70%),
+      linear-gradient(0deg, color-mix(in oklab, var(--c) 10%, transparent), transparent 35%);
+    opacity: calc(0.15 + var(--live, 0) * 0.85);
+    transition: opacity 0.12s linear;
+    will-change: opacity;
+  }
+
+  .col.playing {
+    border-color: color-mix(in oklab, var(--c) calc(18% + var(--live, 0) * 32%), var(--glass-line));
+  }
+
   .col.over {
     border-color: color-mix(in oklab, var(--c) 70%, transparent);
     box-shadow: var(--shadow-2), 0 0 0 1px color-mix(in oklab, var(--c) 40%, transparent), 0 0 34px -8px var(--c);
@@ -139,6 +172,7 @@
   }
 
   .badge {
+    position: relative;
     flex: none;
     width: 36px;
     height: 36px;
@@ -147,6 +181,36 @@
     place-items: center;
     color: var(--c);
     background: color-mix(in oklab, var(--c) 15%, transparent);
+  }
+
+  /* breathes while the channel plays */
+  .ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 14px;
+    border: 1.5px solid var(--c);
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .playing .ring {
+    opacity: calc(0.25 + var(--live, 0) * 0.6);
+    transform: scale(1);
+    animation: breathe 1.6s ease-in-out infinite;
+  }
+
+  @keyframes breathe {
+    50% {
+      transform: scale(1.08);
+      opacity: 0.2;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .playing .ring {
+      animation: none;
+    }
   }
 
   .txt {

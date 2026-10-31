@@ -19,8 +19,10 @@ const IID_NEW: GUID = GUID::from_u128(0xab3d4648_e242_459f_b02f_541c70306324);
 const IID_OLD: GUID = GUID::from_u128(0x2a59116d_6c4f_45e0_a74f_707e3fef9258);
 
 const RENDER_SUFFIX: &str = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
-const ROLES: [i32; 2] = [1, 0]; // multimedia, console
+const CAPTURE_SUFFIX: &str = "#{2eef81be-33fa-4800-9670-1cd474972c3f}";
+const ROLES: [i32; 3] = [1, 0, 2]; // multimedia, console, communications
 const E_RENDER: i32 = 0;
+const E_CAPTURE: i32 = 1;
 
 type SetFn = unsafe extern "system" fn(*mut c_void, u32, i32, i32, *mut c_void) -> HRESULT;
 type GetFn = unsafe extern "system" fn(*mut c_void, u32, i32, i32, *mut *mut c_void) -> HRESULT;
@@ -63,35 +65,55 @@ impl Config {
     }
 }
 
-/// The id form the policy store wants for an MMDevice render endpoint id.
-fn policy_id(device_id: &str) -> String {
-    format!("\\\\?\\SWD#MMDEVAPI#{device_id}{RENDER_SUFFIX}")
+/// The id form the policy store wants for an MMDevice endpoint id.
+fn policy_id(device_id: &str, flow: i32) -> String {
+    let suffix = if flow == E_CAPTURE { CAPTURE_SUFFIX } else { RENDER_SUFFIX };
+    format!("\\\\?\\SWD#MMDEVAPI#{device_id}{suffix}")
 }
 
 fn from_policy_id(s: &str) -> Option<String> {
     let rest = s.strip_prefix("\\\\?\\SWD#MMDEVAPI#")?;
-    Some(rest.strip_suffix(RENDER_SUFFIX).unwrap_or(rest).to_string())
+    Some(rest.strip_suffix(RENDER_SUFFIX).or_else(|| rest.strip_suffix(CAPTURE_SUFFIX)).unwrap_or(rest).to_string())
 }
 
 /// Sends `pid`'s audio to `device_id` (an MMDevice render endpoint id), or back to the system
 /// default when `None`. The choice is stored per executable and survives restarts of that app.
 pub fn set_app_output(pid: u32, device_id: Option<&str>) -> Result<()> {
+    set_app_device(pid, E_RENDER, device_id)
+}
+
+/// The output `pid` is explicitly routed to, or `None` for "system default".
+pub fn get_app_output(pid: u32) -> Result<Option<String>> {
+    get_app_device(pid, E_RENDER)
+}
+
+/// Makes `pid` record from `device_id` (an MMDevice capture endpoint id), or from the system
+/// default when `None`: Windows' per-app "Input device" in the volume mixer.
+pub fn set_app_input(pid: u32, device_id: Option<&str>) -> Result<()> {
+    set_app_device(pid, E_CAPTURE, device_id)
+}
+
+/// The input `pid` is explicitly routed to, or `None` for "system default".
+pub fn get_app_input(pid: u32) -> Result<Option<String>> {
+    get_app_device(pid, E_CAPTURE)
+}
+
+fn set_app_device(pid: u32, flow: i32, device_id: Option<&str>) -> Result<()> {
     let cfg = Config::open()?;
-    let hs = device_id.map(|d| HSTRING::from(policy_id(d))).unwrap_or_default();
+    let hs = device_id.map(|d| HSTRING::from(policy_id(d, flow))).unwrap_or_default();
     for role in ROLES {
-        let hr = unsafe { (cfg.set)(cfg.this(), pid, E_RENDER, role, std::mem::transmute_copy(&hs)) };
-        hr.ok().map_err(|e| HalError(format!("set app output (role {role}): {e}")))?;
+        let hr = unsafe { (cfg.set)(cfg.this(), pid, flow, role, std::mem::transmute_copy(&hs)) };
+        hr.ok().map_err(|e| HalError(format!("set app device (role {role}): {e}")))?;
     }
     Ok(())
 }
 
-/// The endpoint `pid` is explicitly routed to, or `None` for "system default".
-pub fn get_app_output(pid: u32) -> Result<Option<String>> {
+fn get_app_device(pid: u32, flow: i32) -> Result<Option<String>> {
     let cfg = Config::open()?;
     let mut raw: *mut c_void = std::ptr::null_mut();
-    unsafe { (cfg.get)(cfg.this(), pid, E_RENDER, 1, &mut raw) }
+    unsafe { (cfg.get)(cfg.this(), pid, flow, 1, &mut raw) }
         .ok()
-        .map_err(|e| HalError(format!("get app output: {e}")))?;
+        .map_err(|e| HalError(format!("get app device: {e}")))?;
     // The callee hands over an owned HSTRING (null = empty).
     let hs: HSTRING = unsafe { std::mem::transmute::<*mut c_void, HSTRING>(raw) };
     let text = hs.to_string();
