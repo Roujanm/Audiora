@@ -1,0 +1,3201 @@
+Traceback (most recent call last):
+  File "C:\Users\rouja\AppData\Roaming\Blender Foundation\Blender\5.2\extensions\blender_org\freepicker\core.py", line 28, in <module>
+    UNIFORM_SHADER = gpu.shader.from_builtin('UNIFORM_COLOR')
+SystemError: GPU functions for drawing requires the gpu module to be initialized. See gpu.init.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\blender\5.2\scripts\modules\addon_utils.py", line 458, in enable
+    mod = importlib.import_module(module_name)
+  File "D:\blender\5.2\python\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1395, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1023, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\rouja\AppData\Roaming\Blender Foundation\Blender\5.2\extensions\blender_org\freepicker\__init__.py", line 12, in <module>
+    from .core import *
+  File "C:\Users\rouja\AppData\Roaming\Blender Foundation\Blender\5.2\extensions\blender_org\freepicker\core.py", line 30, in <module>
+    UNIFORM_SHADER = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+SystemError: GPU functions for drawing requires the gpu module to be initialized. See gpu.init.
+00:01.344  blend            | Read blend: "C:\Users\rouja\Documents\GitHub\Audiora\intro-video\Audiora_Intro.blend"
+00:01.360  render           | Rendering animation (frames 1..288)
+00:01.375  render           | Rendering frame 1
+00:01.375  render           | Start rendering: Scene, ViewLayer
+00:01.375  render           | Engine: EEVEE
+00:03.078  render           | Fra: 1 | Rendering 1 / 64 samples
+Blender 5.2.2 LTS (hash d13f752e3b9c built 2026-09-15 01:37:04)
+00:03.172  render           | Fra: 1 | Rendering 25 / 64 samples
+00:03.250  render           | Fra: 1 | Rendering 50 / 64 samples
+00:03.281  render           | Fra: 1 | Rendering 64 / 64 samples
+00:03.328  render           | Executing compositor
+00:03.328  render           | Fra: 1 | Compositing
+00:03.422  render           | Video append frame 1
+00:03.422  render           | Time: 00:02.04 (Saving: 00:00.07)
+00:03.422  render           | Rendering frame 2
+00:03.422  render           | Start rendering: Scene, ViewLayer
+00:03.422  render           | Engine: EEVEE
+00:03.860  render           | Fra: 2 | Rendering 1 / 64 samples
+00:03.922  render           | Fra: 2 | Rendering 25 / 64 samples
+00:03.985  render           | Fra: 2 | Rendering 50 / 64 samples
+00:04.031  render           | Fra: 2 | Rendering 64 / 64 samples
+00:04.047  render           | Executing compositor
+00:04.047  render           | Fra: 2 | Compositing
+00:04.110  render           | Video append frame 2
+00:04.110  render           | Time: 00:00.67 (Saving: 00:00.03)
+00:04.110  render           | Rendering frame 3
+00:04.110  render           | Start rendering: Scene, ViewLayer
+00:04.110  render           | Engine: EEVEE
+00:04.141  render           | Fra: 3 | Rendering 1 / 64 samples
+00:04.235  render           | Fra: 3 | Rendering 25 / 64 samples
+00:04.344  render           | Fra: 3 | Rendering 50 / 64 samples
+00:04.406  render           | Fra: 3 | Rendering 64 / 64 samples
+00:04.422  render           | Executing compositor
+00:04.422  render           | Fra: 3 | Compositing
+00:04.453  render           | Video append frame 3
+00:04.453  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:04.453  render           | Rendering frame 4
+00:04.453  render           | Start rendering: Scene, ViewLayer
+00:04.453  render           | Engine: EEVEE
+00:04.485  render           | Fra: 4 | Rendering 1 / 64 samples
+00:04.578  render           | Fra: 4 | Rendering 25 / 64 samples
+00:04.688  render           | Fra: 4 | Rendering 50 / 64 samples
+00:04.750  render           | Fra: 4 | Rendering 64 / 64 samples
+00:04.766  render           | Executing compositor
+00:04.766  render           | Fra: 4 | Compositing
+00:04.797  render           | Video append frame 4
+00:04.797  render           | Time: 00:00.33 (Saving: 00:00.02)
+00:04.797  render           | Rendering frame 5
+00:04.797  render           | Start rendering: Scene, ViewLayer
+00:04.797  render           | Engine: EEVEE
+00:04.813  render           | Fra: 5 | Rendering 1 / 64 samples
+00:04.922  render           | Fra: 5 | Rendering 25 / 64 samples
+00:05.016  render           | Fra: 5 | Rendering 50 / 64 samples
+00:05.078  render           | Fra: 5 | Rendering 64 / 64 samples
+00:05.094  render           | Executing compositor
+00:05.094  render           | Fra: 5 | Compositing
+00:05.125  render           | Video append frame 5
+00:05.125  render           | Time: 00:00.33 (Saving: 00:00.02)
+00:05.125  render           | Rendering frame 6
+00:05.125  render           | Start rendering: Scene, ViewLayer
+00:05.125  render           | Engine: EEVEE
+00:05.156  render           | Fra: 6 | Rendering 1 / 64 samples
+00:05.250  render           | Fra: 6 | Rendering 25 / 64 samples
+00:05.360  render           | Fra: 6 | Rendering 50 / 64 samples
+00:05.422  render           | Fra: 6 | Rendering 64 / 64 samples
+00:05.422  render           | Executing compositor
+00:05.422  render           | Fra: 6 | Compositing
+00:05.469  render           | Video append frame 6
+00:05.469  render           | Time: 00:00.33 (Saving: 00:00.02)
+00:05.469  render           | Rendering frame 7
+00:05.469  render           | Start rendering: Scene, ViewLayer
+00:05.469  render           | Engine: EEVEE
+00:05.485  render           | Fra: 7 | Rendering 1 / 64 samples
+00:05.594  render           | Fra: 7 | Rendering 25 / 64 samples
+00:05.703  render           | Fra: 7 | Rendering 50 / 64 samples
+00:05.750  render           | Fra: 7 | Rendering 64 / 64 samples
+00:05.766  render           | Executing compositor
+00:05.766  render           | Fra: 7 | Compositing
+00:05.797  render           | Video append frame 7
+00:05.797  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:05.797  render           | Rendering frame 8
+00:05.797  render           | Start rendering: Scene, ViewLayer
+00:05.797  render           | Engine: EEVEE
+00:05.828  render           | Fra: 8 | Rendering 1 / 64 samples
+00:05.938  render           | Fra: 8 | Rendering 25 / 64 samples
+00:06.047  render           | Fra: 8 | Rendering 50 / 64 samples
+00:06.110  render           | Fra: 8 | Rendering 64 / 64 samples
+00:06.110  render           | Executing compositor
+00:06.110  render           | Fra: 8 | Compositing
+00:06.156  render           | Video append frame 8
+00:06.156  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:06.156  render           | Rendering frame 9
+00:06.156  render           | Start rendering: Scene, ViewLayer
+00:06.156  render           | Engine: EEVEE
+00:06.172  render           | Fra: 9 | Rendering 1 / 64 samples
+00:06.281  render           | Fra: 9 | Rendering 25 / 64 samples
+00:06.391  render           | Fra: 9 | Rendering 50 / 64 samples
+00:06.453  render           | Fra: 9 | Rendering 64 / 64 samples
+00:06.469  render           | Executing compositor
+00:06.469  render           | Fra: 9 | Compositing
+00:06.500  render           | Video append frame 9
+00:06.500  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:06.500  render           | Rendering frame 10
+00:06.500  render           | Start rendering: Scene, ViewLayer
+00:06.500  render           | Engine: EEVEE
+00:06.531  render           | Fra: 10 | Rendering 1 / 64 samples
+00:06.625  render           | Fra: 10 | Rendering 25 / 64 samples
+00:06.735  render           | Fra: 10 | Rendering 50 / 64 samples
+00:06.797  render           | Fra: 10 | Rendering 64 / 64 samples
+00:06.813  render           | Executing compositor
+00:06.813  render           | Fra: 10 | Compositing
+00:06.844  render           | Video append frame 10
+00:06.844  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:06.844  render           | Rendering frame 11
+00:06.844  render           | Start rendering: Scene, ViewLayer
+00:06.844  render           | Engine: EEVEE
+00:06.875  render           | Fra: 11 | Rendering 1 / 64 samples
+00:06.969  render           | Fra: 11 | Rendering 25 / 64 samples
+00:07.094  render           | Fra: 11 | Rendering 50 / 64 samples
+00:07.141  render           | Fra: 11 | Rendering 64 / 64 samples
+00:07.156  render           | Executing compositor
+00:07.156  render           | Fra: 11 | Compositing
+00:07.188  render           | Video append frame 11
+00:07.188  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:07.188  render           | Rendering frame 12
+00:07.188  render           | Start rendering: Scene, ViewLayer
+00:07.188  render           | Engine: EEVEE
+00:07.297  render           | Fra: 12 | Rendering 1 / 64 samples
+00:07.360  render           | Fra: 12 | Rendering 25 / 64 samples
+00:07.438  render           | Fra: 12 | Rendering 50 / 64 samples
+00:07.469  render           | Fra: 12 | Rendering 64 / 64 samples
+00:07.485  render           | Executing compositor
+00:07.485  render           | Fra: 12 | Compositing
+00:07.531  render           | Video append frame 12
+00:07.531  render           | Time: 00:00.33 (Saving: 00:00.02)
+00:07.531  render           | Rendering frame 13
+00:07.531  render           | Start rendering: Scene, ViewLayer
+00:07.531  render           | Engine: EEVEE
+00:07.563  render           | Fra: 13 | Rendering 1 / 64 samples
+00:07.656  render           | Fra: 13 | Rendering 25 / 64 samples
+00:07.781  render           | Fra: 13 | Rendering 50 / 64 samples
+00:07.844  render           | Fra: 13 | Rendering 64 / 64 samples
+00:07.844  render           | Executing compositor
+00:07.844  render           | Fra: 13 | Compositing
+00:07.891  render           | Video append frame 13
+00:07.891  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:07.891  render           | Rendering frame 14
+00:07.891  render           | Start rendering: Scene, ViewLayer
+00:07.891  render           | Engine: EEVEE
+00:07.906  render           | Fra: 14 | Rendering 1 / 64 samples
+00:08.016  render           | Fra: 14 | Rendering 25 / 64 samples
+00:08.125  render           | Fra: 14 | Rendering 50 / 64 samples
+00:08.188  render           | Fra: 14 | Rendering 64 / 64 samples
+00:08.203  render           | Executing compositor
+00:08.203  render           | Fra: 14 | Compositing
+00:08.235  render           | Video append frame 14
+00:08.235  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:08.235  render           | Rendering frame 15
+00:08.235  render           | Start rendering: Scene, ViewLayer
+00:08.235  render           | Engine: EEVEE
+00:08.266  render           | Fra: 15 | Rendering 1 / 64 samples
+00:08.375  render           | Fra: 15 | Rendering 25 / 64 samples
+00:08.485  render           | Fra: 15 | Rendering 50 / 64 samples
+00:08.547  render           | Fra: 15 | Rendering 64 / 64 samples
+00:08.563  render           | Executing compositor
+00:08.563  render           | Fra: 15 | Compositing
+00:08.594  render           | Video append frame 15
+00:08.594  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:08.594  render           | Rendering frame 16
+00:08.594  render           | Start rendering: Scene, ViewLayer
+00:08.594  render           | Engine: EEVEE
+00:08.625  render           | Fra: 16 | Rendering 1 / 64 samples
+00:08.719  render           | Fra: 16 | Rendering 25 / 64 samples
+00:08.828  render           | Fra: 16 | Rendering 50 / 64 samples
+00:08.891  render           | Fra: 16 | Rendering 64 / 64 samples
+00:08.906  render           | Executing compositor
+00:08.906  render           | Fra: 16 | Compositing
+00:08.938  render           | Video append frame 16
+00:08.938  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:08.938  render           | Rendering frame 17
+00:08.938  render           | Start rendering: Scene, ViewLayer
+00:08.938  render           | Engine: EEVEE
+00:08.969  render           | Fra: 17 | Rendering 1 / 64 samples
+00:09.078  render           | Fra: 17 | Rendering 25 / 64 samples
+00:09.188  render           | Fra: 17 | Rendering 50 / 64 samples
+00:09.250  render           | Fra: 17 | Rendering 64 / 64 samples
+00:09.266  render           | Executing compositor
+00:09.266  render           | Fra: 17 | Compositing
+00:09.297  render           | Video append frame 17
+00:09.297  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:09.297  render           | Rendering frame 18
+00:09.297  render           | Start rendering: Scene, ViewLayer
+00:09.297  render           | Engine: EEVEE
+00:09.328  render           | Fra: 18 | Rendering 1 / 64 samples
+00:09.438  render           | Fra: 18 | Rendering 25 / 64 samples
+00:09.547  render           | Fra: 18 | Rendering 50 / 64 samples
+00:09.610  render           | Fra: 18 | Rendering 64 / 64 samples
+00:09.610  render           | Executing compositor
+00:09.610  render           | Fra: 18 | Compositing
+00:09.656  render           | Video append frame 18
+00:09.656  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:09.656  render           | Rendering frame 19
+00:09.656  render           | Start rendering: Scene, ViewLayer
+00:09.656  render           | Engine: EEVEE
+00:09.688  render           | Fra: 19 | Rendering 1 / 64 samples
+00:09.797  render           | Fra: 19 | Rendering 25 / 64 samples
+00:09.906  render           | Fra: 19 | Rendering 50 / 64 samples
+00:09.969  render           | Fra: 19 | Rendering 64 / 64 samples
+00:09.985  render           | Executing compositor
+00:09.985  render           | Fra: 19 | Compositing
+00:10.016  render           | Video append frame 19
+00:10.016  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:10.016  render           | Rendering frame 20
+00:10.016  render           | Start rendering: Scene, ViewLayer
+00:10.016  render           | Engine: EEVEE
+00:10.047  render           | Fra: 20 | Rendering 1 / 64 samples
+00:10.141  render           | Fra: 20 | Rendering 25 / 64 samples
+00:10.266  render           | Fra: 20 | Rendering 50 / 64 samples
+00:10.328  render           | Fra: 20 | Rendering 64 / 64 samples
+00:10.328  render           | Executing compositor
+00:10.344  render           | Fra: 20 | Compositing
+00:10.375  render           | Video append frame 20
+00:10.375  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:10.375  render           | Rendering frame 21
+00:10.375  render           | Start rendering: Scene, ViewLayer
+00:10.375  render           | Engine: EEVEE
+00:10.406  render           | Fra: 21 | Rendering 1 / 64 samples
+00:10.516  render           | Fra: 21 | Rendering 25 / 64 samples
+00:10.625  render           | Fra: 21 | Rendering 50 / 64 samples
+00:10.688  render           | Fra: 21 | Rendering 64 / 64 samples
+00:10.703  render           | Executing compositor
+00:10.703  render           | Fra: 21 | Compositing
+00:10.750  render           | Video append frame 21
+00:10.750  render           | Time: 00:00.37 (Saving: 00:00.02)
+00:10.750  render           | Rendering frame 22
+00:10.750  render           | Start rendering: Scene, ViewLayer
+00:10.750  render           | Engine: EEVEE
+00:10.766  render           | Fra: 22 | Rendering 1 / 64 samples
+00:10.891  render           | Fra: 22 | Rendering 25 / 64 samples
+00:11.000  render           | Fra: 22 | Rendering 50 / 64 samples
+00:11.063  render           | Fra: 22 | Rendering 64 / 64 samples
+00:11.078  render           | Executing compositor
+00:11.078  render           | Fra: 22 | Compositing
+00:11.110  render           | Video append frame 22
+00:11.110  render           | Time: 00:00.37 (Saving: 00:00.02)
+00:11.110  render           | Rendering frame 23
+00:11.110  render           | Start rendering: Scene, ViewLayer
+00:11.110  render           | Engine: EEVEE
+00:11.141  render           | Fra: 23 | Rendering 1 / 64 samples
+00:11.250  render           | Fra: 23 | Rendering 25 / 64 samples
+00:11.375  render           | Fra: 23 | Rendering 50 / 64 samples
+00:11.438  render           | Fra: 23 | Rendering 64 / 64 samples
+00:11.438  render           | Executing compositor
+00:11.438  render           | Fra: 23 | Compositing
+00:11.485  render           | Video append frame 23
+00:11.485  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:11.485  render           | Rendering frame 24
+00:11.485  render           | Start rendering: Scene, ViewLayer
+00:11.485  render           | Engine: EEVEE
+00:11.516  render           | Fra: 24 | Rendering 1 / 64 samples
+00:11.625  render           | Fra: 24 | Rendering 25 / 64 samples
+00:11.735  render           | Fra: 24 | Rendering 50 / 64 samples
+00:11.797  render           | Fra: 24 | Rendering 64 / 64 samples
+00:11.813  render           | Executing compositor
+00:11.813  render           | Fra: 24 | Compositing
+00:11.844  render           | Video append frame 24
+00:11.844  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:11.844  render           | Rendering frame 25
+00:11.844  render           | Start rendering: Scene, ViewLayer
+00:11.844  render           | Engine: EEVEE
+00:11.875  render           | Fra: 25 | Rendering 1 / 64 samples
+00:11.985  render           | Fra: 25 | Rendering 25 / 64 samples
+00:12.094  render           | Fra: 25 | Rendering 50 / 64 samples
+00:12.156  render           | Fra: 25 | Rendering 64 / 64 samples
+00:12.172  render           | Executing compositor
+00:12.172  render           | Fra: 25 | Compositing
+00:12.203  render           | Video append frame 25
+00:12.203  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:12.203  render           | Rendering frame 26
+00:12.203  render           | Start rendering: Scene, ViewLayer
+00:12.203  render           | Engine: EEVEE
+00:12.235  render           | Fra: 26 | Rendering 1 / 64 samples
+00:12.344  render           | Fra: 26 | Rendering 25 / 64 samples
+00:12.469  render           | Fra: 26 | Rendering 50 / 64 samples
+00:12.531  render           | Fra: 26 | Rendering 64 / 64 samples
+00:12.531  render           | Executing compositor
+00:12.531  render           | Fra: 26 | Compositing
+00:12.578  render           | Video append frame 26
+00:12.578  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:12.578  render           | Rendering frame 27
+00:12.578  render           | Start rendering: Scene, ViewLayer
+00:12.578  render           | Engine: EEVEE
+00:12.594  render           | Fra: 27 | Rendering 1 / 64 samples
+00:12.719  render           | Fra: 27 | Rendering 25 / 64 samples
+00:12.828  render           | Fra: 27 | Rendering 50 / 64 samples
+00:12.891  render           | Fra: 27 | Rendering 64 / 64 samples
+00:12.906  render           | Executing compositor
+00:12.906  render           | Fra: 27 | Compositing
+00:12.938  render           | Video append frame 27
+00:12.938  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:12.938  render           | Rendering frame 28
+00:12.938  render           | Start rendering: Scene, ViewLayer
+00:12.938  render           | Engine: EEVEE
+00:12.969  render           | Fra: 28 | Rendering 1 / 64 samples
+00:13.078  render           | Fra: 28 | Rendering 25 / 64 samples
+00:13.188  render           | Fra: 28 | Rendering 50 / 64 samples
+00:13.266  render           | Fra: 28 | Rendering 64 / 64 samples
+00:13.266  render           | Executing compositor
+00:13.266  render           | Fra: 28 | Compositing
+00:13.313  render           | Video append frame 28
+00:13.313  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:13.313  render           | Rendering frame 29
+00:13.313  render           | Start rendering: Scene, ViewLayer
+00:13.313  render           | Engine: EEVEE
+00:13.328  render           | Fra: 29 | Rendering 1 / 64 samples
+00:13.438  render           | Fra: 29 | Rendering 25 / 64 samples
+00:13.563  render           | Fra: 29 | Rendering 50 / 64 samples
+00:13.625  render           | Fra: 29 | Rendering 64 / 64 samples
+00:13.625  render           | Executing compositor
+00:13.625  render           | Fra: 29 | Compositing
+00:13.672  render           | Video append frame 29
+00:13.672  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:13.672  render           | Rendering frame 30
+00:13.672  render           | Start rendering: Scene, ViewLayer
+00:13.672  render           | Engine: EEVEE
+00:13.688  render           | Fra: 30 | Rendering 1 / 64 samples
+00:13.813  render           | Fra: 30 | Rendering 25 / 64 samples
+00:13.922  render           | Fra: 30 | Rendering 50 / 64 samples
+00:13.985  render           | Fra: 30 | Rendering 64 / 64 samples
+00:14.000  render           | Executing compositor
+00:14.000  render           | Fra: 30 | Compositing
+00:14.031  render           | Video append frame 30
+00:14.031  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:14.031  render           | Rendering frame 31
+00:14.031  render           | Start rendering: Scene, ViewLayer
+00:14.031  render           | Engine: EEVEE
+00:14.063  render           | Fra: 31 | Rendering 1 / 64 samples
+00:14.172  render           | Fra: 31 | Rendering 25 / 64 samples
+00:14.281  render           | Fra: 31 | Rendering 50 / 64 samples
+00:14.344  render           | Fra: 31 | Rendering 64 / 64 samples
+00:14.360  render           | Executing compositor
+00:14.360  render           | Fra: 31 | Compositing
+00:14.391  render           | Video append frame 31
+00:14.391  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:14.391  render           | Rendering frame 32
+00:14.391  render           | Start rendering: Scene, ViewLayer
+00:14.391  render           | Engine: EEVEE
+00:14.422  render           | Fra: 32 | Rendering 1 / 64 samples
+00:14.531  render           | Fra: 32 | Rendering 25 / 64 samples
+00:14.641  render           | Fra: 32 | Rendering 50 / 64 samples
+00:14.703  render           | Fra: 32 | Rendering 64 / 64 samples
+00:14.719  render           | Executing compositor
+00:14.719  render           | Fra: 32 | Compositing
+00:14.750  render           | Video append frame 32
+00:14.750  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:14.750  render           | Rendering frame 33
+00:14.750  render           | Start rendering: Scene, ViewLayer
+00:14.750  render           | Engine: EEVEE
+00:14.781  render           | Fra: 33 | Rendering 1 / 64 samples
+00:14.891  render           | Fra: 33 | Rendering 25 / 64 samples
+00:15.000  render           | Fra: 33 | Rendering 50 / 64 samples
+00:15.078  render           | Fra: 33 | Rendering 64 / 64 samples
+00:15.078  render           | Executing compositor
+00:15.078  render           | Fra: 33 | Compositing
+00:15.125  render           | Video append frame 33
+00:15.125  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:15.125  render           | Rendering frame 34
+00:15.125  render           | Start rendering: Scene, ViewLayer
+00:15.125  render           | Engine: EEVEE
+00:15.141  render           | Fra: 34 | Rendering 1 / 64 samples
+00:15.250  render           | Fra: 34 | Rendering 25 / 64 samples
+00:15.375  render           | Fra: 34 | Rendering 50 / 64 samples
+00:15.438  render           | Fra: 34 | Rendering 64 / 64 samples
+00:15.453  render           | Executing compositor
+00:15.453  render           | Fra: 34 | Compositing
+00:15.485  render           | Video append frame 34
+00:15.485  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:15.485  render           | Rendering frame 35
+00:15.485  render           | Start rendering: Scene, ViewLayer
+00:15.485  render           | Engine: EEVEE
+00:15.516  render           | Fra: 35 | Rendering 1 / 64 samples
+00:15.625  render           | Fra: 35 | Rendering 25 / 64 samples
+00:15.735  render           | Fra: 35 | Rendering 50 / 64 samples
+00:15.797  render           | Fra: 35 | Rendering 64 / 64 samples
+00:15.813  render           | Executing compositor
+00:15.813  render           | Fra: 35 | Compositing
+00:15.844  render           | Video append frame 35
+00:15.844  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:15.844  render           | Rendering frame 36
+00:15.844  render           | Start rendering: Scene, ViewLayer
+00:15.844  render           | Engine: EEVEE
+00:15.875  render           | Fra: 36 | Rendering 1 / 64 samples
+00:15.985  render           | Fra: 36 | Rendering 25 / 64 samples
+00:16.094  render           | Fra: 36 | Rendering 50 / 64 samples
+00:16.156  render           | Fra: 36 | Rendering 64 / 64 samples
+00:16.172  render           | Executing compositor
+00:16.172  render           | Fra: 36 | Compositing
+00:16.203  render           | Video append frame 36
+00:16.203  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:16.203  render           | Rendering frame 37
+00:16.219  render           | Start rendering: Scene, ViewLayer
+00:16.219  render           | Engine: EEVEE
+00:16.235  render           | Fra: 37 | Rendering 1 / 64 samples
+00:16.344  render           | Fra: 37 | Rendering 25 / 64 samples
+00:16.469  render           | Fra: 37 | Rendering 50 / 64 samples
+00:16.531  render           | Fra: 37 | Rendering 64 / 64 samples
+00:16.531  render           | Executing compositor
+00:16.547  render           | Fra: 37 | Compositing
+00:16.578  render           | Video append frame 37
+00:16.578  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:16.578  render           | Rendering frame 38
+00:16.578  render           | Start rendering: Scene, ViewLayer
+00:16.578  render           | Engine: EEVEE
+00:16.610  render           | Fra: 38 | Rendering 1 / 64 samples
+00:16.719  render           | Fra: 38 | Rendering 25 / 64 samples
+00:16.828  render           | Fra: 38 | Rendering 50 / 64 samples
+00:16.891  render           | Fra: 38 | Rendering 64 / 64 samples
+00:16.906  render           | Executing compositor
+00:16.906  render           | Fra: 38 | Compositing
+00:16.938  render           | Video append frame 38
+00:16.938  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:16.938  render           | Rendering frame 39
+00:16.938  render           | Start rendering: Scene, ViewLayer
+00:16.938  render           | Engine: EEVEE
+00:16.969  render           | Fra: 39 | Rendering 1 / 64 samples
+00:17.078  render           | Fra: 39 | Rendering 25 / 64 samples
+00:17.188  render           | Fra: 39 | Rendering 50 / 64 samples
+00:17.250  render           | Fra: 39 | Rendering 64 / 64 samples
+00:17.266  render           | Executing compositor
+00:17.266  render           | Fra: 39 | Compositing
+00:17.297  render           | Video append frame 39
+00:17.297  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:17.297  render           | Rendering frame 40
+00:17.297  render           | Start rendering: Scene, ViewLayer
+00:17.297  render           | Engine: EEVEE
+00:17.328  render           | Fra: 40 | Rendering 1 / 64 samples
+00:17.438  render           | Fra: 40 | Rendering 25 / 64 samples
+00:17.547  render           | Fra: 40 | Rendering 50 / 64 samples
+00:17.610  render           | Fra: 40 | Rendering 64 / 64 samples
+00:17.625  render           | Executing compositor
+00:17.625  render           | Fra: 40 | Compositing
+00:17.656  render           | Video append frame 40
+00:17.656  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:17.656  render           | Rendering frame 41
+00:17.656  render           | Start rendering: Scene, ViewLayer
+00:17.656  render           | Engine: EEVEE
+00:17.688  render           | Fra: 41 | Rendering 1 / 64 samples
+00:17.797  render           | Fra: 41 | Rendering 25 / 64 samples
+00:17.906  render           | Fra: 41 | Rendering 50 / 64 samples
+00:17.969  render           | Fra: 41 | Rendering 64 / 64 samples
+00:17.985  render           | Executing compositor
+00:17.985  render           | Fra: 41 | Compositing
+00:18.016  render           | Video append frame 41
+00:18.016  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:18.016  render           | Rendering frame 42
+00:18.016  render           | Start rendering: Scene, ViewLayer
+00:18.016  render           | Engine: EEVEE
+00:18.047  render           | Fra: 42 | Rendering 1 / 64 samples
+00:18.156  render           | Fra: 42 | Rendering 25 / 64 samples
+00:18.266  render           | Fra: 42 | Rendering 50 / 64 samples
+00:18.328  render           | Fra: 42 | Rendering 64 / 64 samples
+00:18.344  render           | Executing compositor
+00:18.344  render           | Fra: 42 | Compositing
+00:18.375  render           | Video append frame 42
+00:18.375  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:18.375  render           | Rendering frame 43
+00:18.375  render           | Start rendering: Scene, ViewLayer
+00:18.375  render           | Engine: EEVEE
+00:18.406  render           | Fra: 43 | Rendering 1 / 64 samples
+00:18.531  render           | Fra: 43 | Rendering 25 / 64 samples
+00:18.641  render           | Fra: 43 | Rendering 50 / 64 samples
+00:18.703  render           | Fra: 43 | Rendering 64 / 64 samples
+00:18.719  render           | Executing compositor
+00:18.719  render           | Fra: 43 | Compositing
+00:18.750  render           | Video append frame 43
+00:18.750  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:18.750  render           | Rendering frame 44
+00:18.750  render           | Start rendering: Scene, ViewLayer
+00:18.750  render           | Engine: EEVEE
+00:18.781  render           | Fra: 44 | Rendering 1 / 64 samples
+00:18.891  render           | Fra: 44 | Rendering 25 / 64 samples
+00:19.000  render           | Fra: 44 | Rendering 50 / 64 samples
+00:19.063  render           | Fra: 44 | Rendering 64 / 64 samples
+00:19.078  render           | Executing compositor
+00:19.078  render           | Fra: 44 | Compositing
+00:19.110  render           | Video append frame 44
+00:19.110  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:19.110  render           | Rendering frame 45
+00:19.110  render           | Start rendering: Scene, ViewLayer
+00:19.110  render           | Engine: EEVEE
+00:19.141  render           | Fra: 45 | Rendering 1 / 64 samples
+00:19.250  render           | Fra: 45 | Rendering 25 / 64 samples
+00:19.360  render           | Fra: 45 | Rendering 50 / 64 samples
+00:19.422  render           | Fra: 45 | Rendering 64 / 64 samples
+00:19.438  render           | Executing compositor
+00:19.438  render           | Fra: 45 | Compositing
+00:19.485  render           | Video append frame 45
+00:19.485  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:19.485  render           | Rendering frame 46
+00:19.485  render           | Start rendering: Scene, ViewLayer
+00:19.485  render           | Engine: EEVEE
+00:19.500  render           | Fra: 46 | Rendering 1 / 64 samples
+00:19.610  render           | Fra: 46 | Rendering 25 / 64 samples
+00:19.719  render           | Fra: 46 | Rendering 50 / 64 samples
+00:19.797  render           | Fra: 46 | Rendering 64 / 64 samples
+00:19.797  render           | Executing compositor
+00:19.797  render           | Fra: 46 | Compositing
+00:19.844  render           | Video append frame 46
+00:19.844  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:19.844  render           | Rendering frame 47
+00:19.844  render           | Start rendering: Scene, ViewLayer
+00:19.844  render           | Engine: EEVEE
+00:19.860  render           | Fra: 47 | Rendering 1 / 64 samples
+00:19.985  render           | Fra: 47 | Rendering 25 / 64 samples
+00:20.094  render           | Fra: 47 | Rendering 50 / 64 samples
+00:20.156  render           | Fra: 47 | Rendering 64 / 64 samples
+00:20.172  render           | Executing compositor
+00:20.172  render           | Fra: 47 | Compositing
+00:20.203  render           | Video append frame 47
+00:20.203  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:20.203  render           | Rendering frame 48
+00:20.203  render           | Start rendering: Scene, ViewLayer
+00:20.203  render           | Engine: EEVEE
+00:20.235  render           | Fra: 48 | Rendering 1 / 64 samples
+00:20.344  render           | Fra: 48 | Rendering 25 / 64 samples
+00:20.453  render           | Fra: 48 | Rendering 50 / 64 samples
+00:20.516  render           | Fra: 48 | Rendering 64 / 64 samples
+00:20.531  render           | Executing compositor
+00:20.531  render           | Fra: 48 | Compositing
+00:20.563  render           | Video append frame 48
+00:20.563  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:20.563  render           | Rendering frame 49
+00:20.563  render           | Start rendering: Scene, ViewLayer
+00:20.563  render           | Engine: EEVEE
+00:20.594  render           | Fra: 49 | Rendering 1 / 64 samples
+00:20.703  render           | Fra: 49 | Rendering 25 / 64 samples
+00:20.813  render           | Fra: 49 | Rendering 50 / 64 samples
+00:20.875  render           | Fra: 49 | Rendering 64 / 64 samples
+00:20.891  render           | Executing compositor
+00:20.891  render           | Fra: 49 | Compositing
+00:20.922  render           | Video append frame 49
+00:20.922  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:20.922  render           | Rendering frame 50
+00:20.922  render           | Start rendering: Scene, ViewLayer
+00:20.922  render           | Engine: EEVEE
+00:20.953  render           | Fra: 50 | Rendering 1 / 64 samples
+00:21.063  render           | Fra: 50 | Rendering 25 / 64 samples
+00:21.172  render           | Fra: 50 | Rendering 50 / 64 samples
+00:21.235  render           | Fra: 50 | Rendering 64 / 64 samples
+00:21.250  render           | Executing compositor
+00:21.250  render           | Fra: 50 | Compositing
+00:21.313  render           | Video append frame 50
+00:21.313  render           | Time: 00:00.39 (Saving: 00:00.04)
+00:21.313  render           | Rendering frame 51
+00:21.313  render           | Start rendering: Scene, ViewLayer
+00:21.313  render           | Engine: EEVEE
+00:21.344  render           | Fra: 51 | Rendering 1 / 64 samples
+00:21.453  render           | Fra: 51 | Rendering 25 / 64 samples
+00:21.563  render           | Fra: 51 | Rendering 50 / 64 samples
+00:21.625  render           | Fra: 51 | Rendering 64 / 64 samples
+00:21.641  render           | Executing compositor
+00:21.641  render           | Fra: 51 | Compositing
+00:21.672  render           | Video append frame 51
+00:21.672  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:21.672  render           | Rendering frame 52
+00:21.672  render           | Start rendering: Scene, ViewLayer
+00:21.672  render           | Engine: EEVEE
+00:21.703  render           | Fra: 52 | Rendering 1 / 64 samples
+00:21.813  render           | Fra: 52 | Rendering 25 / 64 samples
+00:21.922  render           | Fra: 52 | Rendering 50 / 64 samples
+00:21.985  render           | Fra: 52 | Rendering 64 / 64 samples
+00:22.000  render           | Executing compositor
+00:22.000  render           | Fra: 52 | Compositing
+00:22.031  render           | Video append frame 52
+00:22.031  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:22.031  render           | Rendering frame 53
+00:22.031  render           | Start rendering: Scene, ViewLayer
+00:22.031  render           | Engine: EEVEE
+00:22.063  render           | Fra: 53 | Rendering 1 / 64 samples
+00:22.172  render           | Fra: 53 | Rendering 25 / 64 samples
+00:22.281  render           | Fra: 53 | Rendering 50 / 64 samples
+00:22.344  render           | Fra: 53 | Rendering 64 / 64 samples
+00:22.360  render           | Executing compositor
+00:22.360  render           | Fra: 53 | Compositing
+00:22.391  render           | Video append frame 53
+00:22.391  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:22.391  render           | Rendering frame 54
+00:22.391  render           | Start rendering: Scene, ViewLayer
+00:22.391  render           | Engine: EEVEE
+00:22.422  render           | Fra: 54 | Rendering 1 / 64 samples
+00:22.531  render           | Fra: 54 | Rendering 25 / 64 samples
+00:22.656  render           | Fra: 54 | Rendering 50 / 64 samples
+00:22.719  render           | Fra: 54 | Rendering 64 / 64 samples
+00:22.719  render           | Executing compositor
+00:22.719  render           | Fra: 54 | Compositing
+00:22.750  render           | Video append frame 54
+00:22.750  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:22.750  render           | Rendering frame 55
+00:22.766  render           | Start rendering: Scene, ViewLayer
+00:22.766  render           | Engine: EEVEE
+00:22.781  render           | Fra: 55 | Rendering 1 / 64 samples
+00:22.891  render           | Fra: 55 | Rendering 25 / 64 samples
+00:23.016  render           | Fra: 55 | Rendering 50 / 64 samples
+00:23.078  render           | Fra: 55 | Rendering 64 / 64 samples
+00:23.078  render           | Executing compositor
+00:23.078  render           | Fra: 55 | Compositing
+00:23.125  render           | Video append frame 55
+00:23.125  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:23.125  render           | Rendering frame 56
+00:23.125  render           | Start rendering: Scene, ViewLayer
+00:23.125  render           | Engine: EEVEE
+00:23.141  render           | Fra: 56 | Rendering 1 / 64 samples
+00:23.250  render           | Fra: 56 | Rendering 25 / 64 samples
+00:23.375  render           | Fra: 56 | Rendering 50 / 64 samples
+00:23.438  render           | Fra: 56 | Rendering 64 / 64 samples
+00:23.453  render           | Executing compositor
+00:23.453  render           | Fra: 56 | Compositing
+00:23.485  render           | Video append frame 56
+00:23.485  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:23.485  render           | Rendering frame 57
+00:23.485  render           | Start rendering: Scene, ViewLayer
+00:23.485  render           | Engine: EEVEE
+00:23.516  render           | Fra: 57 | Rendering 1 / 64 samples
+00:23.625  render           | Fra: 57 | Rendering 25 / 64 samples
+00:23.735  render           | Fra: 57 | Rendering 50 / 64 samples
+00:23.797  render           | Fra: 57 | Rendering 64 / 64 samples
+00:23.813  render           | Executing compositor
+00:23.813  render           | Fra: 57 | Compositing
+00:23.844  render           | Video append frame 57
+00:23.844  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:23.844  render           | Rendering frame 58
+00:23.844  render           | Start rendering: Scene, ViewLayer
+00:23.844  render           | Engine: EEVEE
+00:23.875  render           | Fra: 58 | Rendering 1 / 64 samples
+00:23.985  render           | Fra: 58 | Rendering 25 / 64 samples
+00:24.094  render           | Fra: 58 | Rendering 50 / 64 samples
+00:24.172  render           | Fra: 58 | Rendering 64 / 64 samples
+00:24.172  render           | Executing compositor
+00:24.172  render           | Fra: 58 | Compositing
+00:24.203  render           | Video append frame 58
+00:24.203  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:24.203  render           | Rendering frame 59
+00:24.219  render           | Start rendering: Scene, ViewLayer
+00:24.219  render           | Engine: EEVEE
+00:24.235  render           | Fra: 59 | Rendering 1 / 64 samples
+00:24.344  render           | Fra: 59 | Rendering 25 / 64 samples
+00:24.469  render           | Fra: 59 | Rendering 50 / 64 samples
+00:24.531  render           | Fra: 59 | Rendering 64 / 64 samples
+00:24.547  render           | Executing compositor
+00:24.547  render           | Fra: 59 | Compositing
+00:24.578  render           | Video append frame 59
+00:24.578  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:24.578  render           | Rendering frame 60
+00:24.578  render           | Start rendering: Scene, ViewLayer
+00:24.578  render           | Engine: EEVEE
+00:24.594  render           | Fra: 60 | Rendering 1 / 64 samples
+00:24.703  render           | Fra: 60 | Rendering 25 / 64 samples
+00:24.828  render           | Fra: 60 | Rendering 50 / 64 samples
+00:24.891  render           | Fra: 60 | Rendering 64 / 64 samples
+00:24.906  render           | Executing compositor
+00:24.906  render           | Fra: 60 | Compositing
+00:24.938  render           | Video append frame 60
+00:24.938  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:24.938  render           | Rendering frame 61
+00:24.938  render           | Start rendering: Scene, ViewLayer
+00:24.938  render           | Engine: EEVEE
+00:24.953  render           | Fra: 61 | Rendering 1 / 64 samples
+00:25.063  render           | Fra: 61 | Rendering 25 / 64 samples
+00:25.188  render           | Fra: 61 | Rendering 50 / 64 samples
+00:25.250  render           | Fra: 61 | Rendering 64 / 64 samples
+00:25.250  render           | Executing compositor
+00:25.250  render           | Fra: 61 | Compositing
+00:25.297  render           | Video append frame 61
+00:25.297  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:25.297  render           | Rendering frame 62
+00:25.297  render           | Start rendering: Scene, ViewLayer
+00:25.297  render           | Engine: EEVEE
+00:25.313  render           | Fra: 62 | Rendering 1 / 64 samples
+00:25.422  render           | Fra: 62 | Rendering 25 / 64 samples
+00:25.547  render           | Fra: 62 | Rendering 50 / 64 samples
+00:25.610  render           | Fra: 62 | Rendering 64 / 64 samples
+00:25.625  render           | Executing compositor
+00:25.625  render           | Fra: 62 | Compositing
+00:25.656  render           | Video append frame 62
+00:25.656  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:25.656  render           | Rendering frame 63
+00:25.656  render           | Start rendering: Scene, ViewLayer
+00:25.656  render           | Engine: EEVEE
+00:25.688  render           | Fra: 63 | Rendering 1 / 64 samples
+00:25.797  render           | Fra: 63 | Rendering 25 / 64 samples
+00:25.906  render           | Fra: 63 | Rendering 50 / 64 samples
+00:25.969  render           | Fra: 63 | Rendering 64 / 64 samples
+00:25.985  render           | Executing compositor
+00:25.985  render           | Fra: 63 | Compositing
+00:26.016  render           | Video append frame 63
+00:26.016  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:26.016  render           | Rendering frame 64
+00:26.016  render           | Start rendering: Scene, ViewLayer
+00:26.016  render           | Engine: EEVEE
+00:26.047  render           | Fra: 64 | Rendering 1 / 64 samples
+00:26.156  render           | Fra: 64 | Rendering 25 / 64 samples
+00:26.266  render           | Fra: 64 | Rendering 50 / 64 samples
+00:26.328  render           | Fra: 64 | Rendering 64 / 64 samples
+00:26.344  render           | Executing compositor
+00:26.344  render           | Fra: 64 | Compositing
+00:26.375  render           | Video append frame 64
+00:26.375  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:26.375  render           | Rendering frame 65
+00:26.375  render           | Start rendering: Scene, ViewLayer
+00:26.375  render           | Engine: EEVEE
+00:26.406  render           | Fra: 65 | Rendering 1 / 64 samples
+00:26.516  render           | Fra: 65 | Rendering 25 / 64 samples
+00:26.625  render           | Fra: 65 | Rendering 50 / 64 samples
+00:26.688  render           | Fra: 65 | Rendering 64 / 64 samples
+00:26.703  render           | Executing compositor
+00:26.703  render           | Fra: 65 | Compositing
+00:26.735  render           | Video append frame 65
+00:26.735  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:26.735  render           | Rendering frame 66
+00:26.735  render           | Start rendering: Scene, ViewLayer
+00:26.735  render           | Engine: EEVEE
+00:26.766  render           | Fra: 66 | Rendering 1 / 64 samples
+00:26.875  render           | Fra: 66 | Rendering 25 / 64 samples
+00:26.985  render           | Fra: 66 | Rendering 50 / 64 samples
+00:27.047  render           | Fra: 66 | Rendering 64 / 64 samples
+00:27.063  render           | Executing compositor
+00:27.063  render           | Fra: 66 | Compositing
+00:27.094  render           | Video append frame 66
+00:27.094  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:27.094  render           | Rendering frame 67
+00:27.094  render           | Start rendering: Scene, ViewLayer
+00:27.094  render           | Engine: EEVEE
+00:27.125  render           | Fra: 67 | Rendering 1 / 64 samples
+00:27.235  render           | Fra: 67 | Rendering 25 / 64 samples
+00:27.344  render           | Fra: 67 | Rendering 50 / 64 samples
+00:27.406  render           | Fra: 67 | Rendering 64 / 64 samples
+00:27.422  render           | Executing compositor
+00:27.422  render           | Fra: 67 | Compositing
+00:27.453  render           | Video append frame 67
+00:27.453  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:27.453  render           | Rendering frame 68
+00:27.469  render           | Start rendering: Scene, ViewLayer
+00:27.469  render           | Engine: EEVEE
+00:27.485  render           | Fra: 68 | Rendering 1 / 64 samples
+00:27.610  render           | Fra: 68 | Rendering 25 / 64 samples
+00:27.719  render           | Fra: 68 | Rendering 50 / 64 samples
+00:27.781  render           | Fra: 68 | Rendering 64 / 64 samples
+00:27.797  render           | Executing compositor
+00:27.797  render           | Fra: 68 | Compositing
+00:27.828  render           | Video append frame 68
+00:27.828  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:27.828  render           | Rendering frame 69
+00:27.828  render           | Start rendering: Scene, ViewLayer
+00:27.828  render           | Engine: EEVEE
+00:27.860  render           | Fra: 69 | Rendering 1 / 64 samples
+00:27.969  render           | Fra: 69 | Rendering 25 / 64 samples
+00:28.078  render           | Fra: 69 | Rendering 50 / 64 samples
+00:28.141  render           | Fra: 69 | Rendering 64 / 64 samples
+00:28.156  render           | Executing compositor
+00:28.156  render           | Fra: 69 | Compositing
+00:28.188  render           | Video append frame 69
+00:28.188  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:28.188  render           | Rendering frame 70
+00:28.188  render           | Start rendering: Scene, ViewLayer
+00:28.188  render           | Engine: EEVEE
+00:28.219  render           | Fra: 70 | Rendering 1 / 64 samples
+00:28.328  render           | Fra: 70 | Rendering 25 / 64 samples
+00:28.438  render           | Fra: 70 | Rendering 50 / 64 samples
+00:28.500  render           | Fra: 70 | Rendering 64 / 64 samples
+00:28.516  render           | Executing compositor
+00:28.516  render           | Fra: 70 | Compositing
+00:28.547  render           | Video append frame 70
+00:28.547  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:28.547  render           | Rendering frame 71
+00:28.547  render           | Start rendering: Scene, ViewLayer
+00:28.547  render           | Engine: EEVEE
+00:28.578  render           | Fra: 71 | Rendering 1 / 64 samples
+00:28.688  render           | Fra: 71 | Rendering 25 / 64 samples
+00:28.797  render           | Fra: 71 | Rendering 50 / 64 samples
+00:28.860  render           | Fra: 71 | Rendering 64 / 64 samples
+00:28.875  render           | Executing compositor
+00:28.875  render           | Fra: 71 | Compositing
+00:28.906  render           | Video append frame 71
+00:28.906  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:28.906  render           | Rendering frame 72
+00:28.906  render           | Start rendering: Scene, ViewLayer
+00:28.906  render           | Engine: EEVEE
+00:28.938  render           | Fra: 72 | Rendering 1 / 64 samples
+00:29.047  render           | Fra: 72 | Rendering 25 / 64 samples
+00:29.172  render           | Fra: 72 | Rendering 50 / 64 samples
+00:29.235  render           | Fra: 72 | Rendering 64 / 64 samples
+00:29.250  render           | Executing compositor
+00:29.250  render           | Fra: 72 | Compositing
+00:29.281  render           | Video append frame 72
+00:29.281  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:29.281  render           | Rendering frame 73
+00:29.281  render           | Start rendering: Scene, ViewLayer
+00:29.281  render           | Engine: EEVEE
+00:29.313  render           | Fra: 73 | Rendering 1 / 64 samples
+00:29.422  render           | Fra: 73 | Rendering 25 / 64 samples
+00:29.531  render           | Fra: 73 | Rendering 50 / 64 samples
+00:29.594  render           | Fra: 73 | Rendering 64 / 64 samples
+00:29.610  render           | Executing compositor
+00:29.610  render           | Fra: 73 | Compositing
+00:29.641  render           | Video append frame 73
+00:29.641  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:29.641  render           | Rendering frame 74
+00:29.641  render           | Start rendering: Scene, ViewLayer
+00:29.641  render           | Engine: EEVEE
+00:29.672  render           | Fra: 74 | Rendering 1 / 64 samples
+00:29.781  render           | Fra: 74 | Rendering 25 / 64 samples
+00:29.891  render           | Fra: 74 | Rendering 50 / 64 samples
+00:29.953  render           | Fra: 74 | Rendering 64 / 64 samples
+00:29.969  render           | Executing compositor
+00:29.969  render           | Fra: 74 | Compositing
+00:30.000  render           | Video append frame 74
+00:30.000  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:30.000  render           | Rendering frame 75
+00:30.000  render           | Start rendering: Scene, ViewLayer
+00:30.000  render           | Engine: EEVEE
+00:30.031  render           | Fra: 75 | Rendering 1 / 64 samples
+00:30.141  render           | Fra: 75 | Rendering 25 / 64 samples
+00:30.250  render           | Fra: 75 | Rendering 50 / 64 samples
+00:30.313  render           | Fra: 75 | Rendering 64 / 64 samples
+00:30.328  render           | Executing compositor
+00:30.328  render           | Fra: 75 | Compositing
+00:30.360  render           | Video append frame 75
+00:30.360  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:30.360  render           | Rendering frame 76
+00:30.360  render           | Start rendering: Scene, ViewLayer
+00:30.360  render           | Engine: EEVEE
+00:30.391  render           | Fra: 76 | Rendering 1 / 64 samples
+00:30.500  render           | Fra: 76 | Rendering 25 / 64 samples
+00:30.610  render           | Fra: 76 | Rendering 50 / 64 samples
+00:30.672  render           | Fra: 76 | Rendering 64 / 64 samples
+00:30.688  render           | Executing compositor
+00:30.688  render           | Fra: 76 | Compositing
+00:30.719  render           | Video append frame 76
+00:30.719  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:30.719  render           | Rendering frame 77
+00:30.719  render           | Start rendering: Scene, ViewLayer
+00:30.719  render           | Engine: EEVEE
+00:30.750  render           | Fra: 77 | Rendering 1 / 64 samples
+00:30.860  render           | Fra: 77 | Rendering 25 / 64 samples
+00:30.985  render           | Fra: 77 | Rendering 50 / 64 samples
+00:31.047  render           | Fra: 77 | Rendering 64 / 64 samples
+00:31.063  render           | Executing compositor
+00:31.063  render           | Fra: 77 | Compositing
+00:31.094  render           | Video append frame 77
+00:31.094  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:31.094  render           | Rendering frame 78
+00:31.094  render           | Start rendering: Scene, ViewLayer
+00:31.094  render           | Engine: EEVEE
+00:31.125  render           | Fra: 78 | Rendering 1 / 64 samples
+00:31.235  render           | Fra: 78 | Rendering 25 / 64 samples
+00:31.344  render           | Fra: 78 | Rendering 50 / 64 samples
+00:31.406  render           | Fra: 78 | Rendering 64 / 64 samples
+00:31.422  render           | Executing compositor
+00:31.422  render           | Fra: 78 | Compositing
+00:31.469  render           | Video append frame 78
+00:31.469  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:31.469  render           | Rendering frame 79
+00:31.469  render           | Start rendering: Scene, ViewLayer
+00:31.469  render           | Engine: EEVEE
+00:31.485  render           | Fra: 79 | Rendering 1 / 64 samples
+00:31.594  render           | Fra: 79 | Rendering 25 / 64 samples
+00:31.719  render           | Fra: 79 | Rendering 50 / 64 samples
+00:31.781  render           | Fra: 79 | Rendering 64 / 64 samples
+00:31.781  render           | Executing compositor
+00:31.781  render           | Fra: 79 | Compositing
+00:31.828  render           | Video append frame 79
+00:31.828  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:31.828  render           | Rendering frame 80
+00:31.828  render           | Start rendering: Scene, ViewLayer
+00:31.828  render           | Engine: EEVEE
+00:31.844  render           | Fra: 80 | Rendering 1 / 64 samples
+00:31.953  render           | Fra: 80 | Rendering 25 / 64 samples
+00:32.078  render           | Fra: 80 | Rendering 50 / 64 samples
+00:32.141  render           | Fra: 80 | Rendering 64 / 64 samples
+00:32.156  render           | Executing compositor
+00:32.156  render           | Fra: 80 | Compositing
+00:32.188  render           | Video append frame 80
+00:32.188  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:32.188  render           | Rendering frame 81
+00:32.188  render           | Start rendering: Scene, ViewLayer
+00:32.188  render           | Engine: EEVEE
+00:32.219  render           | Fra: 81 | Rendering 1 / 64 samples
+00:32.328  render           | Fra: 81 | Rendering 25 / 64 samples
+00:32.438  render           | Fra: 81 | Rendering 50 / 64 samples
+00:32.500  render           | Fra: 81 | Rendering 64 / 64 samples
+00:32.516  render           | Executing compositor
+00:32.516  render           | Fra: 81 | Compositing
+00:32.547  render           | Video append frame 81
+00:32.547  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:32.547  render           | Rendering frame 82
+00:32.547  render           | Start rendering: Scene, ViewLayer
+00:32.547  render           | Engine: EEVEE
+00:32.578  render           | Fra: 82 | Rendering 1 / 64 samples
+00:32.688  render           | Fra: 82 | Rendering 25 / 64 samples
+00:32.797  render           | Fra: 82 | Rendering 50 / 64 samples
+00:32.860  render           | Fra: 82 | Rendering 64 / 64 samples
+00:32.875  render           | Executing compositor
+00:32.875  render           | Fra: 82 | Compositing
+00:32.906  render           | Video append frame 82
+00:32.906  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:32.906  render           | Rendering frame 83
+00:32.906  render           | Start rendering: Scene, ViewLayer
+00:32.906  render           | Engine: EEVEE
+00:32.938  render           | Fra: 83 | Rendering 1 / 64 samples
+00:33.047  render           | Fra: 83 | Rendering 25 / 64 samples
+00:33.156  render           | Fra: 83 | Rendering 50 / 64 samples
+00:33.219  render           | Fra: 83 | Rendering 64 / 64 samples
+00:33.235  render           | Executing compositor
+00:33.235  render           | Fra: 83 | Compositing
+00:33.266  render           | Video append frame 83
+00:33.266  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:33.266  render           | Rendering frame 84
+00:33.266  render           | Start rendering: Scene, ViewLayer
+00:33.266  render           | Engine: EEVEE
+00:33.297  render           | Fra: 84 | Rendering 1 / 64 samples
+00:33.406  render           | Fra: 84 | Rendering 25 / 64 samples
+00:33.531  render           | Fra: 84 | Rendering 50 / 64 samples
+00:33.594  render           | Fra: 84 | Rendering 64 / 64 samples
+00:33.594  render           | Executing compositor
+00:33.594  render           | Fra: 84 | Compositing
+00:33.641  render           | Video append frame 84
+00:33.641  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:33.641  render           | Rendering frame 85
+00:33.641  render           | Start rendering: Scene, ViewLayer
+00:33.641  render           | Engine: EEVEE
+00:33.656  render           | Fra: 85 | Rendering 1 / 64 samples
+00:33.766  render           | Fra: 85 | Rendering 25 / 64 samples
+00:33.891  render           | Fra: 85 | Rendering 50 / 64 samples
+00:33.953  render           | Fra: 85 | Rendering 64 / 64 samples
+00:33.953  render           | Executing compositor
+00:33.953  render           | Fra: 85 | Compositing
+00:34.000  render           | Video append frame 85
+00:34.000  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:34.000  render           | Rendering frame 86
+00:34.000  render           | Start rendering: Scene, ViewLayer
+00:34.000  render           | Engine: EEVEE
+00:34.031  render           | Fra: 86 | Rendering 1 / 64 samples
+00:34.141  render           | Fra: 86 | Rendering 25 / 64 samples
+00:34.250  render           | Fra: 86 | Rendering 50 / 64 samples
+00:34.313  render           | Fra: 86 | Rendering 64 / 64 samples
+00:34.328  render           | Executing compositor
+00:34.328  render           | Fra: 86 | Compositing
+00:34.360  render           | Video append frame 86
+00:34.360  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:34.360  render           | Rendering frame 87
+00:34.360  render           | Start rendering: Scene, ViewLayer
+00:34.360  render           | Engine: EEVEE
+00:34.391  render           | Fra: 87 | Rendering 1 / 64 samples
+00:34.500  render           | Fra: 87 | Rendering 25 / 64 samples
+00:34.610  render           | Fra: 87 | Rendering 50 / 64 samples
+00:34.672  render           | Fra: 87 | Rendering 64 / 64 samples
+00:34.688  render           | Executing compositor
+00:34.688  render           | Fra: 87 | Compositing
+00:34.719  render           | Video append frame 87
+00:34.719  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:34.719  render           | Rendering frame 88
+00:34.719  render           | Start rendering: Scene, ViewLayer
+00:34.719  render           | Engine: EEVEE
+00:34.750  render           | Fra: 88 | Rendering 1 / 64 samples
+00:34.860  render           | Fra: 88 | Rendering 25 / 64 samples
+00:34.985  render           | Fra: 88 | Rendering 50 / 64 samples
+00:35.047  render           | Fra: 88 | Rendering 64 / 64 samples
+00:35.063  render           | Executing compositor
+00:35.063  render           | Fra: 88 | Compositing
+00:35.094  render           | Video append frame 88
+00:35.094  render           | Time: 00:00.37 (Saving: 00:00.02)
+00:35.094  render           | Rendering frame 89
+00:35.094  render           | Start rendering: Scene, ViewLayer
+00:35.094  render           | Engine: EEVEE
+00:35.125  render           | Fra: 89 | Rendering 1 / 64 samples
+00:35.266  render           | Fra: 89 | Rendering 25 / 64 samples
+00:35.406  render           | Fra: 89 | Rendering 50 / 64 samples
+00:35.469  render           | Fra: 89 | Rendering 64 / 64 samples
+00:35.485  render           | Executing compositor
+00:35.485  render           | Fra: 89 | Compositing
+00:35.516  render           | Video append frame 89
+00:35.516  render           | Time: 00:00.42 (Saving: 00:00.02)
+00:35.516  render           | Rendering frame 90
+00:35.531  render           | Start rendering: Scene, ViewLayer
+00:35.531  render           | Engine: EEVEE
+00:35.563  render           | Fra: 90 | Rendering 1 / 64 samples
+00:35.672  render           | Fra: 90 | Rendering 25 / 64 samples
+00:35.797  render           | Fra: 90 | Rendering 50 / 64 samples
+00:35.860  render           | Fra: 90 | Rendering 64 / 64 samples
+00:35.875  render           | Executing compositor
+00:35.875  render           | Fra: 90 | Compositing
+00:35.906  render           | Video append frame 90
+00:35.906  render           | Time: 00:00.38 (Saving: 00:00.02)
+00:35.906  render           | Rendering frame 91
+00:35.906  render           | Start rendering: Scene, ViewLayer
+00:35.906  render           | Engine: EEVEE
+00:35.938  render           | Fra: 91 | Rendering 1 / 64 samples
+00:36.063  render           | Fra: 91 | Rendering 25 / 64 samples
+00:36.172  render           | Fra: 91 | Rendering 50 / 64 samples
+00:36.235  render           | Fra: 91 | Rendering 64 / 64 samples
+00:36.250  render           | Executing compositor
+00:36.250  render           | Fra: 91 | Compositing
+00:36.297  render           | Video append frame 91
+00:36.297  render           | Time: 00:00.38 (Saving: 00:00.02)
+00:36.297  render           | Rendering frame 92
+00:36.297  render           | Start rendering: Scene, ViewLayer
+00:36.297  render           | Engine: EEVEE
+00:36.313  render           | Fra: 92 | Rendering 1 / 64 samples
+00:36.438  render           | Fra: 92 | Rendering 25 / 64 samples
+00:36.547  render           | Fra: 92 | Rendering 50 / 64 samples
+00:36.625  render           | Fra: 92 | Rendering 64 / 64 samples
+00:36.641  render           | Executing compositor
+00:36.641  render           | Fra: 92 | Compositing
+00:36.672  render           | Video append frame 92
+00:36.672  render           | Time: 00:00.37 (Saving: 00:00.02)
+00:36.672  render           | Rendering frame 93
+00:36.672  render           | Start rendering: Scene, ViewLayer
+00:36.672  render           | Engine: EEVEE
+00:36.703  render           | Fra: 93 | Rendering 1 / 64 samples
+00:36.813  render           | Fra: 93 | Rendering 25 / 64 samples
+00:36.922  render           | Fra: 93 | Rendering 50 / 64 samples
+00:36.985  render           | Fra: 93 | Rendering 64 / 64 samples
+00:37.000  render           | Executing compositor
+00:37.000  render           | Fra: 93 | Compositing
+00:37.031  render           | Video append frame 93
+00:37.031  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:37.031  render           | Rendering frame 94
+00:37.031  render           | Start rendering: Scene, ViewLayer
+00:37.031  render           | Engine: EEVEE
+00:37.063  render           | Fra: 94 | Rendering 1 / 64 samples
+00:37.172  render           | Fra: 94 | Rendering 25 / 64 samples
+00:37.281  render           | Fra: 94 | Rendering 50 / 64 samples
+00:37.344  render           | Fra: 94 | Rendering 64 / 64 samples
+00:37.360  render           | Executing compositor
+00:37.360  render           | Fra: 94 | Compositing
+00:37.391  render           | Video append frame 94
+00:37.391  render           | Time: 00:00.35 (Saving: 00:00.01)
+00:37.391  render           | Rendering frame 95
+00:37.391  render           | Start rendering: Scene, ViewLayer
+00:37.391  render           | Engine: EEVEE
+00:37.422  render           | Fra: 95 | Rendering 1 / 64 samples
+00:37.531  render           | Fra: 95 | Rendering 25 / 64 samples
+00:37.641  render           | Fra: 95 | Rendering 50 / 64 samples
+00:37.719  render           | Fra: 95 | Rendering 64 / 64 samples
+00:37.719  render           | Executing compositor
+00:37.719  render           | Fra: 95 | Compositing
+00:37.750  render           | Video append frame 95
+00:37.750  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:37.750  render           | Rendering frame 96
+00:37.766  render           | Start rendering: Scene, ViewLayer
+00:37.766  render           | Engine: EEVEE
+00:37.797  render           | Fra: 96 | Rendering 1 / 64 samples
+00:37.906  render           | Fra: 96 | Rendering 25 / 64 samples
+00:38.016  render           | Fra: 96 | Rendering 50 / 64 samples
+00:38.078  render           | Fra: 96 | Rendering 64 / 64 samples
+00:38.094  render           | Executing compositor
+00:38.094  render           | Fra: 96 | Compositing
+00:38.125  render           | Video append frame 96
+00:38.125  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:38.125  render           | Rendering frame 97
+00:38.125  render           | Start rendering: Scene, ViewLayer
+00:38.125  render           | Engine: EEVEE
+00:38.156  render           | Fra: 97 | Rendering 1 / 64 samples
+00:38.266  render           | Fra: 97 | Rendering 25 / 64 samples
+00:38.375  render           | Fra: 97 | Rendering 50 / 64 samples
+00:38.438  render           | Fra: 97 | Rendering 64 / 64 samples
+00:38.453  render           | Executing compositor
+00:38.453  render           | Fra: 97 | Compositing
+00:38.485  render           | Video append frame 97
+00:38.485  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:38.485  render           | Rendering frame 98
+00:38.485  render           | Start rendering: Scene, ViewLayer
+00:38.485  render           | Engine: EEVEE
+00:38.516  render           | Fra: 98 | Rendering 1 / 64 samples
+00:38.625  render           | Fra: 98 | Rendering 25 / 64 samples
+00:38.735  render           | Fra: 98 | Rendering 50 / 64 samples
+00:38.813  render           | Fra: 98 | Rendering 64 / 64 samples
+00:38.828  render           | Executing compositor
+00:38.828  render           | Fra: 98 | Compositing
+00:38.860  render           | Video append frame 98
+00:38.860  render           | Time: 00:00.37 (Saving: 00:00.02)
+00:38.860  render           | Rendering frame 99
+00:38.860  render           | Start rendering: Scene, ViewLayer
+00:38.860  render           | Engine: EEVEE
+00:38.891  render           | Fra: 99 | Rendering 1 / 64 samples
+00:39.000  render           | Fra: 99 | Rendering 25 / 64 samples
+00:39.110  render           | Fra: 99 | Rendering 50 / 64 samples
+00:39.172  render           | Fra: 99 | Rendering 64 / 64 samples
+00:39.188  render           | Executing compositor
+00:39.188  render           | Fra: 99 | Compositing
+00:39.219  render           | Video append frame 99
+00:39.219  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:39.219  render           | Rendering frame 100
+00:39.219  render           | Start rendering: Scene, ViewLayer
+00:39.219  render           | Engine: EEVEE
+00:39.250  render           | Fra: 100 | Rendering 1 / 64 samples
+00:39.360  render           | Fra: 100 | Rendering 25 / 64 samples
+00:39.469  render           | Fra: 100 | Rendering 50 / 64 samples
+00:39.531  render           | Fra: 100 | Rendering 64 / 64 samples
+00:39.547  render           | Executing compositor
+00:39.547  render           | Fra: 100 | Compositing
+00:39.578  render           | Video append frame 100
+00:39.578  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:39.578  render           | Rendering frame 101
+00:39.578  render           | Start rendering: Scene, ViewLayer
+00:39.578  render           | Engine: EEVEE
+00:39.610  render           | Fra: 101 | Rendering 1 / 64 samples
+00:39.719  render           | Fra: 101 | Rendering 25 / 64 samples
+00:39.828  render           | Fra: 101 | Rendering 50 / 64 samples
+00:39.891  render           | Fra: 101 | Rendering 64 / 64 samples
+00:39.906  render           | Executing compositor
+00:39.906  render           | Fra: 101 | Compositing
+00:39.938  render           | Video append frame 101
+00:39.938  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:39.938  render           | Rendering frame 102
+00:39.938  render           | Start rendering: Scene, ViewLayer
+00:39.938  render           | Engine: EEVEE
+00:39.969  render           | Fra: 102 | Rendering 1 / 64 samples
+00:40.078  render           | Fra: 102 | Rendering 25 / 64 samples
+00:40.188  render           | Fra: 102 | Rendering 50 / 64 samples
+00:40.250  render           | Fra: 102 | Rendering 64 / 64 samples
+00:40.266  render           | Executing compositor
+00:40.266  render           | Fra: 102 | Compositing
+00:40.297  render           | Video append frame 102
+00:40.297  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:40.297  render           | Rendering frame 103
+00:40.297  render           | Start rendering: Scene, ViewLayer
+00:40.297  render           | Engine: EEVEE
+00:40.328  render           | Fra: 103 | Rendering 1 / 64 samples
+00:40.422  render           | Fra: 103 | Rendering 25 / 64 samples
+00:40.531  render           | Fra: 103 | Rendering 50 / 64 samples
+00:40.594  render           | Fra: 103 | Rendering 64 / 64 samples
+00:40.610  render           | Executing compositor
+00:40.610  render           | Fra: 103 | Compositing
+00:40.641  render           | Video append frame 103
+00:40.641  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:40.641  render           | Rendering frame 104
+00:40.641  render           | Start rendering: Scene, ViewLayer
+00:40.641  render           | Engine: EEVEE
+00:40.672  render           | Fra: 104 | Rendering 1 / 64 samples
+00:40.781  render           | Fra: 104 | Rendering 25 / 64 samples
+00:40.891  render           | Fra: 104 | Rendering 50 / 64 samples
+00:40.953  render           | Fra: 104 | Rendering 64 / 64 samples
+00:40.953  render           | Executing compositor
+00:40.953  render           | Fra: 104 | Compositing
+00:41.000  render           | Video append frame 104
+00:41.000  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:41.000  render           | Rendering frame 105
+00:41.000  render           | Start rendering: Scene, ViewLayer
+00:41.000  render           | Engine: EEVEE
+00:41.016  render           | Fra: 105 | Rendering 1 / 64 samples
+00:41.125  render           | Fra: 105 | Rendering 25 / 64 samples
+00:41.235  render           | Fra: 105 | Rendering 50 / 64 samples
+00:41.297  render           | Fra: 105 | Rendering 64 / 64 samples
+00:41.313  render           | Executing compositor
+00:41.313  render           | Fra: 105 | Compositing
+00:41.344  render           | Video append frame 105
+00:41.344  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:41.344  render           | Rendering frame 106
+00:41.344  render           | Start rendering: Scene, ViewLayer
+00:41.344  render           | Engine: EEVEE
+00:41.375  render           | Fra: 106 | Rendering 1 / 64 samples
+00:41.469  render           | Fra: 106 | Rendering 25 / 64 samples
+00:41.578  render           | Fra: 106 | Rendering 50 / 64 samples
+00:41.641  render           | Fra: 106 | Rendering 64 / 64 samples
+00:41.656  render           | Executing compositor
+00:41.656  render           | Fra: 106 | Compositing
+00:41.688  render           | Video append frame 106
+00:41.688  render           | Time: 00:00.33 (Saving: 00:00.02)
+00:41.688  render           | Rendering frame 107
+00:41.688  render           | Start rendering: Scene, ViewLayer
+00:41.688  render           | Engine: EEVEE
+00:41.719  render           | Fra: 107 | Rendering 1 / 64 samples
+00:41.813  render           | Fra: 107 | Rendering 25 / 64 samples
+00:41.922  render           | Fra: 107 | Rendering 50 / 64 samples
+00:41.985  render           | Fra: 107 | Rendering 64 / 64 samples
+00:41.985  render           | Executing compositor
+00:41.985  render           | Fra: 107 | Compositing
+00:42.031  render           | Video append frame 107
+00:42.031  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:42.031  render           | Rendering frame 108
+00:42.031  render           | Start rendering: Scene, ViewLayer
+00:42.031  render           | Engine: EEVEE
+00:42.063  render           | Fra: 108 | Rendering 1 / 64 samples
+00:42.156  render           | Fra: 108 | Rendering 25 / 64 samples
+00:42.266  render           | Fra: 108 | Rendering 50 / 64 samples
+00:42.328  render           | Fra: 108 | Rendering 64 / 64 samples
+00:42.344  render           | Executing compositor
+00:42.344  render           | Fra: 108 | Compositing
+00:42.375  render           | Video append frame 108
+00:42.375  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:42.375  render           | Rendering frame 109
+00:42.375  render           | Start rendering: Scene, ViewLayer
+00:42.375  render           | Engine: EEVEE
+00:42.406  render           | Fra: 109 | Rendering 1 / 64 samples
+00:42.500  render           | Fra: 109 | Rendering 25 / 64 samples
+00:42.610  render           | Fra: 109 | Rendering 50 / 64 samples
+00:42.672  render           | Fra: 109 | Rendering 64 / 64 samples
+00:42.672  render           | Executing compositor
+00:42.688  render           | Fra: 109 | Compositing
+00:42.719  render           | Video append frame 109
+00:42.719  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:42.719  render           | Rendering frame 110
+00:42.719  render           | Start rendering: Scene, ViewLayer
+00:42.719  render           | Engine: EEVEE
+00:42.735  render           | Fra: 110 | Rendering 1 / 64 samples
+00:42.844  render           | Fra: 110 | Rendering 25 / 64 samples
+00:42.953  render           | Fra: 110 | Rendering 50 / 64 samples
+00:43.000  render           | Fra: 110 | Rendering 64 / 64 samples
+00:43.016  render           | Executing compositor
+00:43.016  render           | Fra: 110 | Compositing
+00:43.047  render           | Video append frame 110
+00:43.047  render           | Time: 00:00.33 (Saving: 00:00.02)
+00:43.047  render           | Rendering frame 111
+00:43.047  render           | Start rendering: Scene, ViewLayer
+00:43.047  render           | Engine: EEVEE
+00:43.078  render           | Fra: 111 | Rendering 1 / 64 samples
+00:43.188  render           | Fra: 111 | Rendering 25 / 64 samples
+00:43.281  render           | Fra: 111 | Rendering 50 / 64 samples
+00:43.344  render           | Fra: 111 | Rendering 64 / 64 samples
+00:43.360  render           | Executing compositor
+00:43.360  render           | Fra: 111 | Compositing
+00:43.391  render           | Video append frame 111
+00:43.391  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:43.391  render           | Rendering frame 112
+00:43.391  render           | Start rendering: Scene, ViewLayer
+00:43.391  render           | Engine: EEVEE
+00:43.422  render           | Fra: 112 | Rendering 1 / 64 samples
+00:43.516  render           | Fra: 112 | Rendering 25 / 64 samples
+00:43.625  render           | Fra: 112 | Rendering 50 / 64 samples
+00:43.688  render           | Fra: 112 | Rendering 64 / 64 samples
+00:43.703  render           | Executing compositor
+00:43.703  render           | Fra: 112 | Compositing
+00:43.735  render           | Video append frame 112
+00:43.735  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:43.735  render           | Rendering frame 113
+00:43.735  render           | Start rendering: Scene, ViewLayer
+00:43.735  render           | Engine: EEVEE
+00:43.766  render           | Fra: 113 | Rendering 1 / 64 samples
+00:43.875  render           | Fra: 113 | Rendering 25 / 64 samples
+00:43.969  render           | Fra: 113 | Rendering 50 / 64 samples
+00:44.031  render           | Fra: 113 | Rendering 64 / 64 samples
+00:44.047  render           | Executing compositor
+00:44.047  render           | Fra: 113 | Compositing
+00:44.078  render           | Video append frame 113
+00:44.078  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:44.078  render           | Rendering frame 114
+00:44.078  render           | Start rendering: Scene, ViewLayer
+00:44.078  render           | Engine: EEVEE
+00:44.110  render           | Fra: 114 | Rendering 1 / 64 samples
+00:44.219  render           | Fra: 114 | Rendering 25 / 64 samples
+00:44.313  render           | Fra: 114 | Rendering 50 / 64 samples
+00:44.375  render           | Fra: 114 | Rendering 64 / 64 samples
+00:44.391  render           | Executing compositor
+00:44.391  render           | Fra: 114 | Compositing
+00:44.422  render           | Video append frame 114
+00:44.422  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:44.422  render           | Rendering frame 115
+00:44.422  render           | Start rendering: Scene, ViewLayer
+00:44.422  render           | Engine: EEVEE
+00:44.453  render           | Fra: 115 | Rendering 1 / 64 samples
+00:44.563  render           | Fra: 115 | Rendering 25 / 64 samples
+00:44.672  render           | Fra: 115 | Rendering 50 / 64 samples
+00:44.735  render           | Fra: 115 | Rendering 64 / 64 samples
+00:44.735  render           | Executing compositor
+00:44.735  render           | Fra: 115 | Compositing
+00:44.781  render           | Video append frame 115
+00:44.781  render           | Time: 00:00.34 (Saving: 00:00.02)
+00:44.781  render           | Rendering frame 116
+00:44.781  render           | Start rendering: Scene, ViewLayer
+00:44.781  render           | Engine: EEVEE
+00:44.797  render           | Fra: 116 | Rendering 1 / 64 samples
+00:44.906  render           | Fra: 116 | Rendering 25 / 64 samples
+00:45.016  render           | Fra: 116 | Rendering 50 / 64 samples
+00:45.078  render           | Fra: 116 | Rendering 64 / 64 samples
+00:45.094  render           | Executing compositor
+00:45.094  render           | Fra: 116 | Compositing
+00:45.125  render           | Video append frame 116
+00:45.125  render           | Time: 00:00.35 (Saving: 00:00.02)
+00:45.125  render           | Rendering frame 117
+00:45.125  render           | Start rendering: Scene, ViewLayer
+00:45.125  render           | Engine: EEVEE
+00:45.156  render           | Fra: 117 | Rendering 1 / 64 samples
+00:45.266  render           | Fra: 117 | Rendering 25 / 64 samples
+00:45.375  render           | Fra: 117 | Rendering 50 / 64 samples
+00:45.438  render           | Fra: 117 | Rendering 64 / 64 samples
+00:45.453  render           | Executing compositor
+00:45.453  render           | Fra: 117 | Compositing
+00:45.485  render           | Video append frame 117
+00:45.485  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:45.485  render           | Rendering frame 118
+00:45.485  render           | Start rendering: Scene, ViewLayer
+00:45.485  render           | Engine: EEVEE
+00:45.516  render           | Fra: 118 | Rendering 1 / 64 samples
+00:45.625  render           | Fra: 118 | Rendering 25 / 64 samples
+00:45.750  render           | Fra: 118 | Rendering 50 / 64 samples
+00:45.813  render           | Fra: 118 | Rendering 64 / 64 samples
+00:45.828  render           | Executing compositor
+00:45.828  render           | Fra: 118 | Compositing
+00:45.860  render           | Video append frame 118
+00:45.860  render           | Time: 00:00.36 (Saving: 00:00.02)
+00:45.860  render           | Rendering frame 119
+00:45.860  render           | Start rendering: Scene, ViewLayer
+00:45.860  render           | Engine: EEVEE
+00:45.891  render           | Fra: 119 | Rendering 1 / 64 samples
+00:46.000  render           | Fra: 119 | Rendering 25 / 64 samples
+00:46.125  render           | Fra: 119 | Rendering 50 / 64 samples
+00:46.203  render           | Fra: 119 | Rendering 64 / 64 samples
+00:46.203  render           | Executing compositor
+00:46.203  render           | Fra: 119 | Compositing
+00:46.235  render           | Video append frame 119
+00:46.235  render           | Time: 00:00.38 (Saving: 00:00.02)
+00:46.235  render           | Rendering frame 120
+00:46.235  render           | Start rendering: Scene, ViewLayer
+00:46.235  render           | Engine: EEVEE
+00:46.266  render           | Fra: 120 | Rendering 1 / 64 samples
+00:46.391  render           | Fra: 120 | Rendering 25 / 64 samples
+00:46.531  render           | Fra: 120 | Rendering 50 / 64 samples
+00:46.610  render           | Fra: 120 | Rendering 64 / 64 samples
+00:46.610  render           | Executing compositor
+00:46.610  render           | Fra: 120 | Compositing
+00:46.656  render           | Video append frame 120
+00:46.656  render           | Time: 00:00.40 (Saving: 00:00.02)
+00:46.656  render           | Rendering frame 121
+00:46.656  render           | Start rendering: Scene, ViewLayer
+00:46.656  render           | Engine: EEVEE
+00:46.688  render           | Fra: 121 | Rendering 1 / 64 samples
+00:46.813  render           | Fra: 121 | Rendering 25 / 64 samples
+00:46.969  render           | Fra: 121 | Rendering 50 / 64 samples
+00:47.047  render           | Fra: 121 | Rendering 64 / 64 samples
+00:47.063  render           | Executing compositor
+00:47.063  render           | Fra: 121 | Compositing
+00:47.094  render           | Video append frame 121
+00:47.094  render           | Time: 00:00.44 (Saving: 00:00.02)
+00:47.094  render           | Rendering frame 122
+00:47.094  render           | Start rendering: Scene, ViewLayer
+00:47.094  render           | Engine: EEVEE
+00:47.125  render           | Fra: 122 | Rendering 1 / 64 samples
+00:47.281  render           | Fra: 122 | Rendering 25 / 64 samples
+00:47.438  render           | Fra: 122 | Rendering 50 / 64 samples
+00:47.531  render           | Fra: 122 | Rendering 64 / 64 samples
+00:47.547  render           | Executing compositor
+00:47.547  render           | Fra: 122 | Compositing
+00:47.578  render           | Video append frame 122
+00:47.578  render           | Time: 00:00.48 (Saving: 00:00.02)
+00:47.578  render           | Rendering frame 123
+00:47.578  render           | Start rendering: Scene, ViewLayer
+00:47.578  render           | Engine: EEVEE
+00:47.610  render           | Fra: 123 | Rendering 1 / 64 samples
+00:47.781  render           | Fra: 123 | Rendering 25 / 64 samples
+00:47.953  render           | Fra: 123 | Rendering 50 / 64 samples
+00:48.063  render           | Fra: 123 | Rendering 64 / 64 samples
+00:48.063  render           | Executing compositor
+00:48.063  render           | Fra: 123 | Compositing
+00:48.094  render           | Video append frame 123
+00:48.094  render           | Time: 00:00.52 (Saving: 00:00.02)
+00:48.094  render           | Rendering frame 124
+00:48.094  render           | Start rendering: Scene, ViewLayer
+00:48.094  render           | Engine: EEVEE
+00:48.125  render           | Fra: 124 | Rendering 1 / 64 samples
+00:48.313  render           | Fra: 124 | Rendering 25 / 64 samples
+00:48.516  render           | Fra: 124 | Rendering 50 / 64 samples
+00:48.625  render           | Fra: 124 | Rendering 64 / 64 samples
+00:48.625  render           | Executing compositor
+00:48.625  render           | Fra: 124 | Compositing
+00:48.672  render           | Video append frame 124
+00:48.672  render           | Time: 00:00.56 (Saving: 00:00.02)
+00:48.672  render           | Rendering frame 125
+00:48.672  render           | Start rendering: Scene, ViewLayer
+00:48.672  render           | Engine: EEVEE
+00:48.688  render           | Fra: 125 | Rendering 1 / 64 samples
+00:48.891  render           | Fra: 125 | Rendering 25 / 64 samples
+00:49.078  render           | Fra: 125 | Rendering 50 / 64 samples
+00:49.188  render           | Fra: 125 | Rendering 64 / 64 samples
+00:49.203  render           | Executing compositor
+00:49.203  render           | Fra: 125 | Compositing
+00:49.235  render           | Video append frame 125
+00:49.235  render           | Time: 00:00.57 (Saving: 00:00.02)
+00:49.235  render           | Rendering frame 126
+00:49.235  render           | Start rendering: Scene, ViewLayer
+00:49.235  render           | Engine: EEVEE
+00:49.266  render           | Fra: 126 | Rendering 1 / 64 samples
+00:49.469  render           | Fra: 126 | Rendering 25 / 64 samples
+00:49.672  render           | Fra: 126 | Rendering 50 / 64 samples
+00:49.781  render           | Fra: 126 | Rendering 64 / 64 samples
+00:49.797  render           | Executing compositor
+00:49.797  render           | Fra: 126 | Compositing
+00:49.828  render           | Video append frame 126
+00:49.828  render           | Time: 00:00.59 (Saving: 00:00.02)
+00:49.828  render           | Rendering frame 127
+00:49.828  render           | Start rendering: Scene, ViewLayer
+00:49.828  render           | Engine: EEVEE
+00:49.860  render           | Fra: 127 | Rendering 1 / 64 samples
+00:50.031  render           | Fra: 127 | Rendering 25 / 64 samples
+00:50.219  render           | Fra: 127 | Rendering 50 / 64 samples
+00:50.313  render           | Fra: 127 | Rendering 64 / 64 samples
+00:50.328  render           | Executing compositor
+00:50.328  render           | Fra: 127 | Compositing
+00:50.360  render           | Video append frame 127
+00:50.360  render           | Time: 00:00.52 (Saving: 00:00.02)
+00:50.360  render           | Rendering frame 128
+00:50.360  render           | Start rendering: Scene, ViewLayer
+00:50.360  render           | Engine: EEVEE
+00:50.391  render           | Fra: 128 | Rendering 1 / 64 samples
+00:50.563  render           | Fra: 128 | Rendering 25 / 64 samples
+00:50.735  render           | Fra: 128 | Rendering 50 / 64 samples
+00:50.844  render           | Fra: 128 | Rendering 64 / 64 samples
+00:50.844  render           | Executing compositor
+00:50.844  render           | Fra: 128 | Compositing
+00:50.875  render           | Video append frame 128
+00:50.875  render           | Time: 00:00.52 (Saving: 00:00.02)
+00:50.875  render           | Rendering frame 129
+00:50.875  render           | Start rendering: Scene, ViewLayer
+00:50.875  render           | Engine: EEVEE
+00:50.922  render           | Fra: 129 | Rendering 1 / 64 samples
+00:51.078  render           | Fra: 129 | Rendering 25 / 64 samples
+00:51.266  render           | Fra: 129 | Rendering 50 / 64 samples
+00:51.360  render           | Fra: 129 | Rendering 64 / 64 samples
+00:51.375  render           | Executing compositor
+00:51.375  render           | Fra: 129 | Compositing
+00:51.406  render           | Video append frame 129
+00:51.406  render           | Time: 00:00.52 (Saving: 00:00.02)
+00:51.406  render           | Rendering frame 130
+00:51.406  render           | Start rendering: Scene, ViewLayer
+00:51.406  render           | Engine: EEVEE
+00:51.438  render           | Fra: 130 | Rendering 1 / 64 samples
+00:51.610  render           | Fra: 130 | Rendering 25 / 64 samples
+00:51.781  render           | Fra: 130 | Rendering 50 / 64 samples
+00:51.875  render           | Fra: 130 | Rendering 64 / 64 samples
+00:51.891  render           | Executing compositor
+00:51.891  render           | Fra: 130 | Compositing
+00:51.922  render           | Video append frame 130
+00:51.922  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:51.922  render           | Rendering frame 131
+00:51.922  render           | Start rendering: Scene, ViewLayer
+00:51.922  render           | Engine: EEVEE
+00:51.953  render           | Fra: 131 | Rendering 1 / 64 samples
+00:52.125  render           | Fra: 131 | Rendering 25 / 64 samples
+00:52.297  render           | Fra: 131 | Rendering 50 / 64 samples
+00:52.391  render           | Fra: 131 | Rendering 64 / 64 samples
+00:52.406  render           | Executing compositor
+00:52.406  render           | Fra: 131 | Compositing
+00:52.438  render           | Video append frame 131
+00:52.438  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:52.438  render           | Rendering frame 132
+00:52.438  render           | Start rendering: Scene, ViewLayer
+00:52.438  render           | Engine: EEVEE
+00:52.469  render           | Fra: 132 | Rendering 1 / 64 samples
+00:52.641  render           | Fra: 132 | Rendering 25 / 64 samples
+00:52.813  render           | Fra: 132 | Rendering 50 / 64 samples
+00:52.906  render           | Fra: 132 | Rendering 64 / 64 samples
+00:52.922  render           | Executing compositor
+00:52.922  render           | Fra: 132 | Compositing
+00:52.953  render           | Video append frame 132
+00:52.953  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:52.953  render           | Rendering frame 133
+00:52.953  render           | Start rendering: Scene, ViewLayer
+00:52.953  render           | Engine: EEVEE
+00:52.985  render           | Fra: 133 | Rendering 1 / 64 samples
+00:53.156  render           | Fra: 133 | Rendering 25 / 64 samples
+00:53.328  render           | Fra: 133 | Rendering 50 / 64 samples
+00:53.422  render           | Fra: 133 | Rendering 64 / 64 samples
+00:53.438  render           | Executing compositor
+00:53.438  render           | Fra: 133 | Compositing
+00:53.469  render           | Video append frame 133
+00:53.469  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:53.469  render           | Rendering frame 134
+00:53.469  render           | Start rendering: Scene, ViewLayer
+00:53.469  render           | Engine: EEVEE
+00:53.500  render           | Fra: 134 | Rendering 1 / 64 samples
+00:53.672  render           | Fra: 134 | Rendering 25 / 64 samples
+00:53.844  render           | Fra: 134 | Rendering 50 / 64 samples
+00:53.938  render           | Fra: 134 | Rendering 64 / 64 samples
+00:53.953  render           | Executing compositor
+00:53.953  render           | Fra: 134 | Compositing
+00:53.985  render           | Video append frame 134
+00:53.985  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:53.985  render           | Rendering frame 135
+00:53.985  render           | Start rendering: Scene, ViewLayer
+00:53.985  render           | Engine: EEVEE
+00:54.016  render           | Fra: 135 | Rendering 1 / 64 samples
+00:54.188  render           | Fra: 135 | Rendering 25 / 64 samples
+00:54.360  render           | Fra: 135 | Rendering 50 / 64 samples
+00:54.453  render           | Fra: 135 | Rendering 64 / 64 samples
+00:54.469  render           | Executing compositor
+00:54.469  render           | Fra: 135 | Compositing
+00:54.500  render           | Video append frame 135
+00:54.500  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:54.500  render           | Rendering frame 136
+00:54.500  render           | Start rendering: Scene, ViewLayer
+00:54.500  render           | Engine: EEVEE
+00:54.531  render           | Fra: 136 | Rendering 1 / 64 samples
+00:54.703  render           | Fra: 136 | Rendering 25 / 64 samples
+00:54.875  render           | Fra: 136 | Rendering 50 / 64 samples
+00:54.969  render           | Fra: 136 | Rendering 64 / 64 samples
+00:54.985  render           | Executing compositor
+00:54.985  render           | Fra: 136 | Compositing
+00:55.016  render           | Video append frame 136
+00:55.016  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:55.016  render           | Rendering frame 137
+00:55.016  render           | Start rendering: Scene, ViewLayer
+00:55.016  render           | Engine: EEVEE
+00:55.047  render           | Fra: 137 | Rendering 1 / 64 samples
+00:55.203  render           | Fra: 137 | Rendering 25 / 64 samples
+00:55.375  render           | Fra: 137 | Rendering 50 / 64 samples
+00:55.485  render           | Fra: 137 | Rendering 64 / 64 samples
+00:55.485  render           | Executing compositor
+00:55.485  render           | Fra: 137 | Compositing
+00:55.531  render           | Video append frame 137
+00:55.531  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:55.531  render           | Rendering frame 138
+00:55.531  render           | Start rendering: Scene, ViewLayer
+00:55.531  render           | Engine: EEVEE
+00:55.563  render           | Fra: 138 | Rendering 1 / 64 samples
+00:55.719  render           | Fra: 138 | Rendering 25 / 64 samples
+00:55.891  render           | Fra: 138 | Rendering 50 / 64 samples
+00:56.000  render           | Fra: 138 | Rendering 64 / 64 samples
+00:56.000  render           | Executing compositor
+00:56.000  render           | Fra: 138 | Compositing
+00:56.047  render           | Video append frame 138
+00:56.047  render           | Time: 00:00.51 (Saving: 00:00.02)
+00:56.047  render           | Rendering frame 139
+00:56.047  render           | Start rendering: Scene, ViewLayer
+00:56.047  render           | Engine: EEVEE
+00:56.078  render           | Fra: 139 | Rendering 1 / 64 samples
+00:56.235  render           | Fra: 139 | Rendering 25 / 64 samples
+00:56.406  render           | Fra: 139 | Rendering 50 / 64 samples
+00:56.500  render           | Fra: 139 | Rendering 64 / 64 samples
+00:56.516  render           | Executing compositor
+00:56.516  render           | Fra: 139 | Compositing
+00:56.547  render           | Video append frame 139
+00:56.547  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:56.547  render           | Rendering frame 140
+00:56.547  render           | Start rendering: Scene, ViewLayer
+00:56.547  render           | Engine: EEVEE
+00:56.578  render           | Fra: 140 | Rendering 1 / 64 samples
+00:56.735  render           | Fra: 140 | Rendering 25 / 64 samples
+00:56.906  render           | Fra: 140 | Rendering 50 / 64 samples
+00:57.000  render           | Fra: 140 | Rendering 64 / 64 samples
+00:57.016  render           | Executing compositor
+00:57.016  render           | Fra: 140 | Compositing
+00:57.047  render           | Video append frame 140
+00:57.047  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:57.047  render           | Rendering frame 141
+00:57.047  render           | Start rendering: Scene, ViewLayer
+00:57.047  render           | Engine: EEVEE
+00:57.078  render           | Fra: 141 | Rendering 1 / 64 samples
+00:57.250  render           | Fra: 141 | Rendering 25 / 64 samples
+00:57.422  render           | Fra: 141 | Rendering 50 / 64 samples
+00:57.516  render           | Fra: 141 | Rendering 64 / 64 samples
+00:57.531  render           | Executing compositor
+00:57.531  render           | Fra: 141 | Compositing
+00:57.563  render           | Video append frame 141
+00:57.563  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:57.563  render           | Rendering frame 142
+00:57.563  render           | Start rendering: Scene, ViewLayer
+00:57.563  render           | Engine: EEVEE
+00:57.594  render           | Fra: 142 | Rendering 1 / 64 samples
+00:57.750  render           | Fra: 142 | Rendering 25 / 64 samples
+00:57.922  render           | Fra: 142 | Rendering 50 / 64 samples
+00:58.016  render           | Fra: 142 | Rendering 64 / 64 samples
+00:58.031  render           | Executing compositor
+00:58.031  render           | Fra: 142 | Compositing
+00:58.063  render           | Video append frame 142
+00:58.063  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:58.063  render           | Rendering frame 143
+00:58.063  render           | Start rendering: Scene, ViewLayer
+00:58.063  render           | Engine: EEVEE
+00:58.094  render           | Fra: 143 | Rendering 1 / 64 samples
+00:58.266  render           | Fra: 143 | Rendering 25 / 64 samples
+00:58.438  render           | Fra: 143 | Rendering 50 / 64 samples
+00:58.531  render           | Fra: 143 | Rendering 64 / 64 samples
+00:58.531  render           | Executing compositor
+00:58.531  render           | Fra: 143 | Compositing
+00:58.578  render           | Video append frame 143
+00:58.578  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:58.578  render           | Rendering frame 144
+00:58.578  render           | Start rendering: Scene, ViewLayer
+00:58.578  render           | Engine: EEVEE
+00:58.610  render           | Fra: 144 | Rendering 1 / 64 samples
+00:58.766  render           | Fra: 144 | Rendering 25 / 64 samples
+00:58.938  render           | Fra: 144 | Rendering 50 / 64 samples
+00:59.031  render           | Fra: 144 | Rendering 64 / 64 samples
+00:59.047  render           | Executing compositor
+00:59.047  render           | Fra: 144 | Compositing
+00:59.078  render           | Video append frame 144
+00:59.078  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:59.078  render           | Rendering frame 145
+00:59.078  render           | Start rendering: Scene, ViewLayer
+00:59.078  render           | Engine: EEVEE
+00:59.110  render           | Fra: 145 | Rendering 1 / 64 samples
+00:59.266  render           | Fra: 145 | Rendering 25 / 64 samples
+00:59.438  render           | Fra: 145 | Rendering 50 / 64 samples
+00:59.531  render           | Fra: 145 | Rendering 64 / 64 samples
+00:59.547  render           | Executing compositor
+00:59.547  render           | Fra: 145 | Compositing
+00:59.578  render           | Video append frame 145
+00:59.578  render           | Time: 00:00.50 (Saving: 00:00.02)
+00:59.578  render           | Rendering frame 146
+00:59.578  render           | Start rendering: Scene, ViewLayer
+00:59.578  render           | Engine: EEVEE
+00:59.610  render           | Fra: 146 | Rendering 1 / 64 samples
+00:59.781  render           | Fra: 146 | Rendering 25 / 64 samples
+00:59.938  render           | Fra: 146 | Rendering 50 / 64 samples
+01:00.031  render           | Fra: 146 | Rendering 64 / 64 samples
+01:00.047  render           | Executing compositor
+01:00.047  render           | Fra: 146 | Compositing
+01:00.078  render           | Video append frame 146
+01:00.078  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:00.078  render           | Rendering frame 147
+01:00.078  render           | Start rendering: Scene, ViewLayer
+01:00.078  render           | Engine: EEVEE
+01:00.110  render           | Fra: 147 | Rendering 1 / 64 samples
+01:00.281  render           | Fra: 147 | Rendering 25 / 64 samples
+01:00.453  render           | Fra: 147 | Rendering 50 / 64 samples
+01:00.547  render           | Fra: 147 | Rendering 64 / 64 samples
+01:00.547  render           | Executing compositor
+01:00.547  render           | Fra: 147 | Compositing
+01:00.594  render           | Video append frame 147
+01:00.594  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:00.594  render           | Rendering frame 148
+01:00.594  render           | Start rendering: Scene, ViewLayer
+01:00.594  render           | Engine: EEVEE
+01:00.625  render           | Fra: 148 | Rendering 1 / 64 samples
+01:00.781  render           | Fra: 148 | Rendering 25 / 64 samples
+01:00.953  render           | Fra: 148 | Rendering 50 / 64 samples
+01:01.047  render           | Fra: 148 | Rendering 64 / 64 samples
+01:01.063  render           | Executing compositor
+01:01.063  render           | Fra: 148 | Compositing
+01:01.094  render           | Video append frame 148
+01:01.094  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:01.094  render           | Rendering frame 149
+01:01.094  render           | Start rendering: Scene, ViewLayer
+01:01.094  render           | Engine: EEVEE
+01:01.125  render           | Fra: 149 | Rendering 1 / 64 samples
+01:01.281  render           | Fra: 149 | Rendering 25 / 64 samples
+01:01.453  render           | Fra: 149 | Rendering 50 / 64 samples
+01:01.547  render           | Fra: 149 | Rendering 64 / 64 samples
+01:01.563  render           | Executing compositor
+01:01.563  render           | Fra: 149 | Compositing
+01:01.594  render           | Video append frame 149
+01:01.594  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:01.594  render           | Rendering frame 150
+01:01.594  render           | Start rendering: Scene, ViewLayer
+01:01.594  render           | Engine: EEVEE
+01:01.625  render           | Fra: 150 | Rendering 1 / 64 samples
+01:01.781  render           | Fra: 150 | Rendering 25 / 64 samples
+01:01.953  render           | Fra: 150 | Rendering 50 / 64 samples
+01:02.047  render           | Fra: 150 | Rendering 64 / 64 samples
+01:02.063  render           | Executing compositor
+01:02.063  render           | Fra: 150 | Compositing
+01:02.094  render           | Video append frame 150
+01:02.094  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:02.094  render           | Rendering frame 151
+01:02.094  render           | Start rendering: Scene, ViewLayer
+01:02.094  render           | Engine: EEVEE
+01:02.125  render           | Fra: 151 | Rendering 1 / 64 samples
+01:02.281  render           | Fra: 151 | Rendering 25 / 64 samples
+01:02.453  render           | Fra: 151 | Rendering 50 / 64 samples
+01:02.547  render           | Fra: 151 | Rendering 64 / 64 samples
+01:02.563  render           | Executing compositor
+01:02.563  render           | Fra: 151 | Compositing
+01:02.610  render           | Video append frame 151
+01:02.610  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:02.610  render           | Rendering frame 152
+01:02.610  render           | Start rendering: Scene, ViewLayer
+01:02.610  render           | Engine: EEVEE
+01:02.641  render           | Fra: 152 | Rendering 1 / 64 samples
+01:02.797  render           | Fra: 152 | Rendering 25 / 64 samples
+01:02.969  render           | Fra: 152 | Rendering 50 / 64 samples
+01:03.063  render           | Fra: 152 | Rendering 64 / 64 samples
+01:03.063  render           | Executing compositor
+01:03.063  render           | Fra: 152 | Compositing
+01:03.110  render           | Video append frame 152
+01:03.110  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:03.110  render           | Rendering frame 153
+01:03.110  render           | Start rendering: Scene, ViewLayer
+01:03.110  render           | Engine: EEVEE
+01:03.141  render           | Fra: 153 | Rendering 1 / 64 samples
+01:03.297  render           | Fra: 153 | Rendering 25 / 64 samples
+01:03.469  render           | Fra: 153 | Rendering 50 / 64 samples
+01:03.563  render           | Fra: 153 | Rendering 64 / 64 samples
+01:03.578  render           | Executing compositor
+01:03.578  render           | Fra: 153 | Compositing
+01:03.610  render           | Video append frame 153
+01:03.610  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:03.610  render           | Rendering frame 154
+01:03.610  render           | Start rendering: Scene, ViewLayer
+01:03.610  render           | Engine: EEVEE
+01:03.641  render           | Fra: 154 | Rendering 1 / 64 samples
+01:03.797  render           | Fra: 154 | Rendering 25 / 64 samples
+01:03.969  render           | Fra: 154 | Rendering 50 / 64 samples
+01:04.063  render           | Fra: 154 | Rendering 64 / 64 samples
+01:04.078  render           | Executing compositor
+01:04.078  render           | Fra: 154 | Compositing
+01:04.110  render           | Video append frame 154
+01:04.110  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:04.110  render           | Rendering frame 155
+01:04.110  render           | Start rendering: Scene, ViewLayer
+01:04.110  render           | Engine: EEVEE
+01:04.141  render           | Fra: 155 | Rendering 1 / 64 samples
+01:04.297  render           | Fra: 155 | Rendering 25 / 64 samples
+01:04.469  render           | Fra: 155 | Rendering 50 / 64 samples
+01:04.563  render           | Fra: 155 | Rendering 64 / 64 samples
+01:04.578  render           | Executing compositor
+01:04.578  render           | Fra: 155 | Compositing
+01:04.610  render           | Video append frame 155
+01:04.610  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:04.610  render           | Rendering frame 156
+01:04.610  render           | Start rendering: Scene, ViewLayer
+01:04.610  render           | Engine: EEVEE
+01:04.641  render           | Fra: 156 | Rendering 1 / 64 samples
+01:04.797  render           | Fra: 156 | Rendering 25 / 64 samples
+01:04.969  render           | Fra: 156 | Rendering 50 / 64 samples
+01:05.063  render           | Fra: 156 | Rendering 64 / 64 samples
+01:05.078  render           | Executing compositor
+01:05.078  render           | Fra: 156 | Compositing
+01:05.110  render           | Video append frame 156
+01:05.110  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:05.110  render           | Rendering frame 157
+01:05.110  render           | Start rendering: Scene, ViewLayer
+01:05.110  render           | Engine: EEVEE
+01:05.141  render           | Fra: 157 | Rendering 1 / 64 samples
+01:05.297  render           | Fra: 157 | Rendering 25 / 64 samples
+01:05.469  render           | Fra: 157 | Rendering 50 / 64 samples
+01:05.563  render           | Fra: 157 | Rendering 64 / 64 samples
+01:05.578  render           | Executing compositor
+01:05.578  render           | Fra: 157 | Compositing
+01:05.610  render           | Video append frame 157
+01:05.610  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:05.610  render           | Rendering frame 158
+01:05.610  render           | Start rendering: Scene, ViewLayer
+01:05.610  render           | Engine: EEVEE
+01:05.641  render           | Fra: 158 | Rendering 1 / 64 samples
+01:05.797  render           | Fra: 158 | Rendering 25 / 64 samples
+01:05.969  render           | Fra: 158 | Rendering 50 / 64 samples
+01:06.063  render           | Fra: 158 | Rendering 64 / 64 samples
+01:06.078  render           | Executing compositor
+01:06.078  render           | Fra: 158 | Compositing
+01:06.110  render           | Video append frame 158
+01:06.110  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:06.110  render           | Rendering frame 159
+01:06.110  render           | Start rendering: Scene, ViewLayer
+01:06.110  render           | Engine: EEVEE
+01:06.141  render           | Fra: 159 | Rendering 1 / 64 samples
+01:06.297  render           | Fra: 159 | Rendering 25 / 64 samples
+01:06.469  render           | Fra: 159 | Rendering 50 / 64 samples
+01:06.563  render           | Fra: 159 | Rendering 64 / 64 samples
+01:06.578  render           | Executing compositor
+01:06.578  render           | Fra: 159 | Compositing
+01:06.610  render           | Video append frame 159
+01:06.610  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:06.610  render           | Rendering frame 160
+01:06.610  render           | Start rendering: Scene, ViewLayer
+01:06.610  render           | Engine: EEVEE
+01:06.641  render           | Fra: 160 | Rendering 1 / 64 samples
+01:06.797  render           | Fra: 160 | Rendering 25 / 64 samples
+01:06.969  render           | Fra: 160 | Rendering 50 / 64 samples
+01:07.063  render           | Fra: 160 | Rendering 64 / 64 samples
+01:07.078  render           | Executing compositor
+01:07.078  render           | Fra: 160 | Compositing
+01:07.110  render           | Video append frame 160
+01:07.110  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:07.110  render           | Rendering frame 161
+01:07.110  render           | Start rendering: Scene, ViewLayer
+01:07.110  render           | Engine: EEVEE
+01:07.141  render           | Fra: 161 | Rendering 1 / 64 samples
+01:07.297  render           | Fra: 161 | Rendering 25 / 64 samples
+01:07.469  render           | Fra: 161 | Rendering 50 / 64 samples
+01:07.563  render           | Fra: 161 | Rendering 64 / 64 samples
+01:07.578  render           | Executing compositor
+01:07.578  render           | Fra: 161 | Compositing
+01:07.610  render           | Video append frame 161
+01:07.610  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:07.610  render           | Rendering frame 162
+01:07.610  render           | Start rendering: Scene, ViewLayer
+01:07.610  render           | Engine: EEVEE
+01:07.641  render           | Fra: 162 | Rendering 1 / 64 samples
+01:07.797  render           | Fra: 162 | Rendering 25 / 64 samples
+01:07.969  render           | Fra: 162 | Rendering 50 / 64 samples
+01:08.063  render           | Fra: 162 | Rendering 64 / 64 samples
+01:08.078  render           | Executing compositor
+01:08.078  render           | Fra: 162 | Compositing
+01:08.110  render           | Video append frame 162
+01:08.110  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:08.110  render           | Rendering frame 163
+01:08.110  render           | Start rendering: Scene, ViewLayer
+01:08.110  render           | Engine: EEVEE
+01:08.141  render           | Fra: 163 | Rendering 1 / 64 samples
+01:08.313  render           | Fra: 163 | Rendering 25 / 64 samples
+01:08.469  render           | Fra: 163 | Rendering 50 / 64 samples
+01:08.563  render           | Fra: 163 | Rendering 64 / 64 samples
+01:08.578  render           | Executing compositor
+01:08.578  render           | Fra: 163 | Compositing
+01:08.610  render           | Video append frame 163
+01:08.610  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:08.610  render           | Rendering frame 164
+01:08.610  render           | Start rendering: Scene, ViewLayer
+01:08.610  render           | Engine: EEVEE
+01:08.641  render           | Fra: 164 | Rendering 1 / 64 samples
+01:08.813  render           | Fra: 164 | Rendering 25 / 64 samples
+01:08.969  render           | Fra: 164 | Rendering 50 / 64 samples
+01:09.063  render           | Fra: 164 | Rendering 64 / 64 samples
+01:09.078  render           | Executing compositor
+01:09.078  render           | Fra: 164 | Compositing
+01:09.110  render           | Video append frame 164
+01:09.110  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:09.110  render           | Rendering frame 165
+01:09.110  render           | Start rendering: Scene, ViewLayer
+01:09.110  render           | Engine: EEVEE
+01:09.141  render           | Fra: 165 | Rendering 1 / 64 samples
+01:09.313  render           | Fra: 165 | Rendering 25 / 64 samples
+01:09.469  render           | Fra: 165 | Rendering 50 / 64 samples
+01:09.563  render           | Fra: 165 | Rendering 64 / 64 samples
+01:09.578  render           | Executing compositor
+01:09.578  render           | Fra: 165 | Compositing
+01:09.610  render           | Video append frame 165
+01:09.610  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:09.610  render           | Rendering frame 166
+01:09.610  render           | Start rendering: Scene, ViewLayer
+01:09.610  render           | Engine: EEVEE
+01:09.656  render           | Fra: 166 | Rendering 1 / 64 samples
+01:09.813  render           | Fra: 166 | Rendering 25 / 64 samples
+01:09.985  render           | Fra: 166 | Rendering 50 / 64 samples
+01:10.078  render           | Fra: 166 | Rendering 64 / 64 samples
+01:10.078  render           | Executing compositor
+01:10.078  render           | Fra: 166 | Compositing
+01:10.125  render           | Video append frame 166
+01:10.125  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:10.125  render           | Rendering frame 167
+01:10.125  render           | Start rendering: Scene, ViewLayer
+01:10.125  render           | Engine: EEVEE
+01:10.141  render           | Fra: 167 | Rendering 1 / 64 samples
+01:10.313  render           | Fra: 167 | Rendering 25 / 64 samples
+01:10.469  render           | Fra: 167 | Rendering 50 / 64 samples
+01:10.563  render           | Fra: 167 | Rendering 64 / 64 samples
+01:10.578  render           | Executing compositor
+01:10.578  render           | Fra: 167 | Compositing
+01:10.610  render           | Video append frame 167
+01:10.610  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:10.610  render           | Rendering frame 168
+01:10.610  render           | Start rendering: Scene, ViewLayer
+01:10.610  render           | Engine: EEVEE
+01:10.641  render           | Fra: 168 | Rendering 1 / 64 samples
+01:10.813  render           | Fra: 168 | Rendering 25 / 64 samples
+01:10.985  render           | Fra: 168 | Rendering 50 / 64 samples
+01:11.078  render           | Fra: 168 | Rendering 64 / 64 samples
+01:11.078  render           | Executing compositor
+01:11.078  render           | Fra: 168 | Compositing
+01:11.125  render           | Video append frame 168
+01:11.125  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:11.125  render           | Rendering frame 169
+01:11.125  render           | Start rendering: Scene, ViewLayer
+01:11.125  render           | Engine: EEVEE
+01:11.156  render           | Fra: 169 | Rendering 1 / 64 samples
+01:11.328  render           | Fra: 169 | Rendering 25 / 64 samples
+01:11.485  render           | Fra: 169 | Rendering 50 / 64 samples
+01:11.578  render           | Fra: 169 | Rendering 64 / 64 samples
+01:11.594  render           | Executing compositor
+01:11.594  render           | Fra: 169 | Compositing
+01:11.641  render           | Video append frame 169
+01:11.641  render           | Time: 00:00.51 (Saving: 00:00.02)
+01:11.641  render           | Rendering frame 170
+01:11.641  render           | Start rendering: Scene, ViewLayer
+01:11.641  render           | Engine: EEVEE
+01:11.672  render           | Fra: 170 | Rendering 1 / 64 samples
+01:11.828  render           | Fra: 170 | Rendering 25 / 64 samples
+01:12.000  render           | Fra: 170 | Rendering 50 / 64 samples
+01:12.094  render           | Fra: 170 | Rendering 64 / 64 samples
+01:12.110  render           | Executing compositor
+01:12.110  render           | Fra: 170 | Compositing
+01:12.141  render           | Video append frame 170
+01:12.141  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:12.141  render           | Rendering frame 171
+01:12.141  render           | Start rendering: Scene, ViewLayer
+01:12.141  render           | Engine: EEVEE
+01:12.172  render           | Fra: 171 | Rendering 1 / 64 samples
+01:12.344  render           | Fra: 171 | Rendering 25 / 64 samples
+01:12.500  render           | Fra: 171 | Rendering 50 / 64 samples
+01:12.594  render           | Fra: 171 | Rendering 64 / 64 samples
+01:12.610  render           | Executing compositor
+01:12.610  render           | Fra: 171 | Compositing
+01:12.641  render           | Video append frame 171
+01:12.641  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:12.641  render           | Rendering frame 172
+01:12.641  render           | Start rendering: Scene, ViewLayer
+01:12.641  render           | Engine: EEVEE
+01:12.672  render           | Fra: 172 | Rendering 1 / 64 samples
+01:12.828  render           | Fra: 172 | Rendering 25 / 64 samples
+01:13.000  render           | Fra: 172 | Rendering 50 / 64 samples
+01:13.094  render           | Fra: 172 | Rendering 64 / 64 samples
+01:13.110  render           | Executing compositor
+01:13.110  render           | Fra: 172 | Compositing
+01:13.141  render           | Video append frame 172
+01:13.141  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:13.141  render           | Rendering frame 173
+01:13.141  render           | Start rendering: Scene, ViewLayer
+01:13.141  render           | Engine: EEVEE
+01:13.172  render           | Fra: 173 | Rendering 1 / 64 samples
+01:13.328  render           | Fra: 173 | Rendering 25 / 64 samples
+01:13.500  render           | Fra: 173 | Rendering 50 / 64 samples
+01:13.594  render           | Fra: 173 | Rendering 64 / 64 samples
+01:13.610  render           | Executing compositor
+01:13.610  render           | Fra: 173 | Compositing
+01:13.641  render           | Video append frame 173
+01:13.641  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:13.641  render           | Rendering frame 174
+01:13.641  render           | Start rendering: Scene, ViewLayer
+01:13.641  render           | Engine: EEVEE
+01:13.672  render           | Fra: 174 | Rendering 1 / 64 samples
+01:13.844  render           | Fra: 174 | Rendering 25 / 64 samples
+01:14.000  render           | Fra: 174 | Rendering 50 / 64 samples
+01:14.094  render           | Fra: 174 | Rendering 64 / 64 samples
+01:14.110  render           | Executing compositor
+01:14.110  render           | Fra: 174 | Compositing
+01:14.141  render           | Video append frame 174
+01:14.141  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:14.141  render           | Rendering frame 175
+01:14.156  render           | Start rendering: Scene, ViewLayer
+01:14.156  render           | Engine: EEVEE
+01:14.172  render           | Fra: 175 | Rendering 1 / 64 samples
+01:14.344  render           | Fra: 175 | Rendering 25 / 64 samples
+01:14.516  render           | Fra: 175 | Rendering 50 / 64 samples
+01:14.610  render           | Fra: 175 | Rendering 64 / 64 samples
+01:14.610  render           | Executing compositor
+01:14.610  render           | Fra: 175 | Compositing
+01:14.641  render           | Video append frame 175
+01:14.641  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:14.656  render           | Rendering frame 176
+01:14.656  render           | Start rendering: Scene, ViewLayer
+01:14.656  render           | Engine: EEVEE
+01:14.672  render           | Fra: 176 | Rendering 1 / 64 samples
+01:14.844  render           | Fra: 176 | Rendering 25 / 64 samples
+01:15.000  render           | Fra: 176 | Rendering 50 / 64 samples
+01:15.094  render           | Fra: 176 | Rendering 64 / 64 samples
+01:15.110  render           | Executing compositor
+01:15.110  render           | Fra: 176 | Compositing
+01:15.141  render           | Video append frame 176
+01:15.141  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:15.141  render           | Rendering frame 177
+01:15.141  render           | Start rendering: Scene, ViewLayer
+01:15.141  render           | Engine: EEVEE
+01:15.172  render           | Fra: 177 | Rendering 1 / 64 samples
+01:15.344  render           | Fra: 177 | Rendering 25 / 64 samples
+01:15.516  render           | Fra: 177 | Rendering 50 / 64 samples
+01:15.610  render           | Fra: 177 | Rendering 64 / 64 samples
+01:15.625  render           | Executing compositor
+01:15.625  render           | Fra: 177 | Compositing
+01:15.656  render           | Video append frame 177
+01:15.656  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:15.656  render           | Rendering frame 178
+01:15.656  render           | Start rendering: Scene, ViewLayer
+01:15.656  render           | Engine: EEVEE
+01:15.688  render           | Fra: 178 | Rendering 1 / 64 samples
+01:15.844  render           | Fra: 178 | Rendering 25 / 64 samples
+01:16.016  render           | Fra: 178 | Rendering 50 / 64 samples
+01:16.110  render           | Fra: 178 | Rendering 64 / 64 samples
+01:16.125  render           | Executing compositor
+01:16.125  render           | Fra: 178 | Compositing
+01:16.156  render           | Video append frame 178
+01:16.156  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:16.156  render           | Rendering frame 179
+01:16.156  render           | Start rendering: Scene, ViewLayer
+01:16.156  render           | Engine: EEVEE
+01:16.188  render           | Fra: 179 | Rendering 1 / 64 samples
+01:16.360  render           | Fra: 179 | Rendering 25 / 64 samples
+01:16.516  render           | Fra: 179 | Rendering 50 / 64 samples
+01:16.610  render           | Fra: 179 | Rendering 64 / 64 samples
+01:16.625  render           | Executing compositor
+01:16.625  render           | Fra: 179 | Compositing
+01:16.656  render           | Video append frame 179
+01:16.656  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:16.656  render           | Rendering frame 180
+01:16.656  render           | Start rendering: Scene, ViewLayer
+01:16.656  render           | Engine: EEVEE
+01:16.688  render           | Fra: 180 | Rendering 1 / 64 samples
+01:16.844  render           | Fra: 180 | Rendering 25 / 64 samples
+01:17.016  render           | Fra: 180 | Rendering 50 / 64 samples
+01:17.110  render           | Fra: 180 | Rendering 64 / 64 samples
+01:17.125  render           | Executing compositor
+01:17.125  render           | Fra: 180 | Compositing
+01:17.156  render           | Video append frame 180
+01:17.156  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:17.156  render           | Rendering frame 181
+01:17.156  render           | Start rendering: Scene, ViewLayer
+01:17.156  render           | Engine: EEVEE
+01:17.188  render           | Fra: 181 | Rendering 1 / 64 samples
+01:17.344  render           | Fra: 181 | Rendering 25 / 64 samples
+01:17.516  render           | Fra: 181 | Rendering 50 / 64 samples
+01:17.610  render           | Fra: 181 | Rendering 64 / 64 samples
+01:17.625  render           | Executing compositor
+01:17.625  render           | Fra: 181 | Compositing
+01:17.656  render           | Video append frame 181
+01:17.656  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:17.656  render           | Rendering frame 182
+01:17.656  render           | Start rendering: Scene, ViewLayer
+01:17.656  render           | Engine: EEVEE
+01:17.688  render           | Fra: 182 | Rendering 1 / 64 samples
+01:17.844  render           | Fra: 182 | Rendering 25 / 64 samples
+01:18.016  render           | Fra: 182 | Rendering 50 / 64 samples
+01:18.110  render           | Fra: 182 | Rendering 64 / 64 samples
+01:18.125  render           | Executing compositor
+01:18.125  render           | Fra: 182 | Compositing
+01:18.156  render           | Video append frame 182
+01:18.156  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:18.156  render           | Rendering frame 183
+01:18.156  render           | Start rendering: Scene, ViewLayer
+01:18.156  render           | Engine: EEVEE
+01:18.188  render           | Fra: 183 | Rendering 1 / 64 samples
+01:18.344  render           | Fra: 183 | Rendering 25 / 64 samples
+01:18.516  render           | Fra: 183 | Rendering 50 / 64 samples
+01:18.610  render           | Fra: 183 | Rendering 64 / 64 samples
+01:18.625  render           | Executing compositor
+01:18.625  render           | Fra: 183 | Compositing
+01:18.656  render           | Video append frame 183
+01:18.656  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:18.656  render           | Rendering frame 184
+01:18.656  render           | Start rendering: Scene, ViewLayer
+01:18.656  render           | Engine: EEVEE
+01:18.688  render           | Fra: 184 | Rendering 1 / 64 samples
+01:18.860  render           | Fra: 184 | Rendering 25 / 64 samples
+01:19.016  render           | Fra: 184 | Rendering 50 / 64 samples
+01:19.110  render           | Fra: 184 | Rendering 64 / 64 samples
+01:19.125  render           | Executing compositor
+01:19.125  render           | Fra: 184 | Compositing
+01:19.156  render           | Video append frame 184
+01:19.156  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:19.156  render           | Rendering frame 185
+01:19.156  render           | Start rendering: Scene, ViewLayer
+01:19.156  render           | Engine: EEVEE
+01:19.188  render           | Fra: 185 | Rendering 1 / 64 samples
+01:19.360  render           | Fra: 185 | Rendering 25 / 64 samples
+01:19.531  render           | Fra: 185 | Rendering 50 / 64 samples
+01:19.625  render           | Fra: 185 | Rendering 64 / 64 samples
+01:19.641  render           | Executing compositor
+01:19.641  render           | Fra: 185 | Compositing
+01:19.672  render           | Video append frame 185
+01:19.672  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:19.672  render           | Rendering frame 186
+01:19.672  render           | Start rendering: Scene, ViewLayer
+01:19.672  render           | Engine: EEVEE
+01:19.703  render           | Fra: 186 | Rendering 1 / 64 samples
+01:19.875  render           | Fra: 186 | Rendering 25 / 64 samples
+01:20.031  render           | Fra: 186 | Rendering 50 / 64 samples
+01:20.125  render           | Fra: 186 | Rendering 64 / 64 samples
+01:20.141  render           | Executing compositor
+01:20.141  render           | Fra: 186 | Compositing
+01:20.172  render           | Video append frame 186
+01:20.172  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:20.172  render           | Rendering frame 187
+01:20.172  render           | Start rendering: Scene, ViewLayer
+01:20.172  render           | Engine: EEVEE
+01:20.203  render           | Fra: 187 | Rendering 1 / 64 samples
+01:20.375  render           | Fra: 187 | Rendering 25 / 64 samples
+01:20.547  render           | Fra: 187 | Rendering 50 / 64 samples
+01:20.641  render           | Fra: 187 | Rendering 64 / 64 samples
+01:20.641  render           | Executing compositor
+01:20.641  render           | Fra: 187 | Compositing
+01:20.688  render           | Video append frame 187
+01:20.688  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:20.688  render           | Rendering frame 188
+01:20.688  render           | Start rendering: Scene, ViewLayer
+01:20.688  render           | Engine: EEVEE
+01:20.719  render           | Fra: 188 | Rendering 1 / 64 samples
+01:20.875  render           | Fra: 188 | Rendering 25 / 64 samples
+01:21.047  render           | Fra: 188 | Rendering 50 / 64 samples
+01:21.156  render           | Fra: 188 | Rendering 64 / 64 samples
+01:21.156  render           | Executing compositor
+01:21.156  render           | Fra: 188 | Compositing
+01:21.188  render           | Video append frame 188
+01:21.188  render           | Time: 00:00.51 (Saving: 00:00.02)
+01:21.188  render           | Rendering frame 189
+01:21.188  render           | Start rendering: Scene, ViewLayer
+01:21.188  render           | Engine: EEVEE
+01:21.219  render           | Fra: 189 | Rendering 1 / 64 samples
+01:21.391  render           | Fra: 189 | Rendering 25 / 64 samples
+01:21.563  render           | Fra: 189 | Rendering 50 / 64 samples
+01:21.656  render           | Fra: 189 | Rendering 64 / 64 samples
+01:21.656  render           | Executing compositor
+01:21.656  render           | Fra: 189 | Compositing
+01:21.703  render           | Video append frame 189
+01:21.703  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:21.703  render           | Rendering frame 190
+01:21.703  render           | Start rendering: Scene, ViewLayer
+01:21.703  render           | Engine: EEVEE
+01:21.735  render           | Fra: 190 | Rendering 1 / 64 samples
+01:21.891  render           | Fra: 190 | Rendering 25 / 64 samples
+01:22.063  render           | Fra: 190 | Rendering 50 / 64 samples
+01:22.172  render           | Fra: 190 | Rendering 64 / 64 samples
+01:22.188  render           | Executing compositor
+01:22.188  render           | Fra: 190 | Compositing
+01:22.219  render           | Video append frame 190
+01:22.219  render           | Time: 00:00.51 (Saving: 00:00.02)
+01:22.219  render           | Rendering frame 191
+01:22.219  render           | Start rendering: Scene, ViewLayer
+01:22.219  render           | Engine: EEVEE
+01:22.250  render           | Fra: 191 | Rendering 1 / 64 samples
+01:22.406  render           | Fra: 191 | Rendering 25 / 64 samples
+01:22.578  render           | Fra: 191 | Rendering 50 / 64 samples
+01:22.672  render           | Fra: 191 | Rendering 64 / 64 samples
+01:22.688  render           | Executing compositor
+01:22.688  render           | Fra: 191 | Compositing
+01:22.719  render           | Video append frame 191
+01:22.719  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:22.719  render           | Rendering frame 192
+01:22.719  render           | Start rendering: Scene, ViewLayer
+01:22.719  render           | Engine: EEVEE
+01:22.750  render           | Fra: 192 | Rendering 1 / 64 samples
+01:22.906  render           | Fra: 192 | Rendering 25 / 64 samples
+01:23.078  render           | Fra: 192 | Rendering 50 / 64 samples
+01:23.172  render           | Fra: 192 | Rendering 64 / 64 samples
+01:23.188  render           | Executing compositor
+01:23.188  render           | Fra: 192 | Compositing
+01:23.219  render           | Video append frame 192
+01:23.219  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:23.219  render           | Rendering frame 193
+01:23.219  render           | Start rendering: Scene, ViewLayer
+01:23.219  render           | Engine: EEVEE
+01:23.250  render           | Fra: 193 | Rendering 1 / 64 samples
+01:23.422  render           | Fra: 193 | Rendering 25 / 64 samples
+01:23.594  render           | Fra: 193 | Rendering 50 / 64 samples
+01:23.688  render           | Fra: 193 | Rendering 64 / 64 samples
+01:23.688  render           | Executing compositor
+01:23.688  render           | Fra: 193 | Compositing
+01:23.735  render           | Video append frame 193
+01:23.735  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:23.735  render           | Rendering frame 194
+01:23.735  render           | Start rendering: Scene, ViewLayer
+01:23.735  render           | Engine: EEVEE
+01:23.750  render           | Fra: 194 | Rendering 1 / 64 samples
+01:23.922  render           | Fra: 194 | Rendering 25 / 64 samples
+01:24.094  render           | Fra: 194 | Rendering 50 / 64 samples
+01:24.188  render           | Fra: 194 | Rendering 64 / 64 samples
+01:24.203  render           | Executing compositor
+01:24.203  render           | Fra: 194 | Compositing
+01:24.235  render           | Video append frame 194
+01:24.235  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:24.235  render           | Rendering frame 195
+01:24.235  render           | Start rendering: Scene, ViewLayer
+01:24.235  render           | Engine: EEVEE
+01:24.266  render           | Fra: 195 | Rendering 1 / 64 samples
+01:24.422  render           | Fra: 195 | Rendering 25 / 64 samples
+01:24.594  render           | Fra: 195 | Rendering 50 / 64 samples
+01:24.688  render           | Fra: 195 | Rendering 64 / 64 samples
+01:24.688  render           | Executing compositor
+01:24.688  render           | Fra: 195 | Compositing
+01:24.719  render           | Video append frame 195
+01:24.719  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:24.719  render           | Rendering frame 196
+01:24.719  render           | Start rendering: Scene, ViewLayer
+01:24.719  render           | Engine: EEVEE
+01:24.750  render           | Fra: 196 | Rendering 1 / 64 samples
+01:24.922  render           | Fra: 196 | Rendering 25 / 64 samples
+01:25.094  render           | Fra: 196 | Rendering 50 / 64 samples
+01:25.188  render           | Fra: 196 | Rendering 64 / 64 samples
+01:25.188  render           | Executing compositor
+01:25.188  render           | Fra: 196 | Compositing
+01:25.219  render           | Video append frame 196
+01:25.219  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:25.219  render           | Rendering frame 197
+01:25.219  render           | Start rendering: Scene, ViewLayer
+01:25.219  render           | Engine: EEVEE
+01:25.250  render           | Fra: 197 | Rendering 1 / 64 samples
+01:25.422  render           | Fra: 197 | Rendering 25 / 64 samples
+01:25.578  render           | Fra: 197 | Rendering 50 / 64 samples
+01:25.688  render           | Fra: 197 | Rendering 64 / 64 samples
+01:25.688  render           | Executing compositor
+01:25.688  render           | Fra: 197 | Compositing
+01:25.719  render           | Video append frame 197
+01:25.719  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:25.719  render           | Rendering frame 198
+01:25.719  render           | Start rendering: Scene, ViewLayer
+01:25.719  render           | Engine: EEVEE
+01:25.750  render           | Fra: 198 | Rendering 1 / 64 samples
+01:25.922  render           | Fra: 198 | Rendering 25 / 64 samples
+01:26.094  render           | Fra: 198 | Rendering 50 / 64 samples
+01:26.188  render           | Fra: 198 | Rendering 64 / 64 samples
+01:26.188  render           | Executing compositor
+01:26.188  render           | Fra: 198 | Compositing
+01:26.235  render           | Video append frame 198
+01:26.235  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:26.235  render           | Rendering frame 199
+01:26.235  render           | Start rendering: Scene, ViewLayer
+01:26.235  render           | Engine: EEVEE
+01:26.266  render           | Fra: 199 | Rendering 1 / 64 samples
+01:26.422  render           | Fra: 199 | Rendering 25 / 64 samples
+01:26.594  render           | Fra: 199 | Rendering 50 / 64 samples
+01:26.688  render           | Fra: 199 | Rendering 64 / 64 samples
+01:26.688  render           | Executing compositor
+01:26.688  render           | Fra: 199 | Compositing
+01:26.735  render           | Video append frame 199
+01:26.735  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:26.735  render           | Rendering frame 200
+01:26.735  render           | Start rendering: Scene, ViewLayer
+01:26.735  render           | Engine: EEVEE
+01:26.750  render           | Fra: 200 | Rendering 1 / 64 samples
+01:26.922  render           | Fra: 200 | Rendering 25 / 64 samples
+01:27.094  render           | Fra: 200 | Rendering 50 / 64 samples
+01:27.188  render           | Fra: 200 | Rendering 64 / 64 samples
+01:27.203  render           | Executing compositor
+01:27.203  render           | Fra: 200 | Compositing
+01:27.235  render           | Video append frame 200
+01:27.235  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:27.235  render           | Rendering frame 201
+01:27.235  render           | Start rendering: Scene, ViewLayer
+01:27.235  render           | Engine: EEVEE
+01:27.266  render           | Fra: 201 | Rendering 1 / 64 samples
+01:27.422  render           | Fra: 201 | Rendering 25 / 64 samples
+01:27.594  render           | Fra: 201 | Rendering 50 / 64 samples
+01:27.688  render           | Fra: 201 | Rendering 64 / 64 samples
+01:27.703  render           | Executing compositor
+01:27.703  render           | Fra: 201 | Compositing
+01:27.735  render           | Video append frame 201
+01:27.735  render           | Time: 00:00.50 (Saving: 00:00.01)
+01:27.735  render           | Rendering frame 202
+01:27.735  render           | Start rendering: Scene, ViewLayer
+01:27.735  render           | Engine: EEVEE
+01:27.766  render           | Fra: 202 | Rendering 1 / 64 samples
+01:27.922  render           | Fra: 202 | Rendering 25 / 64 samples
+01:28.094  render           | Fra: 202 | Rendering 50 / 64 samples
+01:28.188  render           | Fra: 202 | Rendering 64 / 64 samples
+01:28.203  render           | Executing compositor
+01:28.203  render           | Fra: 202 | Compositing
+01:28.235  render           | Video append frame 202
+01:28.235  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:28.235  render           | Rendering frame 203
+01:28.235  render           | Start rendering: Scene, ViewLayer
+01:28.235  render           | Engine: EEVEE
+01:28.266  render           | Fra: 203 | Rendering 1 / 64 samples
+01:28.422  render           | Fra: 203 | Rendering 25 / 64 samples
+01:28.594  render           | Fra: 203 | Rendering 50 / 64 samples
+01:28.688  render           | Fra: 203 | Rendering 64 / 64 samples
+01:28.703  render           | Executing compositor
+01:28.703  render           | Fra: 203 | Compositing
+01:28.735  render           | Video append frame 203
+01:28.735  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:28.735  render           | Rendering frame 204
+01:28.735  render           | Start rendering: Scene, ViewLayer
+01:28.735  render           | Engine: EEVEE
+01:28.766  render           | Fra: 204 | Rendering 1 / 64 samples
+01:28.922  render           | Fra: 204 | Rendering 25 / 64 samples
+01:29.094  render           | Fra: 204 | Rendering 50 / 64 samples
+01:29.188  render           | Fra: 204 | Rendering 64 / 64 samples
+01:29.203  render           | Executing compositor
+01:29.203  render           | Fra: 204 | Compositing
+01:29.235  render           | Video append frame 204
+01:29.235  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:29.235  render           | Rendering frame 205
+01:29.235  render           | Start rendering: Scene, ViewLayer
+01:29.235  render           | Engine: EEVEE
+01:29.266  render           | Fra: 205 | Rendering 1 / 64 samples
+01:29.422  render           | Fra: 205 | Rendering 25 / 64 samples
+01:29.594  render           | Fra: 205 | Rendering 50 / 64 samples
+01:29.688  render           | Fra: 205 | Rendering 64 / 64 samples
+01:29.703  render           | Executing compositor
+01:29.703  render           | Fra: 205 | Compositing
+01:29.750  render           | Video append frame 205
+01:29.750  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:29.750  render           | Rendering frame 206
+01:29.750  render           | Start rendering: Scene, ViewLayer
+01:29.750  render           | Engine: EEVEE
+01:29.781  render           | Fra: 206 | Rendering 1 / 64 samples
+01:29.938  render           | Fra: 206 | Rendering 25 / 64 samples
+01:30.110  render           | Fra: 206 | Rendering 50 / 64 samples
+01:30.203  render           | Fra: 206 | Rendering 64 / 64 samples
+01:30.219  render           | Executing compositor
+01:30.219  render           | Fra: 206 | Compositing
+01:30.250  render           | Video append frame 206
+01:30.250  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:30.250  render           | Rendering frame 207
+01:30.250  render           | Start rendering: Scene, ViewLayer
+01:30.250  render           | Engine: EEVEE
+01:30.281  render           | Fra: 207 | Rendering 1 / 64 samples
+01:30.438  render           | Fra: 207 | Rendering 25 / 64 samples
+01:30.610  render           | Fra: 207 | Rendering 50 / 64 samples
+01:30.703  render           | Fra: 207 | Rendering 64 / 64 samples
+01:30.719  render           | Executing compositor
+01:30.719  render           | Fra: 207 | Compositing
+01:30.750  render           | Video append frame 207
+01:30.750  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:30.750  render           | Rendering frame 208
+01:30.750  render           | Start rendering: Scene, ViewLayer
+01:30.750  render           | Engine: EEVEE
+01:30.781  render           | Fra: 208 | Rendering 1 / 64 samples
+01:30.938  render           | Fra: 208 | Rendering 25 / 64 samples
+01:31.110  render           | Fra: 208 | Rendering 50 / 64 samples
+01:31.203  render           | Fra: 208 | Rendering 64 / 64 samples
+01:31.219  render           | Executing compositor
+01:31.219  render           | Fra: 208 | Compositing
+01:31.250  render           | Video append frame 208
+01:31.250  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:31.250  render           | Rendering frame 209
+01:31.250  render           | Start rendering: Scene, ViewLayer
+01:31.250  render           | Engine: EEVEE
+01:31.281  render           | Fra: 209 | Rendering 1 / 64 samples
+01:31.453  render           | Fra: 209 | Rendering 25 / 64 samples
+01:31.610  render           | Fra: 209 | Rendering 50 / 64 samples
+01:31.703  render           | Fra: 209 | Rendering 64 / 64 samples
+01:31.719  render           | Executing compositor
+01:31.719  render           | Fra: 209 | Compositing
+01:31.766  render           | Video append frame 209
+01:31.766  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:31.766  render           | Rendering frame 210
+01:31.766  render           | Start rendering: Scene, ViewLayer
+01:31.766  render           | Engine: EEVEE
+01:31.797  render           | Fra: 210 | Rendering 1 / 64 samples
+01:31.953  render           | Fra: 210 | Rendering 25 / 64 samples
+01:32.125  render           | Fra: 210 | Rendering 50 / 64 samples
+01:32.219  render           | Fra: 210 | Rendering 64 / 64 samples
+01:32.235  render           | Executing compositor
+01:32.235  render           | Fra: 210 | Compositing
+01:32.266  render           | Video append frame 210
+01:32.266  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:32.266  render           | Rendering frame 211
+01:32.266  render           | Start rendering: Scene, ViewLayer
+01:32.266  render           | Engine: EEVEE
+01:32.297  render           | Fra: 211 | Rendering 1 / 64 samples
+01:32.469  render           | Fra: 211 | Rendering 25 / 64 samples
+01:32.625  render           | Fra: 211 | Rendering 50 / 64 samples
+01:32.719  render           | Fra: 211 | Rendering 64 / 64 samples
+01:32.735  render           | Executing compositor
+01:32.735  render           | Fra: 211 | Compositing
+01:32.766  render           | Video append frame 211
+01:32.766  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:32.766  render           | Rendering frame 212
+01:32.766  render           | Start rendering: Scene, ViewLayer
+01:32.766  render           | Engine: EEVEE
+01:32.797  render           | Fra: 212 | Rendering 1 / 64 samples
+01:32.969  render           | Fra: 212 | Rendering 25 / 64 samples
+01:33.141  render           | Fra: 212 | Rendering 50 / 64 samples
+01:33.235  render           | Fra: 212 | Rendering 64 / 64 samples
+01:33.235  render           | Executing compositor
+01:33.235  render           | Fra: 212 | Compositing
+01:33.266  render           | Video append frame 212
+01:33.266  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:33.266  render           | Rendering frame 213
+01:33.266  render           | Start rendering: Scene, ViewLayer
+01:33.266  render           | Engine: EEVEE
+01:33.313  render           | Fra: 213 | Rendering 1 / 64 samples
+01:33.469  render           | Fra: 213 | Rendering 25 / 64 samples
+01:33.641  render           | Fra: 213 | Rendering 50 / 64 samples
+01:33.735  render           | Fra: 213 | Rendering 64 / 64 samples
+01:33.750  render           | Executing compositor
+01:33.750  render           | Fra: 213 | Compositing
+01:33.781  render           | Video append frame 213
+01:33.781  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:33.781  render           | Rendering frame 214
+01:33.781  render           | Start rendering: Scene, ViewLayer
+01:33.781  render           | Engine: EEVEE
+01:33.813  render           | Fra: 214 | Rendering 1 / 64 samples
+01:33.969  render           | Fra: 214 | Rendering 25 / 64 samples
+01:34.141  render           | Fra: 214 | Rendering 50 / 64 samples
+01:34.235  render           | Fra: 214 | Rendering 64 / 64 samples
+01:34.250  render           | Executing compositor
+01:34.250  render           | Fra: 214 | Compositing
+01:34.281  render           | Video append frame 214
+01:34.281  render           | Time: 00:00.49 (Saving: 00:00.01)
+01:34.281  render           | Rendering frame 215
+01:34.281  render           | Start rendering: Scene, ViewLayer
+01:34.281  render           | Engine: EEVEE
+01:34.313  render           | Fra: 215 | Rendering 1 / 64 samples
+01:34.469  render           | Fra: 215 | Rendering 25 / 64 samples
+01:34.641  render           | Fra: 215 | Rendering 50 / 64 samples
+01:34.735  render           | Fra: 215 | Rendering 64 / 64 samples
+01:34.750  render           | Executing compositor
+01:34.750  render           | Fra: 215 | Compositing
+01:34.781  render           | Video append frame 215
+01:34.781  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:34.781  render           | Rendering frame 216
+01:34.781  render           | Start rendering: Scene, ViewLayer
+01:34.781  render           | Engine: EEVEE
+01:34.813  render           | Fra: 216 | Rendering 1 / 64 samples
+01:34.969  render           | Fra: 216 | Rendering 25 / 64 samples
+01:35.141  render           | Fra: 216 | Rendering 50 / 64 samples
+01:35.235  render           | Fra: 216 | Rendering 64 / 64 samples
+01:35.250  render           | Executing compositor
+01:35.250  render           | Fra: 216 | Compositing
+01:35.281  render           | Video append frame 216
+01:35.281  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:35.281  render           | Rendering frame 217
+01:35.281  render           | Start rendering: Scene, ViewLayer
+01:35.281  render           | Engine: EEVEE
+01:35.313  render           | Fra: 217 | Rendering 1 / 64 samples
+01:35.469  render           | Fra: 217 | Rendering 25 / 64 samples
+01:35.641  render           | Fra: 217 | Rendering 50 / 64 samples
+01:35.735  render           | Fra: 217 | Rendering 64 / 64 samples
+01:35.750  render           | Executing compositor
+01:35.750  render           | Fra: 217 | Compositing
+01:35.781  render           | Video append frame 217
+01:35.781  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:35.781  render           | Rendering frame 218
+01:35.781  render           | Start rendering: Scene, ViewLayer
+01:35.781  render           | Engine: EEVEE
+01:35.813  render           | Fra: 218 | Rendering 1 / 64 samples
+01:35.969  render           | Fra: 218 | Rendering 25 / 64 samples
+01:36.156  render           | Fra: 218 | Rendering 50 / 64 samples
+01:36.250  render           | Fra: 218 | Rendering 64 / 64 samples
+01:36.266  render           | Executing compositor
+01:36.266  render           | Fra: 218 | Compositing
+01:36.297  render           | Video append frame 218
+01:36.297  render           | Time: 00:00.52 (Saving: 00:00.02)
+01:36.297  render           | Rendering frame 219
+01:36.297  render           | Start rendering: Scene, ViewLayer
+01:36.297  render           | Engine: EEVEE
+01:36.328  render           | Fra: 219 | Rendering 1 / 64 samples
+01:36.500  render           | Fra: 219 | Rendering 25 / 64 samples
+01:36.656  render           | Fra: 219 | Rendering 50 / 64 samples
+01:36.750  render           | Fra: 219 | Rendering 64 / 64 samples
+01:36.766  render           | Executing compositor
+01:36.766  render           | Fra: 219 | Compositing
+01:36.797  render           | Video append frame 219
+01:36.797  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:36.797  render           | Rendering frame 220
+01:36.797  render           | Start rendering: Scene, ViewLayer
+01:36.797  render           | Engine: EEVEE
+01:36.828  render           | Fra: 220 | Rendering 1 / 64 samples
+01:36.985  render           | Fra: 220 | Rendering 25 / 64 samples
+01:37.156  render           | Fra: 220 | Rendering 50 / 64 samples
+01:37.250  render           | Fra: 220 | Rendering 64 / 64 samples
+01:37.266  render           | Executing compositor
+01:37.266  render           | Fra: 220 | Compositing
+01:37.297  render           | Video append frame 220
+01:37.297  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:37.297  render           | Rendering frame 221
+01:37.297  render           | Start rendering: Scene, ViewLayer
+01:37.297  render           | Engine: EEVEE
+01:37.328  render           | Fra: 221 | Rendering 1 / 64 samples
+01:37.485  render           | Fra: 221 | Rendering 25 / 64 samples
+01:37.656  render           | Fra: 221 | Rendering 50 / 64 samples
+01:37.750  render           | Fra: 221 | Rendering 64 / 64 samples
+01:37.766  render           | Executing compositor
+01:37.766  render           | Fra: 221 | Compositing
+01:37.797  render           | Video append frame 221
+01:37.797  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:37.797  render           | Rendering frame 222
+01:37.797  render           | Start rendering: Scene, ViewLayer
+01:37.797  render           | Engine: EEVEE
+01:37.828  render           | Fra: 222 | Rendering 1 / 64 samples
+01:37.985  render           | Fra: 222 | Rendering 25 / 64 samples
+01:38.156  render           | Fra: 222 | Rendering 50 / 64 samples
+01:38.250  render           | Fra: 222 | Rendering 64 / 64 samples
+01:38.266  render           | Executing compositor
+01:38.266  render           | Fra: 222 | Compositing
+01:38.297  render           | Video append frame 222
+01:38.297  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:38.297  render           | Rendering frame 223
+01:38.297  render           | Start rendering: Scene, ViewLayer
+01:38.297  render           | Engine: EEVEE
+01:38.328  render           | Fra: 223 | Rendering 1 / 64 samples
+01:38.500  render           | Fra: 223 | Rendering 25 / 64 samples
+01:38.656  render           | Fra: 223 | Rendering 50 / 64 samples
+01:38.750  render           | Fra: 223 | Rendering 64 / 64 samples
+01:38.766  render           | Executing compositor
+01:38.766  render           | Fra: 223 | Compositing
+01:38.797  render           | Video append frame 223
+01:38.797  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:38.797  render           | Rendering frame 224
+01:38.797  render           | Start rendering: Scene, ViewLayer
+01:38.797  render           | Engine: EEVEE
+01:38.828  render           | Fra: 224 | Rendering 1 / 64 samples
+01:39.000  render           | Fra: 224 | Rendering 25 / 64 samples
+01:39.156  render           | Fra: 224 | Rendering 50 / 64 samples
+01:39.250  render           | Fra: 224 | Rendering 64 / 64 samples
+01:39.266  render           | Executing compositor
+01:39.266  render           | Fra: 224 | Compositing
+01:39.297  render           | Video append frame 224
+01:39.297  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:39.297  render           | Rendering frame 225
+01:39.297  render           | Start rendering: Scene, ViewLayer
+01:39.297  render           | Engine: EEVEE
+01:39.328  render           | Fra: 225 | Rendering 1 / 64 samples
+01:39.500  render           | Fra: 225 | Rendering 25 / 64 samples
+01:39.672  render           | Fra: 225 | Rendering 50 / 64 samples
+01:39.766  render           | Fra: 225 | Rendering 64 / 64 samples
+01:39.766  render           | Executing compositor
+01:39.766  render           | Fra: 225 | Compositing
+01:39.797  render           | Video append frame 225
+01:39.797  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:39.797  render           | Rendering frame 226
+01:39.797  render           | Start rendering: Scene, ViewLayer
+01:39.797  render           | Engine: EEVEE
+01:39.828  render           | Fra: 226 | Rendering 1 / 64 samples
+01:40.000  render           | Fra: 226 | Rendering 25 / 64 samples
+01:40.156  render           | Fra: 226 | Rendering 50 / 64 samples
+01:40.250  render           | Fra: 226 | Rendering 64 / 64 samples
+01:40.266  render           | Executing compositor
+01:40.266  render           | Fra: 226 | Compositing
+01:40.297  render           | Video append frame 226
+01:40.297  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:40.297  render           | Rendering frame 227
+01:40.297  render           | Start rendering: Scene, ViewLayer
+01:40.297  render           | Engine: EEVEE
+01:40.328  render           | Fra: 227 | Rendering 1 / 64 samples
+01:40.500  render           | Fra: 227 | Rendering 25 / 64 samples
+01:40.656  render           | Fra: 227 | Rendering 50 / 64 samples
+01:40.750  render           | Fra: 227 | Rendering 64 / 64 samples
+01:40.766  render           | Executing compositor
+01:40.766  render           | Fra: 227 | Compositing
+01:40.797  render           | Video append frame 227
+01:40.797  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:40.797  render           | Rendering frame 228
+01:40.797  render           | Start rendering: Scene, ViewLayer
+01:40.797  render           | Engine: EEVEE
+01:40.828  render           | Fra: 228 | Rendering 1 / 64 samples
+01:41.000  render           | Fra: 228 | Rendering 25 / 64 samples
+01:41.172  render           | Fra: 228 | Rendering 50 / 64 samples
+01:41.266  render           | Fra: 228 | Rendering 64 / 64 samples
+01:41.266  render           | Executing compositor
+01:41.266  render           | Fra: 228 | Compositing
+01:41.297  render           | Video append frame 228
+01:41.297  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:41.297  render           | Rendering frame 229
+01:41.297  render           | Start rendering: Scene, ViewLayer
+01:41.297  render           | Engine: EEVEE
+01:41.328  render           | Fra: 229 | Rendering 1 / 64 samples
+01:41.500  render           | Fra: 229 | Rendering 25 / 64 samples
+01:41.672  render           | Fra: 229 | Rendering 50 / 64 samples
+01:41.750  render           | Fra: 229 | Rendering 64 / 64 samples
+01:41.766  render           | Executing compositor
+01:41.766  render           | Fra: 229 | Compositing
+01:41.797  render           | Video append frame 229
+01:41.797  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:41.797  render           | Rendering frame 230
+01:41.797  render           | Start rendering: Scene, ViewLayer
+01:41.797  render           | Engine: EEVEE
+01:41.828  render           | Fra: 230 | Rendering 1 / 64 samples
+01:42.000  render           | Fra: 230 | Rendering 25 / 64 samples
+01:42.156  render           | Fra: 230 | Rendering 50 / 64 samples
+01:42.250  render           | Fra: 230 | Rendering 64 / 64 samples
+01:42.266  render           | Executing compositor
+01:42.266  render           | Fra: 230 | Compositing
+01:42.297  render           | Video append frame 230
+01:42.297  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:42.297  render           | Rendering frame 231
+01:42.297  render           | Start rendering: Scene, ViewLayer
+01:42.297  render           | Engine: EEVEE
+01:42.328  render           | Fra: 231 | Rendering 1 / 64 samples
+01:42.500  render           | Fra: 231 | Rendering 25 / 64 samples
+01:42.672  render           | Fra: 231 | Rendering 50 / 64 samples
+01:42.766  render           | Fra: 231 | Rendering 64 / 64 samples
+01:42.766  render           | Executing compositor
+01:42.766  render           | Fra: 231 | Compositing
+01:42.797  render           | Video append frame 231
+01:42.797  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:42.797  render           | Rendering frame 232
+01:42.797  render           | Start rendering: Scene, ViewLayer
+01:42.797  render           | Engine: EEVEE
+01:42.828  render           | Fra: 232 | Rendering 1 / 64 samples
+01:43.000  render           | Fra: 232 | Rendering 25 / 64 samples
+01:43.172  render           | Fra: 232 | Rendering 50 / 64 samples
+01:43.266  render           | Fra: 232 | Rendering 64 / 64 samples
+01:43.266  render           | Executing compositor
+01:43.266  render           | Fra: 232 | Compositing
+01:43.313  render           | Video append frame 232
+01:43.313  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:43.313  render           | Rendering frame 233
+01:43.313  render           | Start rendering: Scene, ViewLayer
+01:43.313  render           | Engine: EEVEE
+01:43.344  render           | Fra: 233 | Rendering 1 / 64 samples
+01:43.500  render           | Fra: 233 | Rendering 25 / 64 samples
+01:43.672  render           | Fra: 233 | Rendering 50 / 64 samples
+01:43.766  render           | Fra: 233 | Rendering 64 / 64 samples
+01:43.781  render           | Executing compositor
+01:43.781  render           | Fra: 233 | Compositing
+01:43.813  render           | Video append frame 233
+01:43.813  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:43.813  render           | Rendering frame 234
+01:43.813  render           | Start rendering: Scene, ViewLayer
+01:43.813  render           | Engine: EEVEE
+01:43.844  render           | Fra: 234 | Rendering 1 / 64 samples
+01:44.000  render           | Fra: 234 | Rendering 25 / 64 samples
+01:44.172  render           | Fra: 234 | Rendering 50 / 64 samples
+01:44.266  render           | Fra: 234 | Rendering 64 / 64 samples
+01:44.281  render           | Executing compositor
+01:44.281  render           | Fra: 234 | Compositing
+01:44.313  render           | Video append frame 234
+01:44.313  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:44.313  render           | Rendering frame 235
+01:44.313  render           | Start rendering: Scene, ViewLayer
+01:44.313  render           | Engine: EEVEE
+01:44.344  render           | Fra: 235 | Rendering 1 / 64 samples
+01:44.500  render           | Fra: 235 | Rendering 25 / 64 samples
+01:44.672  render           | Fra: 235 | Rendering 50 / 64 samples
+01:44.766  render           | Fra: 235 | Rendering 64 / 64 samples
+01:44.781  render           | Executing compositor
+01:44.781  render           | Fra: 235 | Compositing
+01:44.813  render           | Video append frame 235
+01:44.813  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:44.813  render           | Rendering frame 236
+01:44.813  render           | Start rendering: Scene, ViewLayer
+01:44.813  render           | Engine: EEVEE
+01:44.844  render           | Fra: 236 | Rendering 1 / 64 samples
+01:45.000  render           | Fra: 236 | Rendering 25 / 64 samples
+01:45.172  render           | Fra: 236 | Rendering 50 / 64 samples
+01:45.266  render           | Fra: 236 | Rendering 64 / 64 samples
+01:45.281  render           | Executing compositor
+01:45.281  render           | Fra: 236 | Compositing
+01:45.313  render           | Video append frame 236
+01:45.313  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:45.313  render           | Rendering frame 237
+01:45.313  render           | Start rendering: Scene, ViewLayer
+01:45.313  render           | Engine: EEVEE
+01:45.344  render           | Fra: 237 | Rendering 1 / 64 samples
+01:45.500  render           | Fra: 237 | Rendering 25 / 64 samples
+01:45.672  render           | Fra: 237 | Rendering 50 / 64 samples
+01:45.766  render           | Fra: 237 | Rendering 64 / 64 samples
+01:45.781  render           | Executing compositor
+01:45.781  render           | Fra: 237 | Compositing
+01:45.813  render           | Video append frame 237
+01:45.813  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:45.813  render           | Rendering frame 238
+01:45.813  render           | Start rendering: Scene, ViewLayer
+01:45.813  render           | Engine: EEVEE
+01:45.844  render           | Fra: 238 | Rendering 1 / 64 samples
+01:46.000  render           | Fra: 238 | Rendering 25 / 64 samples
+01:46.172  render           | Fra: 238 | Rendering 50 / 64 samples
+01:46.281  render           | Fra: 238 | Rendering 64 / 64 samples
+01:46.281  render           | Executing compositor
+01:46.281  render           | Fra: 238 | Compositing
+01:46.313  render           | Video append frame 238
+01:46.313  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:46.313  render           | Rendering frame 239
+01:46.328  render           | Start rendering: Scene, ViewLayer
+01:46.328  render           | Engine: EEVEE
+01:46.344  render           | Fra: 239 | Rendering 1 / 64 samples
+01:46.516  render           | Fra: 239 | Rendering 25 / 64 samples
+01:46.672  render           | Fra: 239 | Rendering 50 / 64 samples
+01:46.766  render           | Fra: 239 | Rendering 64 / 64 samples
+01:46.781  render           | Executing compositor
+01:46.781  render           | Fra: 239 | Compositing
+01:46.813  render           | Video append frame 239
+01:46.813  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:46.813  render           | Rendering frame 240
+01:46.813  render           | Start rendering: Scene, ViewLayer
+01:46.813  render           | Engine: EEVEE
+01:46.844  render           | Fra: 240 | Rendering 1 / 64 samples
+01:47.016  render           | Fra: 240 | Rendering 25 / 64 samples
+01:47.172  render           | Fra: 240 | Rendering 50 / 64 samples
+01:47.266  render           | Fra: 240 | Rendering 64 / 64 samples
+01:47.281  render           | Executing compositor
+01:47.281  render           | Fra: 240 | Compositing
+01:47.313  render           | Video append frame 240
+01:47.313  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:47.313  render           | Rendering frame 241
+01:47.313  render           | Start rendering: Scene, ViewLayer
+01:47.313  render           | Engine: EEVEE
+01:47.344  render           | Fra: 241 | Rendering 1 / 64 samples
+01:47.516  render           | Fra: 241 | Rendering 25 / 64 samples
+01:47.688  render           | Fra: 241 | Rendering 50 / 64 samples
+01:47.781  render           | Fra: 241 | Rendering 64 / 64 samples
+01:47.781  render           | Executing compositor
+01:47.781  render           | Fra: 241 | Compositing
+01:47.828  render           | Video append frame 241
+01:47.828  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:47.828  render           | Rendering frame 242
+01:47.828  render           | Start rendering: Scene, ViewLayer
+01:47.828  render           | Engine: EEVEE
+01:47.860  render           | Fra: 242 | Rendering 1 / 64 samples
+01:48.016  render           | Fra: 242 | Rendering 25 / 64 samples
+01:48.188  render           | Fra: 242 | Rendering 50 / 64 samples
+01:48.281  render           | Fra: 242 | Rendering 64 / 64 samples
+01:48.281  render           | Executing compositor
+01:48.297  render           | Fra: 242 | Compositing
+01:48.328  render           | Video append frame 242
+01:48.328  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:48.328  render           | Rendering frame 243
+01:48.328  render           | Start rendering: Scene, ViewLayer
+01:48.328  render           | Engine: EEVEE
+01:48.360  render           | Fra: 243 | Rendering 1 / 64 samples
+01:48.516  render           | Fra: 243 | Rendering 25 / 64 samples
+01:48.688  render           | Fra: 243 | Rendering 50 / 64 samples
+01:48.781  render           | Fra: 243 | Rendering 64 / 64 samples
+01:48.797  render           | Executing compositor
+01:48.797  render           | Fra: 243 | Compositing
+01:48.828  render           | Video append frame 243
+01:48.828  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:48.828  render           | Rendering frame 244
+01:48.828  render           | Start rendering: Scene, ViewLayer
+01:48.828  render           | Engine: EEVEE
+01:48.860  render           | Fra: 244 | Rendering 1 / 64 samples
+01:49.016  render           | Fra: 244 | Rendering 25 / 64 samples
+01:49.188  render           | Fra: 244 | Rendering 50 / 64 samples
+01:49.281  render           | Fra: 244 | Rendering 64 / 64 samples
+01:49.297  render           | Executing compositor
+01:49.297  render           | Fra: 244 | Compositing
+01:49.328  render           | Video append frame 244
+01:49.328  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:49.328  render           | Rendering frame 245
+01:49.328  render           | Start rendering: Scene, ViewLayer
+01:49.328  render           | Engine: EEVEE
+01:49.360  render           | Fra: 245 | Rendering 1 / 64 samples
+01:49.516  render           | Fra: 245 | Rendering 25 / 64 samples
+01:49.688  render           | Fra: 245 | Rendering 50 / 64 samples
+01:49.781  render           | Fra: 245 | Rendering 64 / 64 samples
+01:49.797  render           | Executing compositor
+01:49.797  render           | Fra: 245 | Compositing
+01:49.828  render           | Video append frame 245
+01:49.828  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:49.828  render           | Rendering frame 246
+01:49.828  render           | Start rendering: Scene, ViewLayer
+01:49.828  render           | Engine: EEVEE
+01:49.860  render           | Fra: 246 | Rendering 1 / 64 samples
+01:50.016  render           | Fra: 246 | Rendering 25 / 64 samples
+01:50.188  render           | Fra: 246 | Rendering 50 / 64 samples
+01:50.281  render           | Fra: 246 | Rendering 64 / 64 samples
+01:50.297  render           | Executing compositor
+01:50.297  render           | Fra: 246 | Compositing
+01:50.328  render           | Video append frame 246
+01:50.328  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:50.328  render           | Rendering frame 247
+01:50.328  render           | Start rendering: Scene, ViewLayer
+01:50.328  render           | Engine: EEVEE
+01:50.360  render           | Fra: 247 | Rendering 1 / 64 samples
+01:50.516  render           | Fra: 247 | Rendering 25 / 64 samples
+01:50.688  render           | Fra: 247 | Rendering 50 / 64 samples
+01:50.781  render           | Fra: 247 | Rendering 64 / 64 samples
+01:50.797  render           | Executing compositor
+01:50.797  render           | Fra: 247 | Compositing
+01:50.828  render           | Video append frame 247
+01:50.828  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:50.828  render           | Rendering frame 248
+01:50.828  render           | Start rendering: Scene, ViewLayer
+01:50.828  render           | Engine: EEVEE
+01:50.860  render           | Fra: 248 | Rendering 1 / 64 samples
+01:51.031  render           | Fra: 248 | Rendering 25 / 64 samples
+01:51.188  render           | Fra: 248 | Rendering 50 / 64 samples
+01:51.297  render           | Fra: 248 | Rendering 64 / 64 samples
+01:51.297  render           | Executing compositor
+01:51.297  render           | Fra: 248 | Compositing
+01:51.328  render           | Video append frame 248
+01:51.328  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:51.328  render           | Rendering frame 249
+01:51.328  render           | Start rendering: Scene, ViewLayer
+01:51.328  render           | Engine: EEVEE
+01:51.375  render           | Fra: 249 | Rendering 1 / 64 samples
+01:51.531  render           | Fra: 249 | Rendering 25 / 64 samples
+01:51.703  render           | Fra: 249 | Rendering 50 / 64 samples
+01:51.797  render           | Fra: 249 | Rendering 64 / 64 samples
+01:51.813  render           | Executing compositor
+01:51.813  render           | Fra: 249 | Compositing
+01:51.844  render           | Video append frame 249
+01:51.844  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:51.844  render           | Rendering frame 250
+01:51.844  render           | Start rendering: Scene, ViewLayer
+01:51.844  render           | Engine: EEVEE
+01:51.875  render           | Fra: 250 | Rendering 1 / 64 samples
+01:52.031  render           | Fra: 250 | Rendering 25 / 64 samples
+01:52.203  render           | Fra: 250 | Rendering 50 / 64 samples
+01:52.297  render           | Fra: 250 | Rendering 64 / 64 samples
+01:52.313  render           | Executing compositor
+01:52.313  render           | Fra: 250 | Compositing
+01:52.344  render           | Video append frame 250
+01:52.344  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:52.344  render           | Rendering frame 251
+01:52.344  render           | Start rendering: Scene, ViewLayer
+01:52.344  render           | Engine: EEVEE
+01:52.375  render           | Fra: 251 | Rendering 1 / 64 samples
+01:52.531  render           | Fra: 251 | Rendering 25 / 64 samples
+01:52.703  render           | Fra: 251 | Rendering 50 / 64 samples
+01:52.797  render           | Fra: 251 | Rendering 64 / 64 samples
+01:52.813  render           | Executing compositor
+01:52.813  render           | Fra: 251 | Compositing
+01:52.844  render           | Video append frame 251
+01:52.844  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:52.844  render           | Rendering frame 252
+01:52.844  render           | Start rendering: Scene, ViewLayer
+01:52.844  render           | Engine: EEVEE
+01:52.875  render           | Fra: 252 | Rendering 1 / 64 samples
+01:53.047  render           | Fra: 252 | Rendering 25 / 64 samples
+01:53.219  render           | Fra: 252 | Rendering 50 / 64 samples
+01:53.313  render           | Fra: 252 | Rendering 64 / 64 samples
+01:53.313  render           | Executing compositor
+01:53.313  render           | Fra: 252 | Compositing
+01:53.360  render           | Video append frame 252
+01:53.360  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:53.360  render           | Rendering frame 253
+01:53.360  render           | Start rendering: Scene, ViewLayer
+01:53.360  render           | Engine: EEVEE
+01:53.391  render           | Fra: 253 | Rendering 1 / 64 samples
+01:53.547  render           | Fra: 253 | Rendering 25 / 64 samples
+01:53.719  render           | Fra: 253 | Rendering 50 / 64 samples
+01:53.813  render           | Fra: 253 | Rendering 64 / 64 samples
+01:53.828  render           | Executing compositor
+01:53.828  render           | Fra: 253 | Compositing
+01:53.860  render           | Video append frame 253
+01:53.860  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:53.860  render           | Rendering frame 254
+01:53.860  render           | Start rendering: Scene, ViewLayer
+01:53.860  render           | Engine: EEVEE
+01:53.891  render           | Fra: 254 | Rendering 1 / 64 samples
+01:54.063  render           | Fra: 254 | Rendering 25 / 64 samples
+01:54.235  render           | Fra: 254 | Rendering 50 / 64 samples
+01:54.328  render           | Fra: 254 | Rendering 64 / 64 samples
+01:54.344  render           | Executing compositor
+01:54.344  render           | Fra: 254 | Compositing
+01:54.375  render           | Video append frame 254
+01:54.375  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:54.375  render           | Rendering frame 255
+01:54.375  render           | Start rendering: Scene, ViewLayer
+01:54.375  render           | Engine: EEVEE
+01:54.406  render           | Fra: 255 | Rendering 1 / 64 samples
+01:54.563  render           | Fra: 255 | Rendering 25 / 64 samples
+01:54.735  render           | Fra: 255 | Rendering 50 / 64 samples
+01:54.828  render           | Fra: 255 | Rendering 64 / 64 samples
+01:54.844  render           | Executing compositor
+01:54.844  render           | Fra: 255 | Compositing
+01:54.875  render           | Video append frame 255
+01:54.875  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:54.875  render           | Rendering frame 256
+01:54.875  render           | Start rendering: Scene, ViewLayer
+01:54.875  render           | Engine: EEVEE
+01:54.906  render           | Fra: 256 | Rendering 1 / 64 samples
+01:55.063  render           | Fra: 256 | Rendering 25 / 64 samples
+01:55.235  render           | Fra: 256 | Rendering 50 / 64 samples
+01:55.328  render           | Fra: 256 | Rendering 64 / 64 samples
+01:55.344  render           | Executing compositor
+01:55.344  render           | Fra: 256 | Compositing
+01:55.375  render           | Video append frame 256
+01:55.375  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:55.375  render           | Rendering frame 257
+01:55.375  render           | Start rendering: Scene, ViewLayer
+01:55.375  render           | Engine: EEVEE
+01:55.406  render           | Fra: 257 | Rendering 1 / 64 samples
+01:55.563  render           | Fra: 257 | Rendering 25 / 64 samples
+01:55.735  render           | Fra: 257 | Rendering 50 / 64 samples
+01:55.828  render           | Fra: 257 | Rendering 64 / 64 samples
+01:55.844  render           | Executing compositor
+01:55.844  render           | Fra: 257 | Compositing
+01:55.875  render           | Video append frame 257
+01:55.875  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:55.875  render           | Rendering frame 258
+01:55.875  render           | Start rendering: Scene, ViewLayer
+01:55.875  render           | Engine: EEVEE
+01:55.906  render           | Fra: 258 | Rendering 1 / 64 samples
+01:56.078  render           | Fra: 258 | Rendering 25 / 64 samples
+01:56.235  render           | Fra: 258 | Rendering 50 / 64 samples
+01:56.328  render           | Fra: 258 | Rendering 64 / 64 samples
+01:56.344  render           | Executing compositor
+01:56.344  render           | Fra: 258 | Compositing
+01:56.375  render           | Video append frame 258
+01:56.375  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:56.375  render           | Rendering frame 259
+01:56.375  render           | Start rendering: Scene, ViewLayer
+01:56.375  render           | Engine: EEVEE
+01:56.406  render           | Fra: 259 | Rendering 1 / 64 samples
+01:56.578  render           | Fra: 259 | Rendering 25 / 64 samples
+01:56.735  render           | Fra: 259 | Rendering 50 / 64 samples
+01:56.828  render           | Fra: 259 | Rendering 64 / 64 samples
+01:56.844  render           | Executing compositor
+01:56.844  render           | Fra: 259 | Compositing
+01:56.875  render           | Video append frame 259
+01:56.875  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:56.875  render           | Rendering frame 260
+01:56.875  render           | Start rendering: Scene, ViewLayer
+01:56.875  render           | Engine: EEVEE
+01:56.906  render           | Fra: 260 | Rendering 1 / 64 samples
+01:57.078  render           | Fra: 260 | Rendering 25 / 64 samples
+01:57.250  render           | Fra: 260 | Rendering 50 / 64 samples
+01:57.344  render           | Fra: 260 | Rendering 64 / 64 samples
+01:57.344  render           | Executing compositor
+01:57.344  render           | Fra: 260 | Compositing
+01:57.391  render           | Video append frame 260
+01:57.391  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:57.391  render           | Rendering frame 261
+01:57.391  render           | Start rendering: Scene, ViewLayer
+01:57.391  render           | Engine: EEVEE
+01:57.422  render           | Fra: 261 | Rendering 1 / 64 samples
+01:57.578  render           | Fra: 261 | Rendering 25 / 64 samples
+01:57.750  render           | Fra: 261 | Rendering 50 / 64 samples
+01:57.844  render           | Fra: 261 | Rendering 64 / 64 samples
+01:57.844  render           | Executing compositor
+01:57.844  render           | Fra: 261 | Compositing
+01:57.891  render           | Video append frame 261
+01:57.891  render           | Time: 00:00.49 (Saving: 00:00.02)
+01:57.891  render           | Rendering frame 262
+01:57.891  render           | Start rendering: Scene, ViewLayer
+01:57.891  render           | Engine: EEVEE
+01:57.922  render           | Fra: 262 | Rendering 1 / 64 samples
+01:58.078  render           | Fra: 262 | Rendering 25 / 64 samples
+01:58.250  render           | Fra: 262 | Rendering 50 / 64 samples
+01:58.344  render           | Fra: 262 | Rendering 64 / 64 samples
+01:58.360  render           | Executing compositor
+01:58.360  render           | Fra: 262 | Compositing
+01:58.391  render           | Video append frame 262
+01:58.391  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:58.391  render           | Rendering frame 263
+01:58.391  render           | Start rendering: Scene, ViewLayer
+01:58.391  render           | Engine: EEVEE
+01:58.422  render           | Fra: 263 | Rendering 1 / 64 samples
+01:58.578  render           | Fra: 263 | Rendering 25 / 64 samples
+01:58.750  render           | Fra: 263 | Rendering 50 / 64 samples
+01:58.844  render           | Fra: 263 | Rendering 64 / 64 samples
+01:58.860  render           | Executing compositor
+01:58.860  render           | Fra: 263 | Compositing
+01:58.891  render           | Video append frame 263
+01:58.891  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:58.891  render           | Rendering frame 264
+01:58.891  render           | Start rendering: Scene, ViewLayer
+01:58.891  render           | Engine: EEVEE
+01:58.922  render           | Fra: 264 | Rendering 1 / 64 samples
+01:59.094  render           | Fra: 264 | Rendering 25 / 64 samples
+01:59.250  render           | Fra: 264 | Rendering 50 / 64 samples
+01:59.344  render           | Fra: 264 | Rendering 64 / 64 samples
+01:59.360  render           | Executing compositor
+01:59.360  render           | Fra: 264 | Compositing
+01:59.391  render           | Video append frame 264
+01:59.391  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:59.391  render           | Rendering frame 265
+01:59.391  render           | Start rendering: Scene, ViewLayer
+01:59.391  render           | Engine: EEVEE
+01:59.422  render           | Fra: 265 | Rendering 1 / 64 samples
+01:59.594  render           | Fra: 265 | Rendering 25 / 64 samples
+01:59.766  render           | Fra: 265 | Rendering 50 / 64 samples
+01:59.860  render           | Fra: 265 | Rendering 64 / 64 samples
+01:59.875  render           | Executing compositor
+01:59.875  render           | Fra: 265 | Compositing
+01:59.906  render           | Video append frame 265
+01:59.906  render           | Time: 00:00.50 (Saving: 00:00.02)
+01:59.906  render           | Rendering frame 266
+01:59.906  render           | Start rendering: Scene, ViewLayer
+01:59.906  render           | Engine: EEVEE
+01:59.938  render           | Fra: 266 | Rendering 1 / 64 samples
+02:00.094  render           | Fra: 266 | Rendering 25 / 64 samples
+02:00.266  render           | Fra: 266 | Rendering 50 / 64 samples
+02:00.360  render           | Fra: 266 | Rendering 64 / 64 samples
+02:00.360  render           | Executing compositor
+02:00.360  render           | Fra: 266 | Compositing
+02:00.406  render           | Video append frame 266
+02:00.406  render           | Time: 00:00.49 (Saving: 00:00.02)
+02:00.406  render           | Rendering frame 267
+02:00.406  render           | Start rendering: Scene, ViewLayer
+02:00.406  render           | Engine: EEVEE
+02:00.438  render           | Fra: 267 | Rendering 1 / 64 samples
+02:00.594  render           | Fra: 267 | Rendering 25 / 64 samples
+02:00.766  render           | Fra: 267 | Rendering 50 / 64 samples
+02:00.860  render           | Fra: 267 | Rendering 64 / 64 samples
+02:00.875  render           | Executing compositor
+02:00.875  render           | Fra: 267 | Compositing
+02:00.906  render           | Video append frame 267
+02:00.906  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:00.906  render           | Rendering frame 268
+02:00.906  render           | Start rendering: Scene, ViewLayer
+02:00.906  render           | Engine: EEVEE
+02:00.938  render           | Fra: 268 | Rendering 1 / 64 samples
+02:01.094  render           | Fra: 268 | Rendering 25 / 64 samples
+02:01.266  render           | Fra: 268 | Rendering 50 / 64 samples
+02:01.360  render           | Fra: 268 | Rendering 64 / 64 samples
+02:01.375  render           | Executing compositor
+02:01.375  render           | Fra: 268 | Compositing
+02:01.406  render           | Video append frame 268
+02:01.406  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:01.406  render           | Rendering frame 269
+02:01.406  render           | Start rendering: Scene, ViewLayer
+02:01.406  render           | Engine: EEVEE
+02:01.438  render           | Fra: 269 | Rendering 1 / 64 samples
+02:01.594  render           | Fra: 269 | Rendering 25 / 64 samples
+02:01.766  render           | Fra: 269 | Rendering 50 / 64 samples
+02:01.860  render           | Fra: 269 | Rendering 64 / 64 samples
+02:01.875  render           | Executing compositor
+02:01.875  render           | Fra: 269 | Compositing
+02:01.906  render           | Video append frame 269
+02:01.906  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:01.906  render           | Rendering frame 270
+02:01.906  render           | Start rendering: Scene, ViewLayer
+02:01.906  render           | Engine: EEVEE
+02:01.938  render           | Fra: 270 | Rendering 1 / 64 samples
+02:02.110  render           | Fra: 270 | Rendering 25 / 64 samples
+02:02.281  render           | Fra: 270 | Rendering 50 / 64 samples
+02:02.375  render           | Fra: 270 | Rendering 64 / 64 samples
+02:02.375  render           | Executing compositor
+02:02.375  render           | Fra: 270 | Compositing
+02:02.406  render           | Video append frame 270
+02:02.406  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:02.406  render           | Rendering frame 271
+02:02.406  render           | Start rendering: Scene, ViewLayer
+02:02.406  render           | Engine: EEVEE
+02:02.438  render           | Fra: 271 | Rendering 1 / 64 samples
+02:02.610  render           | Fra: 271 | Rendering 25 / 64 samples
+02:02.781  render           | Fra: 271 | Rendering 50 / 64 samples
+02:02.875  render           | Fra: 271 | Rendering 64 / 64 samples
+02:02.875  render           | Executing compositor
+02:02.875  render           | Fra: 271 | Compositing
+02:02.906  render           | Video append frame 271
+02:02.906  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:02.906  render           | Rendering frame 272
+02:02.906  render           | Start rendering: Scene, ViewLayer
+02:02.906  render           | Engine: EEVEE
+02:02.953  render           | Fra: 272 | Rendering 1 / 64 samples
+02:03.110  render           | Fra: 272 | Rendering 25 / 64 samples
+02:03.281  render           | Fra: 272 | Rendering 50 / 64 samples
+02:03.375  render           | Fra: 272 | Rendering 64 / 64 samples
+02:03.391  render           | Executing compositor
+02:03.391  render           | Fra: 272 | Compositing
+02:03.422  render           | Video append frame 272
+02:03.422  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:03.422  render           | Rendering frame 273
+02:03.422  render           | Start rendering: Scene, ViewLayer
+02:03.422  render           | Engine: EEVEE
+02:03.453  render           | Fra: 273 | Rendering 1 / 64 samples
+02:03.610  render           | Fra: 273 | Rendering 25 / 64 samples
+02:03.781  render           | Fra: 273 | Rendering 50 / 64 samples
+02:03.875  render           | Fra: 273 | Rendering 64 / 64 samples
+02:03.891  render           | Executing compositor
+02:03.891  render           | Fra: 273 | Compositing
+02:03.922  render           | Video append frame 273
+02:03.922  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:03.922  render           | Rendering frame 274
+02:03.922  render           | Start rendering: Scene, ViewLayer
+02:03.922  render           | Engine: EEVEE
+02:03.969  render           | Fra: 274 | Rendering 1 / 64 samples
+02:04.125  render           | Fra: 274 | Rendering 25 / 64 samples
+02:04.297  render           | Fra: 274 | Rendering 50 / 64 samples
+02:04.391  render           | Fra: 274 | Rendering 64 / 64 samples
+02:04.406  render           | Executing compositor
+02:04.406  render           | Fra: 274 | Compositing
+02:04.438  render           | Video append frame 274
+02:04.438  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:04.438  render           | Rendering frame 275
+02:04.438  render           | Start rendering: Scene, ViewLayer
+02:04.438  render           | Engine: EEVEE
+02:04.531  render           | Fra: 275 | Rendering 1 / 64 samples
+02:04.656  render           | Fra: 275 | Rendering 25 / 64 samples
+02:04.781  render           | Fra: 275 | Rendering 50 / 64 samples
+02:04.860  render           | Fra: 275 | Rendering 64 / 64 samples
+02:04.875  render           | Executing compositor
+02:04.875  render           | Fra: 275 | Compositing
+02:04.906  render           | Video append frame 275
+02:04.906  render           | Time: 00:00.47 (Saving: 00:00.02)
+02:04.906  render           | Rendering frame 276
+02:04.906  render           | Start rendering: Scene, ViewLayer
+02:04.906  render           | Engine: EEVEE
+02:04.938  render           | Fra: 276 | Rendering 1 / 64 samples
+02:05.094  render           | Fra: 276 | Rendering 25 / 64 samples
+02:05.266  render           | Fra: 276 | Rendering 50 / 64 samples
+02:05.360  render           | Fra: 276 | Rendering 64 / 64 samples
+02:05.375  render           | Executing compositor
+02:05.375  render           | Fra: 276 | Compositing
+02:05.406  render           | Video append frame 276
+02:05.406  render           | Time: 00:00.49 (Saving: 00:00.02)
+02:05.406  render           | Rendering frame 277
+02:05.406  render           | Start rendering: Scene, ViewLayer
+02:05.406  render           | Engine: EEVEE
+02:05.438  render           | Fra: 277 | Rendering 1 / 64 samples
+02:05.594  render           | Fra: 277 | Rendering 25 / 64 samples
+02:05.766  render           | Fra: 277 | Rendering 50 / 64 samples
+02:05.860  render           | Fra: 277 | Rendering 64 / 64 samples
+02:05.875  render           | Executing compositor
+02:05.875  render           | Fra: 277 | Compositing
+02:05.906  render           | Video append frame 277
+02:05.906  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:05.906  render           | Rendering frame 278
+02:05.906  render           | Start rendering: Scene, ViewLayer
+02:05.906  render           | Engine: EEVEE
+02:05.938  render           | Fra: 278 | Rendering 1 / 64 samples
+02:06.110  render           | Fra: 278 | Rendering 25 / 64 samples
+02:06.281  render           | Fra: 278 | Rendering 50 / 64 samples
+02:06.375  render           | Fra: 278 | Rendering 64 / 64 samples
+02:06.375  render           | Executing compositor
+02:06.375  render           | Fra: 278 | Compositing
+02:06.406  render           | Video append frame 278
+02:06.406  render           | Time: 00:00.49 (Saving: 00:00.02)
+02:06.406  render           | Rendering frame 279
+02:06.406  render           | Start rendering: Scene, ViewLayer
+02:06.406  render           | Engine: EEVEE
+02:06.438  render           | Fra: 279 | Rendering 1 / 64 samples
+02:06.610  render           | Fra: 279 | Rendering 25 / 64 samples
+02:06.781  render           | Fra: 279 | Rendering 50 / 64 samples
+02:06.875  render           | Fra: 279 | Rendering 64 / 64 samples
+02:06.891  render           | Executing compositor
+02:06.891  render           | Fra: 279 | Compositing
+02:06.922  render           | Video append frame 279
+02:06.922  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:06.922  render           | Rendering frame 280
+02:06.922  render           | Start rendering: Scene, ViewLayer
+02:06.922  render           | Engine: EEVEE
+02:06.953  render           | Fra: 280 | Rendering 1 / 64 samples
+02:07.110  render           | Fra: 280 | Rendering 25 / 64 samples
+02:07.281  render           | Fra: 280 | Rendering 50 / 64 samples
+02:07.375  render           | Fra: 280 | Rendering 64 / 64 samples
+02:07.391  render           | Executing compositor
+02:07.391  render           | Fra: 280 | Compositing
+02:07.422  render           | Video append frame 280
+02:07.422  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:07.422  render           | Rendering frame 281
+02:07.422  render           | Start rendering: Scene, ViewLayer
+02:07.422  render           | Engine: EEVEE
+02:07.453  render           | Fra: 281 | Rendering 1 / 64 samples
+02:07.610  render           | Fra: 281 | Rendering 25 / 64 samples
+02:07.781  render           | Fra: 281 | Rendering 50 / 64 samples
+02:07.875  render           | Fra: 281 | Rendering 64 / 64 samples
+02:07.891  render           | Executing compositor
+02:07.891  render           | Fra: 281 | Compositing
+02:07.922  render           | Video append frame 281
+02:07.922  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:07.922  render           | Rendering frame 282
+02:07.922  render           | Start rendering: Scene, ViewLayer
+02:07.922  render           | Engine: EEVEE
+02:07.953  render           | Fra: 282 | Rendering 1 / 64 samples
+02:08.125  render           | Fra: 282 | Rendering 25 / 64 samples
+02:08.281  render           | Fra: 282 | Rendering 50 / 64 samples
+02:08.375  render           | Fra: 282 | Rendering 64 / 64 samples
+02:08.391  render           | Executing compositor
+02:08.391  render           | Fra: 282 | Compositing
+02:08.422  render           | Video append frame 282
+02:08.422  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:08.422  render           | Rendering frame 283
+02:08.422  render           | Start rendering: Scene, ViewLayer
+02:08.422  render           | Engine: EEVEE
+02:08.453  render           | Fra: 283 | Rendering 1 / 64 samples
+02:08.625  render           | Fra: 283 | Rendering 25 / 64 samples
+02:08.797  render           | Fra: 283 | Rendering 50 / 64 samples
+02:08.891  render           | Fra: 283 | Rendering 64 / 64 samples
+02:08.906  render           | Executing compositor
+02:08.906  render           | Fra: 283 | Compositing
+02:08.938  render           | Video append frame 283
+02:08.938  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:08.938  render           | Rendering frame 284
+02:08.938  render           | Start rendering: Scene, ViewLayer
+02:08.938  render           | Engine: EEVEE
+02:08.969  render           | Fra: 284 | Rendering 1 / 64 samples
+02:09.125  render           | Fra: 284 | Rendering 25 / 64 samples
+02:09.297  render           | Fra: 284 | Rendering 50 / 64 samples
+02:09.391  render           | Fra: 284 | Rendering 64 / 64 samples
+02:09.406  render           | Executing compositor
+02:09.406  render           | Fra: 284 | Compositing
+02:09.438  render           | Video append frame 284
+02:09.438  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:09.438  render           | Rendering frame 285
+02:09.438  render           | Start rendering: Scene, ViewLayer
+02:09.438  render           | Engine: EEVEE
+02:09.469  render           | Fra: 285 | Rendering 1 / 64 samples
+02:09.625  render           | Fra: 285 | Rendering 25 / 64 samples
+02:09.797  render           | Fra: 285 | Rendering 50 / 64 samples
+02:09.891  render           | Fra: 285 | Rendering 64 / 64 samples
+02:09.906  render           | Executing compositor
+02:09.906  render           | Fra: 285 | Compositing
+02:09.938  render           | Video append frame 285
+02:09.938  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:09.938  render           | Rendering frame 286
+02:09.938  render           | Start rendering: Scene, ViewLayer
+02:09.938  render           | Engine: EEVEE
+02:09.969  render           | Fra: 286 | Rendering 1 / 64 samples
+02:10.141  render           | Fra: 286 | Rendering 25 / 64 samples
+02:10.313  render           | Fra: 286 | Rendering 50 / 64 samples
+02:10.406  render           | Fra: 286 | Rendering 64 / 64 samples
+02:10.406  render           | Executing compositor
+02:10.406  render           | Fra: 286 | Compositing
+02:10.453  render           | Video append frame 286
+02:10.453  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:10.453  render           | Rendering frame 287
+02:10.453  render           | Start rendering: Scene, ViewLayer
+02:10.453  render           | Engine: EEVEE
+02:10.485  render           | Fra: 287 | Rendering 1 / 64 samples
+02:10.641  render           | Fra: 287 | Rendering 25 / 64 samples
+02:10.813  render           | Fra: 287 | Rendering 50 / 64 samples
+02:10.906  render           | Fra: 287 | Rendering 64 / 64 samples
+02:10.922  render           | Executing compositor
+02:10.922  render           | Fra: 287 | Compositing
+02:10.953  render           | Video append frame 287
+02:10.953  render           | Time: 00:00.50 (Saving: 00:00.02)
+02:10.953  render           | Rendering frame 288
+02:10.953  render           | Start rendering: Scene, ViewLayer
+02:10.953  render           | Engine: EEVEE
+02:10.985  render           | Fra: 288 | Rendering 1 / 64 samples
+02:11.110  render           | Fra: 288 | Rendering 25 / 64 samples
+02:11.235  render           | Fra: 288 | Rendering 50 / 64 samples
+02:11.313  render           | Fra: 288 | Rendering 64 / 64 samples
+02:11.313  render           | Executing compositor
+02:11.313  render           | Fra: 288 | Compositing
+02:11.360  render           | Video append frame 288
+02:11.360  render           | Time: 00:00.40 (Saving: 00:00.02)
+BlenderMCP addon registered
+Reloading external rigs...
+Reloading external metarigs...
+BlenderMCP addon unregistered
+
+Blender quit

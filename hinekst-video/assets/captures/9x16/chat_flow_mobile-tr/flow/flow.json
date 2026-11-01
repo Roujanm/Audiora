@@ -1,0 +1,52 @@
+{
+ "dpr": 3.0,
+ "css": [
+  430,
+  932
+ ],
+ "steps": [
+  {
+   "file": "00.png",
+   "action": null
+  },
+  {
+   "action": "click",
+   "label": "Mesaj kutusu",
+   "rect": [
+    99,
+    821,
+    277,
+    42
+   ],
+   "point": [
+    237.5,
+    842.0
+   ],
+   "scroll_y": 0,
+   "file": "01.png"
+  },
+  {
+   "action": "fill",
+   "label": "Yazar",
+   "rect": [
+    99,
+    821,
+    277,
+    42
+   ],
+   "point": [
+    237.5,
+    842.0
+   ],
+   "text": "Ben de varım, 22:00'de lobide!",
+   "scroll_y": 0,
+   "file": "02.png"
+  },
+  {
+   "action": "press",
+   "label": "Gönderir",
+   "scroll_y": 0,
+   "file": "03.png"
+  }
+ ]
+}
