@@ -184,11 +184,11 @@ h2.eyebrow,
 /* ------------------------------------------------------------ surfaces */
 .panel {
   position: relative;
-  background: var(--glass), color-mix(in oklab, var(--bg-1) 72%, transparent);
+  /* no backdrop blur: over the moving background it made the GPU re-blur every panel every frame */
+  background: var(--glass), color-mix(in oklab, var(--bg-1) 86%, transparent);
   border: 1px solid var(--glass-line);
   border-radius: 20px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 18px 40px -22px rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(20px) saturate(140%);
 }
 
 .panel.pad {

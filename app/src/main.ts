@@ -1,6 +1,9 @@
 import { mount } from 'svelte';
 import './app.css';
 import App from './App.svelte';
+import { activity } from './lib/activity.svelte.ts';
+
+activity.start();
 
 // In the installed app the UI must feel like an app, not a web page: no browser context menu
 // ("Save image", "Inspect"…) except in text fields, and no reload / print / find / view-source

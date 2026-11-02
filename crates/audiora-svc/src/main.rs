@@ -390,7 +390,20 @@ fn main() -> ExitCode {
                 }
                 let cfg = channels::Config::load(&dir);
                 let devs = audiora_hal::list_devices().unwrap_or_default();
-                let pick = channels::resolve(&cfg, &devs, &audiora_hal::running_process_names()).master_out;
+                let resolved = channels::resolve(&cfg, &devs, &audiora_hal::running_process_names());
+                // Windows makes a newly installed output the default (VB-Audio's cable, Audiora's own
+                // driver). As the default, every program would play into the microphone cable:
+                // nobody hears it here and everyone in the call does. Put the default back on the
+                // output Audiora plays to.
+                if let (Some(default), Some(master)) = (devs.iter().find(|d| d.flow == audiora_hal::Flow::Render && d.is_default), current.as_deref()) {
+                    if default.id != master && channels::feeds_microphone(&default.name, resolved.mic_out.as_deref(), &devs) {
+                        match audiora_hal::set_default_device(master) {
+                            Ok(()) => println!("{} Windows made {} the default output; put it back on the speakers Audiora plays to", stamp(), default.name),
+                            Err(e) => eprintln!("{} could not restore the default output: {e}", stamp()),
+                        }
+                    }
+                }
+                let pick = resolved.master_out;
                 // two readings in a row: Windows settles the default a moment after a device arrives
                 seen = if pick.is_some() && pick != current { seen + 1 } else { 0 };
                 if seen >= 2 {

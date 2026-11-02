@@ -119,3 +119,33 @@ fn get_app_device(pid: u32, flow: i32) -> Result<Option<String>> {
     let text = hs.to_string();
     Ok(if text.is_empty() { None } else { from_policy_id(&text) })
 }
+
+/// `CPolicyConfigClient` and its `IPolicyConfig` interface (Windows 7 and later), the undocumented
+/// way the Sound settings change the default device.
+const CLSID_POLICY_CONFIG: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
+const IID_POLICY_CONFIG: GUID = GUID::from_u128(0xf8679f50_850a_41cf_9c72_430f290290c8);
+/// `SetDefaultEndpoint` after the three IUnknown slots and ten format / period / property methods.
+const SLOT_SET_DEFAULT: usize = 3 + 10;
+
+type SetDefaultFn = unsafe extern "system" fn(*mut c_void, windows::core::PCWSTR, i32) -> HRESULT;
+
+/// Makes `device_id` (an MMDevice render or capture endpoint id) the Windows default for every
+/// role: what Settings > System > Sound does when you pick a device there.
+pub fn set_default_device(device_id: &str) -> Result<()> {
+    use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
+    crate::wasapi::init_com();
+    let unk: windows::core::IUnknown = unsafe { CoCreateInstance(&CLSID_POLICY_CONFIG, None, CLSCTX_ALL) }
+        .map_err(|e| HalError(format!("policy config unavailable: {e}")))?;
+    let mut raw = std::ptr::null_mut();
+    unsafe { unk.query(&IID_POLICY_CONFIG, &mut raw) }.ok().map_err(|e| HalError(format!("policy config interface: {e}")))?;
+    // owns the reference query() added, released when it goes out of scope
+    let obj = unsafe { windows::core::IUnknown::from_raw(raw) };
+    let set: SetDefaultFn = unsafe { std::mem::transmute::<usize, SetDefaultFn>(*(*(raw as *const *const usize)).add(SLOT_SET_DEFAULT)) };
+    let id = HSTRING::from(device_id);
+    for role in 0..3 {
+        unsafe { set(obj.as_raw(), windows::core::PCWSTR(id.as_ptr()), role) }
+            .ok()
+            .map_err(|e| HalError(format!("set default device (role {role}): {e}")))?;
+    }
+    Ok(())
+}

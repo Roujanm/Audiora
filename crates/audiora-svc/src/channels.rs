@@ -211,10 +211,14 @@ pub fn resolve(cfg: &Config, devs: &[DeviceInfo], running: &[String]) -> Resolve
             let n = d.name.to_lowercase();
             d.flow == Flow::Render && n.contains(a) && n.contains(b)
         };
+        // VB-Audio has named its main input "CABLE Input" and "Speakers"; the "16 ch" one is the
+        // second input of the same cable
+        let vb = |d: &&DeviceInfo| d.flow == Flow::Render && driver_of(&d.name).as_deref() == Some("vb-audio virtual cable");
         r.mic_out = devs
             .iter()
             .find(|d| named(d, "audiora", "mic feed"))
-            .or_else(|| devs.iter().find(|d| named(d, "cable input", "vb-audio")))
+            .or_else(|| devs.iter().filter(vb).find(|d| !d.name.to_lowercase().contains("16")))
+            .or_else(|| devs.iter().find(vb))
             .map(|d| d.id.clone());
     }
     let mut used: HashSet<String> = HashSet::new();
@@ -348,6 +352,16 @@ fn driver_of(name: &str) -> Option<String> {
     let inner = name.rsplit_once('(')?.1.trim_end_matches(')').trim();
     let inner = inner.split_once("- ").filter(|(n, _)| n.chars().all(|c| c.is_ascii_digit())).map_or(inner, |(_, rest)| rest);
     (!inner.to_lowercase().contains("audiora")).then(|| inner.to_lowercase())
+}
+
+/// True for an output whose sound ends up in a microphone: Audiora's own endpoints, and every input
+/// of the cable that carries the processed microphone. None of them may be the Windows default.
+pub fn feeds_microphone(name: &str, mic_out: Option<&str>, devs: &[DeviceInfo]) -> bool {
+    if name.to_lowercase().starts_with("audiora ") {
+        return true;
+    }
+    let cable = mic_out.and_then(|id| devs.iter().find(|d| d.id == id)).and_then(|d| driver_of(&d.name));
+    cable.is_some() && driver_of(name) == cable
 }
 
 /// The capture endpoint every program can pick to hear the processed microphone: Audiora's own
@@ -931,6 +945,21 @@ mod tests {
         assert!(r.devices.iter().all(|d| d.is_none()), "{:?}", r.devices);
         assert_eq!(driver_of("CABLE In 16ch (2- VB-Audio Virtual Cable)").as_deref(), Some("vb-audio virtual cable"));
         assert_eq!(driver_of("Audiora Game (Audiora Virtual Audio)"), None);
+        // the names a newer VB-Audio release uses
+        let renamed = [
+            dev("Headphones (JBL Quantum 360)", Flow::Render, "jbl", true),
+            dev("Speakers (VB-Audio Virtual Cable)", Flow::Render, "spk", false),
+            dev("CABLE In 16 Ch (VB-Audio Virtual Cable)", Flow::Render, "c16", false),
+            dev("CABLE Output (VB-Audio Virtual Cable)", Flow::Capture, "cout", false),
+        ];
+        let r = resolve(&Config::default(), &renamed, &[]);
+        assert_eq!(r.mic_out.as_deref(), Some("spk"));
+        assert!(r.devices.iter().all(|d| d.is_none()), "{:?}", r.devices);
+        assert_eq!(r.master_out.as_deref(), Some("jbl"));
+        assert!(feeds_microphone("Speakers (VB-Audio Virtual Cable)", Some("spk"), &renamed));
+        assert!(feeds_microphone("CABLE In 16 Ch (VB-Audio Virtual Cable)", Some("spk"), &renamed));
+        assert!(!feeds_microphone("Headphones (JBL Quantum 360)", Some("spk"), &renamed));
+        assert!(feeds_microphone("Audiora Game (Audiora Virtual Audio)", None, &renamed));
 
         let dir = std::env::temp_dir().join(format!("audiora-microutes-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();

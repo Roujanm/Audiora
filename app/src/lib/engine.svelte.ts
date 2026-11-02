@@ -2,6 +2,7 @@
 // Components read `engine.*` and call its methods; nothing else touches the socket.
 
 import { stepMeter, stepSpectrum, type MeterState } from './ballistics.ts';
+import { activity } from './activity.svelte.ts';
 import { shortName } from './theme.ts';
 import { toast } from './toast.svelte.ts';
 import type {
@@ -128,6 +129,7 @@ class EngineClient {
   #nextId = 1;
   #pending = new Map<number, Pending>();
   #meterPaths: string[] = [];
+  #meterSkip = 0;
   #lastMeterAt = 0;
   #dirty = new Map<string, number>();
   #timers: number[] = [];
@@ -303,6 +305,8 @@ class EngineClient {
   }
 
   #applyMeters(values: number[]) {
+    // nobody sees a minimised window; in the background a third of the frames is plenty
+    if (!activity.visible || (!activity.focused && ++this.#meterSkip % 3 !== 0)) return;
     const now = performance.now();
     const elapsed = now - this.#lastMeterAt;
     this.#lastMeterAt = now;

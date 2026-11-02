@@ -1,5 +1,6 @@
 <script lang="ts">
   import { APP_CHANNEL_KEYS, appColor, appLabel, CHANNELS, channelMeta } from './lib/channels.ts';
+  import { activity } from './lib/activity.svelte.ts';
   import { dnd } from './lib/dnd.svelte.ts';
   import { engine } from './lib/engine.svelte.ts';
   import { ACCENTS, periodLabel, rateLabel, shortName, type AccentId } from './lib/theme.ts';
@@ -238,8 +239,8 @@
 
 {#if splash}<Splash ondone={() => (splash = false)} />{/if}
 
-<div class="app">
-  <div class="aurora" aria-hidden="true" style:--lvl={auroraLevel}><i></i><i></i><i></i><i></i><b class="sheen"></b><b class="dust"></b><b class="pulse"></b></div>
+<div class="app" class:calm={!activity.lively} class:away={!activity.visible}>
+  <div class="aurora" aria-hidden="true" style:--lvl={auroraLevel}><i></i><i></i><i></i><i></i><b class="pulse"></b></div>
 
   <div class="shell">
     <header class="top">
@@ -408,9 +409,9 @@
     isolation: isolate;
   }
 
-  /* ----- aurora: soft light fields, a slow sheen and drifting dust behind everything, brighter
-     while sound plays. Only transform and opacity animate (no blur filter, no repaint): the
-     compositor moves ready-made layers, so it costs next to nothing on the CPU and the GPU. */
+  /* ----- aurora: four soft light fields behind everything, brighter while sound plays. Only
+     transform and opacity animate (no blur filter, no repaint, nothing larger than the screen
+     needs to stay in memory), and it all stops while Audiora is in the background. */
   .aurora {
     position: fixed;
     inset: 0;
@@ -463,32 +464,6 @@
     animation: drift-d 29s ease-in-out infinite alternate;
   }
 
-  /* a wide, faint light that turns once every two minutes */
-  .aurora .sheen {
-    left: 50%;
-    top: 50%;
-    width: 160vmax;
-    height: 160vmax;
-    margin: -80vmax 0 0 -80vmax;
-    background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 255, 255, 0.035) 40deg, transparent 90deg, transparent 180deg, rgba(120, 170, 255, 0.03) 230deg, transparent 280deg);
-    animation: spin 120s linear infinite;
-  }
-
-  /* fine dust drifting upwards, drawn once as a tile and only moved */
-  .aurora .dust {
-    inset: -200px 0 0 0;
-    height: calc(100% + 400px);
-    opacity: 0.55;
-    background-image:
-      radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.5), transparent),
-      radial-gradient(1px 1px at 120px 160px, rgba(190, 215, 255, 0.45), transparent),
-      radial-gradient(1.5px 1.5px at 210px 80px, rgba(255, 255, 255, 0.35), transparent),
-      radial-gradient(1px 1px at 300px 240px, rgba(170, 240, 255, 0.4), transparent),
-      radial-gradient(1px 1px at 60px 300px, rgba(255, 255, 255, 0.3), transparent);
-    background-size: 340px 340px;
-    animation: rise 60s linear infinite;
-  }
-
   /* breathes with the music: only its opacity follows the level */
   .aurora .pulse {
     left: 50%;
@@ -527,23 +502,20 @@
     }
   }
 
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes rise {
-    to {
-      transform: translateY(-340px);
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .aurora i,
     .aurora b {
       animation: none;
     }
+  }
+
+  /* Audiora in the background: everything holds still; minimised: the background is not drawn */
+  .app.calm :global(*) {
+    animation-play-state: paused !important;
+  }
+
+  .app.away .aurora {
+    display: none;
   }
 
   /* ----- shell */
@@ -573,9 +545,8 @@
     margin: 14px 18px 0;
     padding: 8px 10px 8px 14px;
     border-radius: 18px;
-    background: var(--glass);
+    background: color-mix(in oklab, var(--bg-1) 88%, transparent);
     border: 1px solid var(--glass-line);
-    backdrop-filter: blur(22px) saturate(150%);
     box-shadow: var(--shadow-2);
   }
 
@@ -688,7 +659,6 @@
     border-radius: 999px;
     border: 1px solid var(--glass-line);
     background: var(--glass);
-    backdrop-filter: blur(14px);
     color: var(--text-2);
     font-weight: 600;
     font-size: 13px;

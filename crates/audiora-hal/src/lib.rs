@@ -19,7 +19,7 @@ mod wasapi;
 #[cfg(windows)]
 pub use endpoint::{endpoint_level, endpoint_mute, set_endpoint_level, set_endpoint_mute};
 #[cfg(windows)]
-pub use policy::{get_app_input, get_app_output, set_app_input, set_app_output};
+pub use policy::{get_app_input, get_app_output, set_app_input, set_app_output, set_default_device};
 #[cfg(windows)]
 pub use proc_loopback::ProcessCapture;
 /// Sample rate every per-application capture delivers.
